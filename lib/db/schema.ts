@@ -26,15 +26,54 @@ export const instituicoes = pgTable('instituicoes', {
 });
 
 // Tabela: Usuários (profissionais)
+// Better-Auth usa esta tabela como user. Campos senha, especialidade e instituicaoId
+// são específicos do domínio e não mapeados pelo adapter.
 export const usuarios = pgTable('usuarios', {
   id: uuid('id').primaryKey().defaultRandom(),
   instituicaoId: uuid('instituicao_id').references(() => instituicoes.id).notNull(),
   nome: text('nome').notNull(),
   email: text('email').unique().notNull(),
-  senha: text('senha').notNull(),
-  especialidade: especialidadeEnum('especialidade').notNull(),
+  senha: text('senha'), // usado apenas se migrar para auth própria; Better-Auth gerencia hash
+  especialidade: especialidadeEnum('especialidade'),
   registroProfissional: text('registro_profissional'), // CRM, COREN, CREFITO, etc
   ativo: boolean('ativo').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// Tabelas do Better-Auth
+export const sessions = pgTable('sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => usuarios.id, { onDelete: 'cascade' }).notNull(),
+  token: text('token').notNull().unique(),
+  expiresAt: timestamp('expires_at').notNull(),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const accounts = pgTable('accounts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => usuarios.id, { onDelete: 'cascade' }).notNull(),
+  accountId: text('account_id').notNull(),
+  providerId: text('provider_id').notNull(),
+  accessToken: text('access_token'),
+  refreshToken: text('refresh_token'),
+  idToken: text('id_token'),
+  accessTokenExpiresAt: timestamp('access_token_expires_at'),
+  refreshTokenExpiresAt: timestamp('refresh_token_expires_at'),
+  scope: text('scope'),
+  password: text('password'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const verifications = pgTable('verifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identifier: text('identifier').notNull(),
+  value: text('value').notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
