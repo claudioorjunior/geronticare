@@ -1,0 +1,34 @@
+name: Feature Request / Solicitação de Funcionalidade
+about: Suggest an idea for GerontiCare
+about_pt: Sugira uma ideia para o GerontiCare
+title: "[feature]: "
+labels: enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / Problema
+      description: What problem does this feature solve?
+      description_pt: Que problema essa funcionalidade resolve?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution / Solução Proposta
+      description: How should it work?
+      description_pt: Como deveria funcionar?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives / Alternativas
+      description: Any alternative solutions considered?
+      description_pt: Alguma alternativa considerada?
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context / Contexto Adicional
+      description: Screenshots, mockups, related issues
+      description_pt: Screenshots, mockups, issues relacionadas
