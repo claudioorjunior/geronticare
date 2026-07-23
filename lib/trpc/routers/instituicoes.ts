@@ -5,7 +5,6 @@ import { eq } from 'drizzle-orm';
 
 export const instituicoesRouter = createTRPCRouter({
   buscar: protectedProcedure.query(async ({ ctx }) => {
-    if (!ctx.instituicaoId) return null;
     return ctx.db.query.instituicoes.findFirst({
       where: eq(instituicoes.id, ctx.instituicaoId),
     });
@@ -30,9 +29,6 @@ export const instituicoesRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      if (!ctx.instituicaoId) {
-        throw new Error('Instituição não encontrada');
-      }
       const [instituicao] = await ctx.db
         .update(instituicoes)
         .set(input)
