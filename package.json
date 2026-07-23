@@ -13,11 +13,13 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@better-auth/drizzle-adapter": "^1.6.24",
     "@tanstack/react-query": "^5.101.4",
     "@trpc/client": "^11.13.0",
     "@trpc/next": "^11.13.0",
     "@trpc/react-query": "^11.13.0",
     "@trpc/server": "^11.13.0",
+    "better-auth": "^1.6.24",
     "drizzle-orm": "^0.45.2",
     "next": "16.2.11",
     "postgres": "^3.4.9",
