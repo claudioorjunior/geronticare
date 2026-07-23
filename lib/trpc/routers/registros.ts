@@ -208,4 +208,50 @@ export const registrosRouter = createTRPCRouter({
 
       return timeline;
     }),
+
+  anexar: protectedProcedure
+    .input(
+      z.object({
+        registroId: z.string().uuid(),
+        anexos: z.array(
+          z.object({
+            nome: z.string(),
+            url: z.string().url(),
+            tipo: z.string(),
+          })
+        ),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const registro = await ctx.db.query.registros.findFirst({
+        where: eq(registros.id, input.registroId),
+      });
+
+      if (!registro) {
+        throw new Error('Registro não encontrado');
+      }
+
+      // Valida que o paciente pertence à mesma instituição
+      const paciente = await ctx.db.query.pacientes.findFirst({
+        where: and(
+          eq(pacientes.id, registro.pacienteId),
+          eq(pacientes.instituicaoId, ctx.instituicaoId!)
+        ),
+      });
+
+      if (!paciente) {
+        throw new Error('Paciente não encontrado');
+      }
+
+      const anexosAtuais = registro.anexos ?? [];
+      const novosAnexos = [...anexosAtuais, ...input.anexos];
+
+      const [atualizado] = await ctx.db
+        .update(registros)
+        .set({ anexos: novosAnexos })
+        .where(eq(registros.id, input.registroId))
+        .returning();
+
+      return atualizado;
+    }),
 });
