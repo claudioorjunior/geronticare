@@ -1,0 +1,44 @@
+name: Bug Report / Reporte de Bug
+about: Report something that is not working
+about_pt: Reporte algo que não está funcionando
+title: "[bug]: "
+labels: bug
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description / Descrição
+      description: A clear and concise description of what the bug is.
+      description_pt: Uma descrição clara e concisa do que não está funcionando.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce / Passos para Reproduzir
+      description: 1. Go to '...' 2. Click on '...' 3. See error
+      description_pt: 1. Acesse '...' 2. Clique em '...' 3. Veja o erro
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior / Comportamento Esperado
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior / Comportamento Atual
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version / Versão
+      description: "v0.1.0"
+  - type: input
+    id: browser
+    attributes:
+      label: Browser / Navegador
+      description: "Chrome, Firefox, Safari, etc."
