@@ -4,14 +4,32 @@ import { avaliacoesGeriatricas, pacientes, usuarios } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { criarAvaliacaoSchema, interpretarEscala } from '@/lib/validations/escalas';
 
+// Helper: valida que paciente pertence à mesma instituição
+async function verificarOwnershipPaciente(
+  db: typeof import('@/lib/db').db,
+  pacienteId: string,
+  instituicaoId: string
+) {
+  const paciente = await db.query.pacientes.findFirst({
+    where: and(
+      eq(pacientes.id, pacienteId),
+      eq(pacientes.instituicaoId, instituicaoId)
+    ),
+  });
+  if (!paciente) {
+    throw new Error('Paciente não encontrado ou não pertence à sua instituição');
+  }
+  return paciente;
+}
+
 export const avaliacoesGeriatricasRouter = createTRPCRouter({
   listar: protectedProcedure
     .input(z.object({ pacienteId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
+      await verificarOwnershipPaciente(ctx.db, input.pacienteId, ctx.instituicaoId);
+
       return ctx.db.query.avaliacoesGeriatricas.findMany({
-        where: and(
-          eq(avaliacoesGeriatricas.pacienteId, input.pacienteId),
-        ),
+        where: eq(avaliacoesGeriatricas.pacienteId, input.pacienteId),
         orderBy: (avaliacoesGeriatricas, { desc }) => [desc(avaliacoesGeriatricas.dataAvaliacao)],
       });
     }),
@@ -25,7 +43,9 @@ export const avaliacoesGeriatricasRouter = createTRPCRouter({
 
       if (!avaliacao) return null;
 
-      // Inclui interpretação automática das escalas
+      // Verifica ownership do paciente antes de retornar
+      await verificarOwnershipPaciente(ctx.db, avaliacao.pacienteId, ctx.instituicaoId);
+
       return {
         ...avaliacao,
         interpretacao: {
@@ -42,23 +62,13 @@ export const avaliacoesGeriatricasRouter = createTRPCRouter({
   criar: protectedProcedure
     .input(criarAvaliacaoSchema)
     .mutation(async ({ ctx, input }) => {
-      // Valida que o paciente pertence à mesma instituição
-      const paciente = await ctx.db.query.pacientes.findFirst({
-        where: and(
-          eq(pacientes.id, input.pacienteId),
-          eq(pacientes.instituicaoId, ctx.instituicaoId!)
-        ),
-      });
-
-      if (!paciente) {
-        throw new Error('Paciente não encontrado');
-      }
+      await verificarOwnershipPaciente(ctx.db, input.pacienteId, ctx.instituicaoId);
 
       const [novaAvaliacao] = await ctx.db
         .insert(avaliacoesGeriatricas)
         .values({
           ...input,
-          profissionalId: ctx.userId!,
+          profissionalId: ctx.userId,
         })
         .returning();
 
@@ -68,7 +78,8 @@ export const avaliacoesGeriatricasRouter = createTRPCRouter({
   relatorio: protectedProcedure
     .input(z.object({ pacienteId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      // Busca a AGA mais recente
+      await verificarOwnershipPaciente(ctx.db, input.pacienteId, ctx.instituicaoId);
+
       const avaliacao = await ctx.db.query.avaliacoesGeriatricas.findFirst({
         where: eq(avaliacoesGeriatricas.pacienteId, input.pacienteId),
         orderBy: (avaliacoesGeriatricas, { desc }) => [desc(avaliacoesGeriatricas.dataAvaliacao)],
@@ -76,7 +87,6 @@ export const avaliacoesGeriatricasRouter = createTRPCRouter({
 
       if (!avaliacao) return null;
 
-      // Busca o profissional que aplicou
       const profissional = await ctx.db.query.usuarios.findFirst({
         where: eq(usuarios.id, avaliacao.profissionalId),
         columns: { nome: true, especialidade: true },

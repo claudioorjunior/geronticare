@@ -6,7 +6,7 @@ import { eq, and } from 'drizzle-orm';
 export const usuariosRouter = createTRPCRouter({
   listar: protectedProcedure.query(async ({ ctx }) => {
     return ctx.db.query.usuarios.findMany({
-      where: eq(usuarios.instituicaoId, ctx.instituicaoId!),
+      where: eq(usuarios.instituicaoId, ctx.instituicaoId),
       columns: {
         id: true,
         nome: true,
@@ -25,7 +25,7 @@ export const usuariosRouter = createTRPCRouter({
       return ctx.db.query.usuarios.findFirst({
         where: and(
           eq(usuarios.id, input.id),
-          eq(usuarios.instituicaoId, ctx.instituicaoId!)
+          eq(usuarios.instituicaoId, ctx.instituicaoId)
         ),
         columns: {
           id: true,
@@ -57,7 +57,7 @@ export const usuariosRouter = createTRPCRouter({
         .where(
           and(
             eq(usuarios.id, id),
-            eq(usuarios.instituicaoId, ctx.instituicaoId!)
+            eq(usuarios.instituicaoId, ctx.instituicaoId)
           )
         )
         .returning({
@@ -79,7 +79,7 @@ export const usuariosRouter = createTRPCRouter({
         .where(
           and(
             eq(usuarios.id, input.id),
-            eq(usuarios.instituicaoId, ctx.instituicaoId!)
+            eq(usuarios.instituicaoId, ctx.instituicaoId)
           )
         );
       return { success: true };

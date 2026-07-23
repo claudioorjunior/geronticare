@@ -22,12 +22,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const parsed = bodySchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Dados inválidos', details: parsed.error.flatten() }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Dados inválidos', details: parsed.error.flatten() },
+        { status: 400 }
+      );
     }
 
     const { pacienteId, nomeArquivo, tipoMime } = parsed.data;
 
-    // Busca instituicaoId do usuário
     const usuario = await db.query.usuarios.findFirst({
       where: eq(usuarios.id, session.user.id),
       columns: { instituicaoId: true },
@@ -37,7 +39,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Usuário sem instituição' }, { status: 403 });
     }
 
-    // Valida que o paciente pertence à mesma instituição
     const paciente = await db.query.pacientes.findFirst({
       where: and(
         eq(pacientes.id, pacienteId),
@@ -59,6 +60,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Erro ao gerar URL de upload:', error);
-    return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Erro interno';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
