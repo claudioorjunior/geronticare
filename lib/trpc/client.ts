@@ -1,4 +1,4 @@
-import { createTRPCClient, httpBatchLink } from '@trpc/client';
+import { httpBatchLink } from '@trpc/client';
 import { createTRPCReact } from '@trpc/react-query';
 import type { AppRouter } from './root';
 import superjson from 'superjson';
