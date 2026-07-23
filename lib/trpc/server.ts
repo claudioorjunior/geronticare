@@ -6,9 +6,15 @@ import { eq } from 'drizzle-orm';
 import superjson from 'superjson';
 
 export const createTRPCContext = async (opts: { headers: Headers }) => {
-  const session = await auth.api.getSession({
-    headers: opts.headers,
-  });
+  let session = null;
+  try {
+    session = await auth.api.getSession({
+      headers: opts.headers,
+    });
+  } catch {
+    // Erro de autenticação não deve derrubar toda request
+    session = null;
+  }
 
   // Busca instituicaoId no DB (Better-Auth não conhece campos customizados)
   let instituicaoId: string | null = null;
@@ -36,10 +42,16 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
 export const createTRPCRouter = t.router;
 export const publicProcedure = t.procedure;
 
-// Middleware de autenticação
+// Middleware de autenticação — exige userId E instituicaoId
 const isAuthenticated = t.middleware(({ ctx, next }) => {
   if (!ctx.userId) {
     throw new TRPCError({ code: 'UNAUTHORIZED' });
+  }
+  if (!ctx.instituicaoId) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Usuário não está vinculado a uma instituição',
+    });
   }
   return next({
     ctx: {

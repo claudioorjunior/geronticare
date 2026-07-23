@@ -8,7 +8,7 @@ export const pacientesRouter = createTRPCRouter({
     return ctx.db.query.pacientes.findMany({
       where: and(
         eq(pacientes.ativo, true),
-        eq(pacientes.instituicaoId, ctx.instituicaoId!)
+        eq(pacientes.instituicaoId, ctx.instituicaoId)
       ),
       orderBy: (pacientes, { desc }) => [desc(pacientes.createdAt)],
     });
@@ -20,7 +20,7 @@ export const pacientesRouter = createTRPCRouter({
       return ctx.db.query.pacientes.findFirst({
         where: and(
           eq(pacientes.id, input.id),
-          eq(pacientes.instituicaoId, ctx.instituicaoId!)
+          eq(pacientes.instituicaoId, ctx.instituicaoId)
         ),
       });
     }),
@@ -45,11 +45,22 @@ export const pacientesRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Valida unicidade de CPF se fornecido
+      if (input.cpf) {
+        const cpfExistente = await ctx.db.query.pacientes.findFirst({
+          where: eq(pacientes.cpf, input.cpf),
+          columns: { id: true },
+        });
+        if (cpfExistente) {
+          throw new Error('Já existe um paciente cadastrado com este CPF');
+        }
+      }
+
       const [novoPaciente] = await ctx.db
         .insert(pacientes)
         .values({
           ...input,
-          instituicaoId: ctx.instituicaoId!,
+          instituicaoId: ctx.instituicaoId,
         })
         .returning();
       return novoPaciente;
@@ -79,7 +90,7 @@ export const pacientesRouter = createTRPCRouter({
         .where(
           and(
             eq(pacientes.id, id),
-            eq(pacientes.instituicaoId, ctx.instituicaoId!)
+            eq(pacientes.instituicaoId, ctx.instituicaoId)
           )
         )
         .returning();
@@ -95,7 +106,7 @@ export const pacientesRouter = createTRPCRouter({
         .where(
           and(
             eq(pacientes.id, input.id),
-            eq(pacientes.instituicaoId, ctx.instituicaoId!)
+            eq(pacientes.instituicaoId, ctx.instituicaoId)
           )
         );
       return { success: true };
