@@ -3,15 +3,10 @@
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
-import { useState } from 'react';
+import { useDevRole } from '@/lib/dev/use-dev-role';
 
+// Dev-only shared role
 type Role = 'admin' | 'profissional' | 'usuario';
-
-// Dev helper - same as dashboard
-const useDevRole = () => {
-  const [role, setRole] = useState<Role>('profissional');
-  return { role, setRole };
-};
 
 const allTabs = [
   { label: 'Dados', path: '', roles: ['admin', 'profissional', 'usuario'] as const },
@@ -26,9 +21,8 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
   const params = useParams<{ id: string }>();
   const patientId = params.id;
 
-  const { role: userRole, setRole } = useDevRole();
+  const { role: userRole } = useDevRole();
 
-  // Safe filter (avoids strict TS narrowing on mixed role arrays)
   const tabs = allTabs.filter((tab) => (tab.roles as readonly string[]).includes(userRole));
 
   // TODO: fetch real patient header data via tRPC
@@ -58,19 +52,7 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
           </div>
         </div>
 
-        {/* Dev role switcher */}
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-slate-400">Papel:</span>
-          {(['admin', 'profissional', 'usuario'] as Role[]).map((r) => (
-            <button
-              key={r}
-              onClick={() => setRole(r)}
-              className={`px-2 py-0.5 rounded border ${userRole === r ? 'bg-teal-600 text-white' : 'bg-white'}`}
-            >
-              {r}
-            </button>
-          ))}
-        </div>
+        <div className="text-xs text-slate-400">Altere o papel no topo →</div>
       </div>
 
       {/* Local Tabs (filtrados por papel) */}
