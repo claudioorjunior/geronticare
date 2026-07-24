@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Search, User, LogOut } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 interface TopNavProps {
   userName?: string;
@@ -56,15 +58,15 @@ export function TopNav({ userName = 'Usuário', userRole = 'profissional' }: Top
           )}
         </div>
 
-        {/* Global Patient Search */}
+        {/* Global Patient Search (shadcn Input) */}
         <div className="flex-1 max-w-sm mx-6">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <input
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+            <Input
               type="text"
               placeholder="Buscar paciente (nome, CPF, CN)"
-              className="w-full pl-9 pr-4 py-1.5 text-sm border rounded-md bg-slate-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-teal-600 placeholder:text-slate-400"
-              // TODO: wire with real search + dropdown
+              className="pl-9"
+              // TODO: real search + dropdown that navigates to /pacientes/[id]
             />
           </div>
         </div>
@@ -81,13 +83,14 @@ export function TopNav({ userName = 'Usuário', userRole = 'profissional' }: Top
             </div>
           </div>
 
-          <button 
+          <Button 
+            variant="ghost" 
+            size="icon"
             onClick={() => {/* TODO: logout via better-auth */}}
-            className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-md"
             title="Sair"
           >
             <LogOut className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
       </div>
     </nav>
