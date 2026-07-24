@@ -1,21 +1,42 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
-// Mock data - will be replaced by tRPC calls
+type Role = 'admin' | 'profissional' | 'usuario';
+
 export default function DashboardPage() {
-  // TODO: get role from session/context
-  const [role] = useState<'admin' | 'profissional' | 'usuario'>('profissional');
+  // Dev helper: switch roles easily to test the 3 experiences
+  const [role, setRole] = useState<Role>('profissional');
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          {role === 'admin' && 'Visão geral da instituição'}
-          {role === 'profissional' && 'Seus atendimentos e pacientes'}
-          {role === 'usuario' && 'Operações cadastrais'}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            {role === 'admin' && 'Visão geral da instituição'}
+            {role === 'profissional' && 'Seus atendimentos e pacientes'}
+            {role === 'usuario' && 'Operações cadastrais'}
+          </p>
+        </div>
+
+        {/* Dev role switcher - remove in production */}
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-slate-400">Simular papel:</span>
+          {(['admin', 'profissional', 'usuario'] as Role[]).map((r) => (
+            <button
+              key={r}
+              onClick={() => setRole(r)}
+              className={`px-3 py-1 rounded border transition ${
+                role === r
+                  ? 'bg-teal-600 text-white border-teal-600'
+                  : 'bg-white hover:bg-slate-50 border-slate-200'
+              }`}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Cards por papel */}
@@ -66,7 +87,8 @@ export default function DashboardPage() {
       </div>
 
       <div className="text-xs text-slate-400 mt-8">
-        Dashboard mínimo — será evoluído com agendamentos e mais métricas.
+        Dashboard mínimo — será evoluído com agendamentos e mais métricas. 
+        Use os botões acima para testar os 3 papéis (incluindo ocultação de tabs clínicas).
       </div>
     </div>
   );
