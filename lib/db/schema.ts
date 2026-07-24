@@ -4,6 +4,7 @@ import { pgTable, text, timestamp, uuid, integer, boolean, jsonb, pgEnum } from 
 export const sexoEnum = pgEnum('sexo', ['masculino', 'feminino', 'outro']);
 export const estadoCivilEnum = pgEnum('estado_civil', ['solteiro', 'casado', 'viuvo', 'divorciado', 'uniao_estavel']);
 export const especialidadeEnum = pgEnum('especialidade', ['medicina', 'enfermagem', 'fisioterapia', 'terapia_ocupacional', 'fonoaudiologia', 'nutricao', 'psicologia', 'servico_social']);
+export const roleEnum = pgEnum('role', ['admin', 'profissional', 'usuario']);
 
 // Tabela: Instituições (multi-tenant)
 export const instituicoes = pgTable('instituicoes', {
@@ -35,6 +36,7 @@ export const usuarios = pgTable('usuarios', {
   email: text('email').unique().notNull(),
   senha: text('senha'), // usado apenas se migrar para auth própria; Better-Auth gerencia hash
   especialidade: especialidadeEnum('especialidade'),
+  role: roleEnum('role').default('profissional').notNull(),
   registroProfissional: text('registro_profissional'), // CRM, COREN, CREFITO, etc
   ativo: boolean('ativo').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),

@@ -16,14 +16,16 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
     session = null;
   }
 
-  // Busca instituicaoId no DB (Better-Auth não conhece campos customizados)
+  // Busca instituicaoId E role no DB
   let instituicaoId: string | null = null;
+  let userRole: string | null = null;
   if (session?.user?.id) {
     const user = await db.query.usuarios.findFirst({
       where: eq(usuarios.id, session.user.id),
-      columns: { instituicaoId: true },
+      columns: { instituicaoId: true, role: true },
     });
     instituicaoId = user?.instituicaoId ?? null;
+    userRole = user?.role ?? null;
   }
 
   return {
@@ -31,6 +33,7 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
     session,
     userId: session?.user?.id,
     instituicaoId,
+    userRole,
     ...opts,
   };
 };
@@ -63,3 +66,19 @@ const isAuthenticated = t.middleware(({ ctx, next }) => {
 });
 
 export const protectedProcedure = t.procedure.use(isAuthenticated);
+
+// Só admin (gestão de instituição/usuários)
+export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (ctx.userRole !== 'admin') {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Requer papel admin' });
+  }
+  return next({ ctx: { ...ctx, userRole: ctx.userRole } });
+});
+
+// Profissional + admin (dados clínicos completos)
+export const clinicalProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (!['admin', 'profissional'].includes(ctx.userRole ?? '')) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Requer papel profissional ou admin' });
+  }
+  return next({ ctx: { ...ctx, userRole: ctx.userRole } });
+});
