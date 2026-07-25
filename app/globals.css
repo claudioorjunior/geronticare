@@ -7,7 +7,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -46,33 +46,113 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* ── M3 Color Tokens (from Stitch) ── */
+  --color-m3-primary: #00685f;
+  --color-m3-primary-container: #008378;
+  --color-m3-on-primary: #ffffff;
+  --color-m3-on-primary-container: #f4fffc;
+  --color-m3-secondary: #565e74;
+  --color-m3-secondary-container: #dae2fd;
+  --color-m3-on-secondary: #ffffff;
+  --color-m3-on-secondary-container: #5c647a;
+  --color-m3-error: #ba1a1a;
+  --color-m3-error-container: #ffdad6;
+  --color-m3-on-error: #ffffff;
+  --color-m3-on-error-container: #93000a;
+  --color-m3-outline: #6d7a77;
+  --color-m3-outline-variant: #bcc9c6;
+  --color-m3-background: #f8f9ff;
+  --color-m3-surface: #f8f9ff;
+  --color-m3-surface-container-lowest: #ffffff;
+  --color-m3-surface-container-low: #eff4ff;
+  --color-m3-surface-container: #e5eeff;
+  --color-m3-surface-container-high: #dce9ff;
+  --color-m3-surface-variant: #d3e4fe;
+  --color-m3-on-surface: #0b1c30;
+  --color-m3-on-surface-variant: #3d4947;
+  --color-m3-inverse-surface: #213145;
+  --color-m3-inverse-on-surface: #eaf1ff;
+  --color-m3-tertiary: #595c5e;
+  --color-m3-tertiary-container: #727577;
+  --color-m3-on-tertiary: #ffffff;
+
+  /* ── M3 Spacing ── */
+  --spacing-gutter: 1.5rem;
+  --spacing-margin-desktop: 2rem;
+  --spacing-margin-mobile: 1rem;
+  --spacing-container-max: 80rem;
+  --spacing-section-gap: 3rem;
+
+  /* ── M3 Border Radius ── */
+  --radius-m3-lg: 0.25rem;
+  --radius-m3-xl: 0.5rem;
+  --radius-m3-full: 0.75rem;
+
+  /* ── M3 Type Scale (Tailwind v4 native --text-* variables) ── */
+  --text-label-sm: 0.6875rem;
+  --text-label-sm--line-height: 1rem;
+  --text-label-sm--letter-spacing: 0.05em;
+  --text-label-sm--font-weight: 600;
+  --text-label-md: 0.75rem;
+  --text-label-md--line-height: 1rem;
+  --text-label-md--letter-spacing: 0.02em;
+  --text-label-md--font-weight: 500;
+  --text-body-md: 0.875rem;
+  --text-body-md--line-height: 1.25rem;
+  --text-body-md--letter-spacing: 0em;
+  --text-body-md--font-weight: 400;
+  --text-body-lg: 1rem;
+  --text-body-lg--line-height: 1.5rem;
+  --text-body-lg--letter-spacing: 0em;
+  --text-body-lg--font-weight: 400;
+  --text-title-lg: 1.25rem;
+  --text-title-lg--line-height: 1.75rem;
+  --text-title-lg--letter-spacing: -0.01em;
+  --text-title-lg--font-weight: 500;
+  --text-headline-md: 1.5rem;
+  --text-headline-md--line-height: 2rem;
+  --text-headline-md--letter-spacing: -0.01em;
+  --text-headline-md--font-weight: 600;
+  --text-headline-lg: 2rem;
+  --text-headline-lg--line-height: 2.5rem;
+  --text-headline-lg--letter-spacing: -0.02em;
+  --text-headline-lg--font-weight: 600;
+  --text-display: 3rem;
+  --text-display--line-height: 3.5rem;
+  --text-display--letter-spacing: -0.02em;
+  --text-display--font-weight: 700;
+  --text-kpi-lg: 2.25rem;
+  --text-kpi-lg--line-height: 2.5rem;
+  --text-kpi-lg--letter-spacing: -0.02em;
+  --text-kpi-lg--font-weight: 600;
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --background: #f8f9ff;
+  --foreground: #0b1c30;
+  --card: #ffffff;
+  --card-foreground: #0b1c30;
+  --popover: #ffffff;
+  --popover-foreground: #0b1c30;
+  --primary: #00685f;
+  --primary-foreground: #ffffff;
+  --secondary: #eff4ff;
+  --secondary-foreground: #0b1c30;
+  --muted: #e5eeff;
+  --muted-foreground: #565e74;
+  --accent: #d3e4fe;
+  --accent-foreground: #0b1c30;
+  --destructive: #ba1a1a;
+  --border: #bcc9c6;
+  --input: #bcc9c6;
+  --ring: #00685f;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
+  --radius: 0.5rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -122,9 +202,8 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
-  }
-  html {
-    @apply font-sans;
+    @apply bg-background text-foreground font-sans;
   }
 }
+
+/* ── M3 Type Scale — native --text-* utilities, see @theme block above ── */
