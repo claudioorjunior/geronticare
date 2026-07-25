@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { createTRPCRouter, protectedProcedure, adminProcedure } from '../server';
 import { pacientes } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
 
 export const pacientesRouter = createTRPCRouter({
   listar: protectedProcedure.query(async ({ ctx }) => {
@@ -55,7 +56,10 @@ export const pacientesRouter = createTRPCRouter({
           columns: { id: true },
         });
         if (cpfExistente) {
-          throw new Error('Já existe um paciente cadastrado com este CPF');
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Já existe um paciente cadastrado com este CPF',
+          });
         }
       }
 
