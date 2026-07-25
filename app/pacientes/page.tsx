@@ -48,12 +48,12 @@ export default function PacientesPage() {
   });
 
   return (
-    <div className="px-6 py-6">
+    <div className="mx-auto max-w-7xl px-8 py-8">
       {/* Header */}
-      <div className="mb-6 flex items-start justify-between">
+      <div className="mb-8 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Pacientes</h1>
-          <p className="mt-1 text-sm text-slate-500">Casa de Repouso Vila Nova</p>
+          <h1 className="mb-1 text-2xl font-semibold tracking-tight text-slate-900">Pacientes</h1>
+          <p className="text-sm text-slate-500">Casa de Repouso Vila Nova</p>
         </div>
         {podeCriar && (
           <Button className="bg-teal-600 text-white hover:bg-teal-700">
@@ -64,7 +64,7 @@ export default function PacientesPage() {
       </div>
 
       {/* Search + filters */}
-      <div className="mb-4 flex items-center gap-4">
+      <div className="mb-8 flex items-center gap-4">
         <div className="relative max-w-xs flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
@@ -94,7 +94,7 @@ export default function PacientesPage() {
 
       {/* Table or empty state */}
       {pacientesFiltrados.length > 0 ? (
-        <div className="overflow-hidden rounded-lg border border-slate-200">
+        <div className="overflow-hidden rounded-lg border border-slate-200 shadow-sm">
           <table className="w-full">
             <thead className="bg-slate-50/50">
               <tr>
@@ -108,7 +108,7 @@ export default function PacientesPage() {
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white">
               {pacientesFiltrados.map((p) => (
-                <tr key={p.id} className="hover:bg-slate-50">
+                <tr key={p.id} className="transition-colors hover:bg-slate-50">
                   <td className="px-4 py-3">
                     <div className="font-medium text-sm text-slate-900">{p.nome}</div>
                     <div className="text-xs text-slate-500">{p.cpf}</div>
@@ -136,7 +136,7 @@ export default function PacientesPage() {
                   <td className="px-4 py-3 text-right">
                     <a
                       href={`/pacientes/${p.id}`}
-                      className="inline-flex items-center text-sm font-medium text-teal-600 hover:text-teal-700"
+                      className="inline-flex items-center text-sm font-medium text-teal-600 transition-colors hover:text-teal-700"
                     >
                       Abrir
                       <ChevronRight className="ml-0.5 h-4 w-4" />

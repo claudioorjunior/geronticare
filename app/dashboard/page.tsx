@@ -93,7 +93,7 @@ function StatusBadge({ status }: { status: Status }) {
 
 function KpiCard({ label, value, delta }: { label: string; value: string; delta?: string }) {
   return (
-    <Card className="p-5">
+    <Card className="border border-slate-200 p-6 shadow-sm transition-colors hover:bg-slate-50/50">
       <div className="text-sm text-slate-500">{label}</div>
       <div className="mt-1 text-3xl font-semibold tabular-nums text-slate-900">{value}</div>
       {delta && <div className="mt-1 text-xs text-emerald-600">{delta}</div>}
@@ -103,14 +103,14 @@ function KpiCard({ label, value, delta }: { label: string; value: string; delta?
 
 function DashboardAdmin() {
   return (
-    <div className="px-6 py-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Painel Administrativo</h1>
-        <p className="mt-1 text-sm text-slate-500">Casa de Repouso Vila Nova</p>
+    <div className="mx-auto max-w-7xl px-8 py-8">
+      <div className="mb-8">
+        <h1 className="mb-1 text-2xl font-semibold tracking-tight text-slate-900">Painel Administrativo</h1>
+        <p className="text-sm text-slate-500">Casa de Repouso Vila Nova</p>
       </div>
 
       {/* KPIs */}
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard label="Pacientes Ativos" value="142" delta="+3 este mes" />
         <KpiCard label="Profissionais" value="8" />
         <KpiCard label="AGAs Pendentes" value="5" />
@@ -118,30 +118,30 @@ function DashboardAdmin() {
       </div>
 
       {/* Two-column layout */}
-      <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Atendimentos Recentes */}
-        <Card className="lg:col-span-2">
-          <div className="border-b border-slate-200 px-5 py-4">
-            <h2 className="text-base font-semibold text-slate-900">Atendimentos Recentes</h2>
+        <Card className="border border-slate-200 p-0 shadow-sm lg:col-span-2">
+          <div className="border-b border-slate-200 px-6 py-4">
+            <h2 className="text-lg font-semibold text-slate-900">Atendimentos Recentes</h2>
           </div>
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/50">
-                <th className="px-5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Paciente</th>
-                <th className="px-5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Tipo</th>
-                <th className="px-5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Profissional</th>
-                <th className="px-5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Data</th>
-                <th className="px-5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Paciente</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Tipo</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Profissional</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Data</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
               {atendimentosRecentes.map((a, i) => (
-                <tr key={i} className="hover:bg-slate-50">
-                  <td className="px-5 py-3 text-sm font-medium text-slate-900">{a.paciente}</td>
-                  <td className="px-5 py-3 text-sm text-slate-600">{a.tipo}</td>
-                  <td className="px-5 py-3 text-sm text-slate-600">{a.profissional}</td>
-                  <td className="px-5 py-3 text-sm tabular-nums text-slate-600">{a.data}</td>
-                  <td className="px-5 py-3"><StatusBadge status={a.status} /></td>
+                <tr key={i} className="transition-colors hover:bg-slate-50">
+                  <td className="px-4 py-3 text-sm font-medium text-slate-900">{a.paciente}</td>
+                  <td className="px-4 py-3 text-sm leading-relaxed text-slate-600">{a.tipo}</td>
+                  <td className="px-4 py-3 text-sm leading-relaxed text-slate-600">{a.profissional}</td>
+                  <td className="px-4 py-3 text-sm tabular-nums text-slate-600">{a.data}</td>
+                  <td className="px-4 py-3"><StatusBadge status={a.status} /></td>
                 </tr>
               ))}
             </tbody>
@@ -149,16 +149,16 @@ function DashboardAdmin() {
         </Card>
 
         {/* Alertas Vitais */}
-        <Card>
-          <div className="border-b border-slate-200 px-5 py-4">
-            <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900">
+        <Card className="border border-slate-200 p-0 shadow-sm">
+          <div className="border-b border-slate-200 px-6 py-4">
+            <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
               <AlertTriangle className="h-4 w-4 text-amber-600" />
               Sinais Vitais - Alertas
             </h2>
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100 p-6">
             {alertasVitais.map((a, i) => (
-              <div key={i} className="flex items-center justify-between px-5 py-3">
+              <div key={i} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
                 <div>
                   <div className="text-sm font-medium text-slate-900">{a.paciente}</div>
                   <div className="text-xs text-slate-500">{a.sinal}</div>
@@ -180,10 +180,10 @@ function DashboardAdmin() {
 
       {/* AGAs Proximas */}
       <div>
-        <h2 className="mb-3 text-base font-semibold text-slate-900">Avaliacoes AGA - Proximas</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <h2 className="mb-4 text-lg font-semibold text-slate-900">Avaliacoes AGA - Proximas</h2>
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
           {agasProximas.map((a, i) => (
-            <Card key={i} className="p-5">
+            <Card key={i} className="border border-slate-200 p-6 shadow-sm transition-colors hover:bg-slate-50/50">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-50">
                   <ClipboardList className="h-5 w-5 text-teal-600" />
@@ -225,27 +225,27 @@ function DashboardProfissional() {
   };
 
   return (
-    <div className="px-6 py-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Meus Atendimentos</h1>
-        <p className="mt-1 text-sm text-slate-500">Dra. Helena Costa - Geriatria</p>
+    <div className="mx-auto max-w-7xl px-8 py-8">
+      <div className="mb-8">
+        <h1 className="mb-1 text-2xl font-semibold tracking-tight text-slate-900">Meus Atendimentos</h1>
+        <p className="text-sm text-slate-500">Dra. Helena Costa - Geriatria</p>
       </div>
 
       {/* KPIs */}
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-3">
         <KpiCard label="Atendimentos Hoje" value="7" />
         <KpiCard label="Pacientes Sob Cuidado" value="23" />
         <KpiCard label="AGAs Pendentes" value="4" />
       </div>
 
       {/* Registros de Hoje */}
-      <Card className="mb-6">
-        <div className="border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-900">Registros de Hoje</h2>
+      <Card className="mb-8 border border-slate-200 p-0 shadow-sm">
+        <div className="border-b border-slate-200 px-6 py-4">
+          <h2 className="text-lg font-semibold text-slate-900">Registros de Hoje</h2>
         </div>
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-slate-100 p-6">
           {registrosHoje.map((r, i) => (
-            <div key={i} className="flex gap-4 px-5 py-3">
+            <div key={i} className="flex gap-4 py-3 first:pt-0 last:pb-0">
               <div className="flex flex-col items-center pt-0.5">
                 <div className="text-xs font-medium tabular-nums text-slate-500">{r.hora}</div>
                 <div className="mt-1 h-full w-px bg-slate-200" />
@@ -257,7 +257,7 @@ function DashboardProfissional() {
                     {tipoLabels[r.tipo] || r.tipo}
                   </span>
                 </div>
-                <p className="mt-0.5 text-sm text-slate-600">{r.conteudo}</p>
+                <p className="mt-0.5 text-sm leading-relaxed text-slate-600">{r.conteudo}</p>
               </div>
             </div>
           ))}
@@ -265,16 +265,16 @@ function DashboardProfissional() {
       </Card>
 
       {/* Sinais Vitais - Monitorar */}
-      <Card>
-        <div className="border-b border-slate-200 px-5 py-4">
-          <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900">
+      <Card className="border border-slate-200 p-0 shadow-sm">
+        <div className="border-b border-slate-200 px-6 py-4">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
             <HeartPulse className="h-4 w-4 text-teal-600" />
             Sinais Vitais - Monitorar
           </h2>
         </div>
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-slate-100 p-6">
           {sinaisMonitorar.map((s, i) => (
-            <div key={i} className="flex items-center justify-between px-5 py-3">
+            <div key={i} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
               <div>
                 <div className="text-sm font-medium text-slate-900">{s.paciente}</div>
                 <div className="text-xs tabular-nums text-slate-500">{s.sinal}</div>
@@ -292,21 +292,21 @@ function DashboardProfissional() {
 
 function DashboardUsuario() {
   return (
-    <div className="px-6 py-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Painel de Cadastro</h1>
-        <p className="mt-1 text-sm text-slate-500">Casa de Repouso Vila Nova</p>
+    <div className="mx-auto max-w-7xl px-8 py-8">
+      <div className="mb-8">
+        <h1 className="mb-1 text-2xl font-semibold tracking-tight text-slate-900">Painel de Cadastro</h1>
+        <p className="text-sm text-slate-500">Casa de Repouso Vila Nova</p>
       </div>
 
       {/* Welcome card */}
-      <Card className="mb-6 p-6">
+      <Card className="mb-8 border border-slate-200 p-6 shadow-sm">
         <div className="flex items-start gap-4">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-teal-50">
             <Activity className="h-6 w-6 text-teal-600" />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-slate-900">Bem-vindo(a)</h2>
-            <p className="mt-1 text-sm text-slate-600">
+            <h2 className="text-lg font-semibold text-slate-900">Bem-vindo(a)</h2>
+            <p className="mt-1 text-sm leading-relaxed text-slate-600">
               Seu perfil tem acesso aos dados cadastrais de pacientes. Registros clinicos,
               avaliacoes geriatricas, sinais vitais e anexos sao restritos a profissionais de saude.
             </p>
@@ -316,13 +316,13 @@ function DashboardUsuario() {
 
       {/* Pacientes Recentes */}
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-base font-semibold text-slate-900">Pacientes Recentes</h2>
+        <h2 className="text-lg font-semibold text-slate-900">Pacientes Recentes</h2>
         <Button className="bg-teal-600 text-white hover:bg-teal-700">
           Novo Paciente
         </Button>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-slate-200">
+      <div className="overflow-hidden rounded-lg border border-slate-200 shadow-sm">
         <table className="w-full">
           <thead className="bg-slate-50/50">
             <tr>
@@ -335,7 +335,7 @@ function DashboardUsuario() {
           </thead>
           <tbody className="divide-y divide-slate-200 bg-white">
             {pacientesRecentes.map((p, i) => (
-              <tr key={i} className="hover:bg-slate-50">
+              <tr key={i} className="transition-colors hover:bg-slate-50">
                 <td className="px-4 py-3 text-sm font-medium text-slate-900">{p.nome}</td>
                 <td className="px-4 py-3 text-sm tabular-nums text-slate-600">{p.cpf}</td>
                 <td className="px-4 py-3 text-sm tabular-nums text-slate-700">{p.idade} anos</td>

@@ -61,36 +61,37 @@ export function TopNav() {
 
   return (
     <header className="sticky top-0 z-50 h-16 border-b border-slate-200 bg-white">
-      <div className="flex h-full items-center gap-6 px-6">
-        {/* Logo */}
-        <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
-          <Activity className="h-5 w-5 text-teal-600" strokeWidth={2} />
-          <span className="text-lg font-semibold text-slate-900">GerontiCare</span>
-        </Link>
+      <div className="mx-auto flex h-full max-w-7xl items-center gap-6 px-8">
+        {/* Logo + Nav — grouped left */}
+        <div className="flex items-center gap-6 shrink-0">
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <Activity className="h-5 w-5 text-teal-600" strokeWidth={2} />
+            <span className="text-lg font-semibold text-slate-900">GerontiCare</span>
+          </Link>
 
-        {/* Nav links */}
-        <nav className="flex items-center gap-1 shrink-0">
-          {navLinks.map((link) => {
-            const active =
-              pathname === link.href || pathname.startsWith(link.href + '/');
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`px-3 py-1.5 text-sm font-medium transition-colors ${
-                  active
-                    ? 'text-teal-600'
-                    : 'text-slate-600 hover:text-teal-600'
-                }`}
-              >
-                {link.label}
-              </Link>
-            );
-          })}
-        </nav>
+          <nav className="flex items-center gap-4">
+            {navLinks.map((link) => {
+              const active =
+                pathname === link.href || pathname.startsWith(link.href + '/');
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                    active
+                      ? 'text-teal-600'
+                      : 'text-slate-600 hover:text-teal-600'
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
 
-        {/* Search */}
-        <div ref={searchRef} className="relative flex-1 max-w-sm mx-auto">
+        {/* Search — centered */}
+        <div ref={searchRef} className="relative mx-auto w-full max-w-xs">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
             type="text"
