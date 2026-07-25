@@ -1,7 +1,8 @@
 import { z } from 'zod';
-import { createTRPCRouter, protectedProcedure } from '../server';
+import { createTRPCRouter, clinicalProcedure } from '../server';
 import { registros, pacientes, avaliacoesGeriatricas, sinaisVitais } from '@/lib/db/schema';
 import { eq, and, gte, lte } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
 
 // Helper: valida que paciente pertence à mesma instituição
 async function verificarOwnershipPaciente(
@@ -16,13 +17,16 @@ async function verificarOwnershipPaciente(
     ),
   });
   if (!paciente) {
-    throw new Error('Paciente não encontrado ou não pertence à sua instituição');
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Paciente não encontrado ou não pertence à sua instituição',
+    });
   }
   return paciente;
 }
 
 export const registrosRouter = createTRPCRouter({
-  listar: protectedProcedure
+  listar: clinicalProcedure
     .input(
       z.object({
         pacienteId: z.string().uuid(),
@@ -52,7 +56,7 @@ export const registrosRouter = createTRPCRouter({
       });
     }),
 
-  buscar: protectedProcedure
+  buscar: clinicalProcedure
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const registro = await ctx.db.query.registros.findFirst({
@@ -66,7 +70,7 @@ export const registrosRouter = createTRPCRouter({
       return registro;
     }),
 
-  criar: protectedProcedure
+  criar: clinicalProcedure
     .input(
       z.object({
         pacienteId: z.string().uuid(),
@@ -98,7 +102,7 @@ export const registrosRouter = createTRPCRouter({
       return novoRegistro;
     }),
 
-  timeline: protectedProcedure
+  timeline: clinicalProcedure
     .input(
       z.object({
         pacienteId: z.string().uuid(),
@@ -223,7 +227,7 @@ export const registrosRouter = createTRPCRouter({
       return timeline;
     }),
 
-  anexar: protectedProcedure
+  anexar: clinicalProcedure
     .input(
       z.object({
         registroId: z.string().uuid(),
@@ -242,7 +246,7 @@ export const registrosRouter = createTRPCRouter({
       });
 
       if (!registro) {
-        throw new Error('Registro não encontrado');
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Registro não encontrado' });
       }
 
       await verificarOwnershipPaciente(ctx.db, registro.pacienteId, ctx.instituicaoId);

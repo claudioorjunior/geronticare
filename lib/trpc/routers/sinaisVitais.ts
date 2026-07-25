@@ -1,8 +1,9 @@
 import { z } from 'zod';
-import { createTRPCRouter, protectedProcedure } from '../server';
+import { createTRPCRouter, clinicalProcedure } from '../server';
 import { sinaisVitais, pacientes } from '@/lib/db/schema';
 import { eq, and, gte, lte } from 'drizzle-orm';
 import { sinalVitalSchema } from '@/lib/validations/escalas';
+import { TRPCError } from '@trpc/server';
 
 // Helper: valida que paciente pertence à mesma instituição
 async function verificarOwnershipPaciente(
@@ -17,13 +18,16 @@ async function verificarOwnershipPaciente(
     ),
   });
   if (!paciente) {
-    throw new Error('Paciente não encontrado ou não pertence à sua instituição');
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Paciente não encontrado ou não pertence à sua instituição',
+    });
   }
   return paciente;
 }
 
 export const sinaisVitaisRouter = createTRPCRouter({
-  listar: protectedProcedure
+  listar: clinicalProcedure
     .input(
       z.object({
         pacienteId: z.string().uuid(),
@@ -46,7 +50,7 @@ export const sinaisVitaisRouter = createTRPCRouter({
       });
     }),
 
-  registrar: protectedProcedure
+  registrar: clinicalProcedure
     .input(sinalVitalSchema)
     .mutation(async ({ ctx, input }) => {
       await verificarOwnershipPaciente(ctx.db, input.pacienteId, ctx.instituicaoId);
@@ -62,7 +66,7 @@ export const sinaisVitaisRouter = createTRPCRouter({
       return novoSinal;
     }),
 
-  ultimo: protectedProcedure
+  ultimo: clinicalProcedure
     .input(z.object({ pacienteId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       await verificarOwnershipPaciente(ctx.db, input.pacienteId, ctx.instituicaoId);

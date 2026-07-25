@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { createTRPCRouter, protectedProcedure } from '../server';
+import { createTRPCRouter, protectedProcedure, adminProcedure } from '../server';
 import { pacientes } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 
@@ -45,10 +45,13 @@ export const pacientesRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Valida unicidade de CPF se fornecido
+      // Valida unicidade de CPF dentro da instituição (não vaza existência em outras ILPIs)
       if (input.cpf) {
         const cpfExistente = await ctx.db.query.pacientes.findFirst({
-          where: eq(pacientes.cpf, input.cpf),
+          where: and(
+            eq(pacientes.cpf, input.cpf),
+            eq(pacientes.instituicaoId, ctx.instituicaoId)
+          ),
           columns: { id: true },
         });
         if (cpfExistente) {
@@ -97,7 +100,7 @@ export const pacientesRouter = createTRPCRouter({
       return pacienteAtualizado;
     }),
 
-  desativar: protectedProcedure
+  desativar: adminProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db
