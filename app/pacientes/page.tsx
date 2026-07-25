@@ -48,7 +48,7 @@ export default function PacientesPage() {
   });
 
   return (
-    <div className="mx-auto max-w-7xl px-8 py-8">
+    <div>
       {/* Header */}
       <div className="mb-8 flex items-start justify-between">
         <div>

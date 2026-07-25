@@ -103,7 +103,7 @@ function KpiCard({ label, value, delta }: { label: string; value: string; delta?
 
 function DashboardAdmin() {
   return (
-    <div className="mx-auto max-w-7xl px-8 py-8">
+    <div>
       <div className="mb-8">
         <h1 className="mb-1 text-2xl font-semibold tracking-tight text-slate-900">Painel Administrativo</h1>
         <p className="text-sm text-slate-500">Casa de Repouso Vila Nova</p>
@@ -225,7 +225,7 @@ function DashboardProfissional() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-8 py-8">
+    <div>
       <div className="mb-8">
         <h1 className="mb-1 text-2xl font-semibold tracking-tight text-slate-900">Meus Atendimentos</h1>
         <p className="text-sm text-slate-500">Dra. Helena Costa - Geriatria</p>
@@ -292,7 +292,7 @@ function DashboardProfissional() {
 
 function DashboardUsuario() {
   return (
-    <div className="mx-auto max-w-7xl px-8 py-8">
+    <div>
       <div className="mb-8">
         <h1 className="mb-1 text-2xl font-semibold tracking-tight text-slate-900">Painel de Cadastro</h1>
         <p className="text-sm text-slate-500">Casa de Repouso Vila Nova</p>

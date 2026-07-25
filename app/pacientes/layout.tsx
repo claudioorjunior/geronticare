@@ -1,6 +1,6 @@
 import { TopNav } from '@/components/layout/TopNav';
 
-export default function DashboardLayout({
+export default function PacientesLayout({
   children,
 }: {
   children: React.ReactNode;
