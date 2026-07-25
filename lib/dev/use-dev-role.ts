@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useSyncExternalStore, useCallback } from 'react';
 
 export type DevRole = 'admin' | 'profissional' | 'usuario';
 
@@ -9,11 +9,28 @@ const IS_DEV = process.env.NODE_ENV === 'development';
 
 // Module-level state so all hook instances share the same role
 let currentRole: DevRole = 'profissional';
-const listeners = new Set<(role: DevRole) => void>();
+const listeners = new Set<() => void>();
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function getSnapshot(): DevRole {
+  return currentRole;
+}
 
 function notifyAll(role: DevRole) {
   currentRole = role;
-  listeners.forEach((fn) => fn(role));
+  listeners.forEach((fn) => fn());
+}
+
+// Initialize from localStorage on client-side first load
+if (IS_DEV && typeof window !== 'undefined') {
+  const saved = localStorage.getItem(STORAGE_KEY) as DevRole | null;
+  if (saved && ['admin', 'profissional', 'usuario'].includes(saved)) {
+    currentRole = saved;
+  }
 }
 
 /**
@@ -23,25 +40,7 @@ function notifyAll(role: DevRole) {
  * A autoridade final de permissoes e SEMPRE o servidor (tRPC middlewares).
  */
 export function useDevRole() {
-  const [role, setRoleState] = useState<DevRole>(currentRole);
-
-  useEffect(() => {
-    if (!IS_DEV) return;
-
-    // Carrega do localStorage na primeira montagem
-    const saved = localStorage.getItem(STORAGE_KEY) as DevRole | null;
-    if (saved && ['admin', 'profissional', 'usuario'].includes(saved)) {
-      notifyAll(saved);
-    }
-
-    // Inscreve para mudancas de outros componentes
-    const listener = (newRole: DevRole) => setRoleState(newRole);
-    listeners.add(listener);
-
-    return () => {
-      listeners.delete(listener);
-    };
-  }, []);
+  const role = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
   const setRole = useCallback((newRole: DevRole) => {
     if (!IS_DEV) return;
