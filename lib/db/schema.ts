@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, integer, boolean, jsonb, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, uuid, integer, boolean, jsonb, pgEnum, index } from 'drizzle-orm/pg-core';
 
 // Enums
 export const sexoEnum = pgEnum('sexo', ['masculino', 'feminino', 'outro']);
@@ -41,7 +41,9 @@ export const usuarios = pgTable('usuarios', {
   ativo: boolean('ativo').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  instituicaoIdx: index('usuarios_instituicao_idx').on(table.instituicaoId),
+}));
 
 // Tabelas do Better-Auth
 export const sessions = pgTable('sessions', {
@@ -111,7 +113,10 @@ export const pacientes = pgTable('pacientes', {
   ativo: boolean('ativo').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  instituicaoIdx: index('pacientes_instituicao_idx').on(table.instituicaoId),
+  ativoIdx: index('pacientes_ativo_idx').on(table.ativo),
+}));
 
 // Tabela: Avaliação Geriátrica Ampla (AGA)
 export const avaliacoesGeriatricas = pgTable('avaliacoes_geriatricas', {
@@ -145,7 +150,10 @@ export const avaliacoesGeriatricas = pgTable('avaliacoes_geriatricas', {
   
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  pacienteIdx: index('avaliacoes_paciente_idx').on(table.pacienteId),
+  profissionalIdx: index('avaliacoes_profissional_idx').on(table.profissionalId),
+}));
 
 // Tabela: Prontuário (registros clínicos)
 export const registros = pgTable('registros', {
@@ -164,7 +172,10 @@ export const registros = pgTable('registros', {
   }>>(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  pacienteIdx: index('registros_paciente_idx').on(table.pacienteId),
+  profissionalIdx: index('registros_profissional_idx').on(table.profissionalId),
+}));
 
 // Tabela: Sinais vitais
 export const sinaisVitais = pgTable('sinais_vitais', {
@@ -184,7 +195,10 @@ export const sinaisVitais = pgTable('sinais_vitais', {
   observacoes: text('observacoes'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  pacienteIdx: index('sinaisvitais_paciente_idx').on(table.pacienteId),
+  profissionalIdx: index('sinaisvitais_profissional_idx').on(table.profissionalId),
+}));
 
 export type Instituicao = typeof instituicoes.$inferSelect;
 export type NovaInstituicao = typeof instituicoes.$inferInsert;
