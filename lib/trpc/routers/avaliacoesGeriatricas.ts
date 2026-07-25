@@ -1,8 +1,9 @@
 import { z } from 'zod';
-import { createTRPCRouter, protectedProcedure } from '../server';
+import { createTRPCRouter, clinicalProcedure } from '../server';
 import { avaliacoesGeriatricas, pacientes, usuarios } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { criarAvaliacaoSchema, interpretarEscala } from '@/lib/validations/escalas';
+import { TRPCError } from '@trpc/server';
 
 // Helper: valida que paciente pertence à mesma instituição
 async function verificarOwnershipPaciente(
@@ -17,13 +18,16 @@ async function verificarOwnershipPaciente(
     ),
   });
   if (!paciente) {
-    throw new Error('Paciente não encontrado ou não pertence à sua instituição');
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Paciente não encontrado ou não pertence à sua instituição',
+    });
   }
   return paciente;
 }
 
 export const avaliacoesGeriatricasRouter = createTRPCRouter({
-  listar: protectedProcedure
+  listar: clinicalProcedure
     .input(z.object({ pacienteId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       await verificarOwnershipPaciente(ctx.db, input.pacienteId, ctx.instituicaoId);
@@ -34,7 +38,7 @@ export const avaliacoesGeriatricasRouter = createTRPCRouter({
       });
     }),
 
-  buscar: protectedProcedure
+  buscar: clinicalProcedure
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const avaliacao = await ctx.db.query.avaliacoesGeriatricas.findFirst({
@@ -59,7 +63,7 @@ export const avaliacoesGeriatricasRouter = createTRPCRouter({
       };
     }),
 
-  criar: protectedProcedure
+  criar: clinicalProcedure
     .input(criarAvaliacaoSchema)
     .mutation(async ({ ctx, input }) => {
       await verificarOwnershipPaciente(ctx.db, input.pacienteId, ctx.instituicaoId);
@@ -75,7 +79,7 @@ export const avaliacoesGeriatricasRouter = createTRPCRouter({
       return novaAvaliacao;
     }),
 
-  relatorio: protectedProcedure
+  relatorio: clinicalProcedure
     .input(z.object({ pacienteId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       await verificarOwnershipPaciente(ctx.db, input.pacienteId, ctx.instituicaoId);

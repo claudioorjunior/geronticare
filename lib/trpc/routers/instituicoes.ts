@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { createTRPCRouter, protectedProcedure } from '../server';
+import { createTRPCRouter, protectedProcedure, adminProcedure } from '../server';
 import { instituicoes } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
@@ -10,7 +10,7 @@ export const instituicoesRouter = createTRPCRouter({
     });
   }),
 
-  atualizar: protectedProcedure
+  atualizar: adminProcedure
     .input(
       z.object({
         nome: z.string().min(3).optional(),

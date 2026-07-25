@@ -141,18 +141,20 @@ export function TopNav() {
 
         {/* User Menu + Dev Role Switcher */}
         <div className="flex items-center gap-3 ml-auto">
-          {/* Dev role switcher (remove in production) */}
-          <div className="flex items-center gap-1 text-xs border rounded-md p-0.5 bg-slate-50">
-            {(['admin', 'profissional', 'usuario'] as DevRole[]).map((r) => (
-              <button
-                key={r}
-                onClick={() => setRole(r)}
-                className={`px-2 py-0.5 rounded ${userRole === r ? 'bg-teal-600 text-white' : 'hover:bg-white'}`}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
+          {/* Dev role switcher — só renderiza em desenvolvimento */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="flex items-center gap-1 text-xs border rounded-md p-0.5 bg-slate-50">
+              {(['admin', 'profissional', 'usuario'] as DevRole[]).map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setRole(r)}
+                  className={`px-2 py-0.5 rounded ${userRole === r ? 'bg-teal-600 text-white' : 'hover:bg-white'}`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          )}
 
           <div className="flex items-center gap-2 text-sm">
             <div className="text-right">
