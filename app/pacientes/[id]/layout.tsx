@@ -6,11 +6,11 @@ import { ArrowLeft } from 'lucide-react';
 import { useDevRole } from '@/lib/dev/use-dev-role';
 
 const allTabs = [
-  { label: 'Dados', path: '', roles: ['admin', 'profissional', 'usuario'] as const },
-  { label: 'AGA', path: 'aga', roles: ['admin', 'profissional'] as const },
-  { label: 'Registros', path: 'registros', roles: ['admin', 'profissional'] as const },
-  { label: 'Sinais', path: 'sinais', roles: ['admin', 'profissional'] as const },
-  { label: 'Anexos', path: 'anexos', roles: ['admin', 'profissional'] as const },
+  { label: 'Dados', path: '', roles: ['admin', 'profissional', 'usuario'] },
+  { label: 'AGA', path: 'aga', roles: ['admin', 'profissional'] },
+  { label: 'Registros', path: 'registros', roles: ['admin', 'profissional'] },
+  { label: 'Sinais', path: 'sinais', roles: ['admin', 'profissional'] },
+  { label: 'Anexos', path: 'anexos', roles: ['admin', 'profissional'] },
 ];
 
 export default function PatientLayout({ children }: { children: React.ReactNode }) {
@@ -20,10 +20,9 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
 
   const { role: userRole } = useDevRole();
 
-  const tabs = allTabs.filter((tab) => (tab.roles as readonly string[]).includes(userRole));
+  const tabs = allTabs.filter((tab) => tab.roles.includes(userRole));
 
-  // TODO: fetch real patient header data via tRPC
-  const patientName = 'Maria das Graças Silva';
+  const patientName = 'Maria das Gracas Silva';
   const patientAge = 78;
 
   const currentTab = () => {
@@ -34,52 +33,47 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
   const activeTab = currentTab();
 
   return (
-    <div className="space-y-4">
-      {/* Patient Header */}
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/pacientes" className="text-slate-500 hover:text-slate-700">
+    <div>
+      <div className="mb-8 flex items-start justify-between">
+        <div className="flex items-center gap-4">
+          <Link href="/pacientes" className="mt-0.5 text-slate-400 hover:text-slate-600 transition-colors">
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{patientName}</h1>
-            <div className="text-sm text-slate-500">
-              {patientAge} anos • ID: {patientId.slice(0, 8)}...
-            </div>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900" style={{ textWrap: 'balance' }}>
+              {patientName}
+            </h1>
+            <p className="mt-0.5 text-sm text-slate-500">
+              {patientAge} anos &middot; ID {patientId.slice(0, 8)}&hellip;
+            </p>
           </div>
         </div>
-
-        <div className="text-xs text-slate-400">Altere o papel no topo →</div>
       </div>
 
-      {/* Local Tabs (filtrados por papel) */}
-      <div className="border-b">
-        <nav className="flex gap-6 text-sm font-medium -mb-px">
-          {tabs.map((tab) => {
-            const isActive = activeTab === tab.path;
-            const href = tab.path
-              ? `/pacientes/${patientId}/${tab.path}`
-              : `/pacientes/${patientId}`;
+      <nav className="flex gap-6 border-b border-slate-200 pb-px">
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.path;
+          const href = tab.path
+            ? `/pacientes/${patientId}/${tab.path}`
+            : `/pacientes/${patientId}`;
 
-            return (
-              <Link
-                key={tab.path || 'dados'}
-                href={href}
-                className={`pb-3 px-1 border-b-2 transition-colors ${
-                  isActive
-                    ? 'border-teal-600 text-teal-600'
-                    : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
-                }`}
-              >
-                {tab.label}
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
+          return (
+            <Link
+              key={tab.path || 'dados'}
+              href={href}
+              className={`pb-3 text-sm font-medium transition-colors ${
+                isActive
+                  ? 'border-b-2 border-slate-900 text-slate-900'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {tab.label}
+            </Link>
+          );
+        })}
+      </nav>
 
-      {/* Tab Content */}
-      <div className="pt-2">{children}</div>
+      <div className="pt-8">{children}</div>
     </div>
   );
 }

@@ -5,11 +5,9 @@ import { useState } from 'react';
 import { useDevRole } from '@/lib/dev/use-dev-role';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-// Mock data - will come from tRPC later
 const initialData = {
-  nome: 'Maria das Graças Silva',
+  nome: 'Maria das Gracas Silva',
   cpf: '123.456.789-00',
   dataNascimento: '1946-03-12',
   telefone: '(21) 99999-1234',
@@ -23,6 +21,16 @@ const initialData = {
 
 type PatientData = typeof initialData;
 
+function FieldGroup({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-xs font-medium text-slate-500">{label}</label>
+      {children}
+      {hint && <p className="mt-1 text-[11px] text-slate-400">{hint}</p>}
+    </div>
+  );
+}
+
 export default function PatientDadosPage() {
   const params = useParams<{ id: string }>();
   const { role } = useDevRole();
@@ -35,156 +43,116 @@ export default function PatientDadosPage() {
   const canEditStatus = role === 'admin';
 
   const handleChange = (field: keyof PatientData, value: string | boolean) => {
-    setData(prev => ({ ...prev, [field]: value }));
+    setData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSave = async () => {
     setIsSaving(true);
     setSaveMessage('');
-
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 600));
-
+    await new Promise((resolve) => setTimeout(resolve, 600));
     setIsSaving(false);
-    setSaveMessage('Dados salvos com sucesso! (mock)');
-
+    setSaveMessage('Dados salvos com sucesso (mock).');
     setTimeout(() => setSaveMessage(''), 2500);
   };
 
   return (
-    <div className="max-w-4xl space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Dados Cadastrais</CardTitle>
-          <p className="text-sm text-slate-500">
-            Papel atual: <span className="font-medium capitalize">{role}</span> — 
-            {role === 'usuario' && ' você pode editar apenas dados pessoais básicos.'}
-            {(role === 'profissional' || role === 'admin') && ' acesso completo aos dados cadastrais.'}
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Nome - editável por todos */}
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">Nome completo</label>
-              <Input 
-                value={data.nome} 
-                onChange={(e) => handleChange('nome', e.target.value)}
-                disabled={role === 'usuario' ? false : false} // todos podem editar nome
-              />
-            </div>
+    <div className="max-w-3xl">
+      <div className="mb-6 border-b border-slate-200 pb-4">
+        <h2 className="text-lg font-semibold text-slate-900">Dados Cadastrais</h2>
+      </div>
 
-            {/* CPF - readonly para todos no momento */}
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">CPF</label>
-              <Input value={data.cpf} disabled className="bg-slate-50" />
-            </div>
+      <div className="mb-8 grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
+        <FieldGroup label="Nome completo">
+          <Input
+            value={data.nome}
+            onChange={(e) => handleChange('nome', e.target.value)}
+          />
+        </FieldGroup>
 
-            {/* Data de nascimento */}
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">Data de nascimento</label>
-              <Input value={data.dataNascimento} disabled className="bg-slate-50" />
-            </div>
+        <FieldGroup label="CPF">
+          <Input value={data.cpf} disabled className="bg-slate-50 text-slate-500" />
+        </FieldGroup>
 
-            {/* Telefone - editável */}
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">Telefone</label>
-              <Input 
-                value={data.telefone} 
-                onChange={(e) => handleChange('telefone', e.target.value)}
-              />
-            </div>
+        <FieldGroup label="Data de nascimento">
+          <Input value={data.dataNascimento} disabled className="bg-slate-50 text-slate-500" />
+        </FieldGroup>
 
-            {/* Email */}
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">E-mail</label>
-              <Input 
-                value={data.email} 
-                onChange={(e) => handleChange('email', e.target.value)}
-              />
-            </div>
+        <FieldGroup label="Telefone">
+          <Input
+            value={data.telefone}
+            onChange={(e) => handleChange('telefone', e.target.value)}
+          />
+        </FieldGroup>
 
-            {/* Data de admissão - só profissional/admin */}
-            <div>
-              <label className="block text-xs text-slate-500 mb-1">Data de admissão</label>
-              <Input 
-                value={data.dataAdmissao} 
-                onChange={(e) => handleChange('dataAdmissao', e.target.value)}
-                disabled={!canEditClinical}
-                className={!canEditClinical ? 'bg-slate-50' : ''}
-              />
-              {!canEditClinical && (
-                <p className="text-[10px] text-slate-400 mt-0.5">Apenas profissionais podem alterar</p>
-              )}
-            </div>
-          </div>
+        <FieldGroup label="E-mail">
+          <Input
+            value={data.email}
+            onChange={(e) => handleChange('email', e.target.value)}
+          />
+        </FieldGroup>
 
-          {/* Contato de emergência */}
-          <div className="border-t pt-6">
-            <h3 className="text-sm font-medium mb-3">Contato de emergência</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Nome</label>
-                <Input 
-                  value={data.contatoEmergenciaNome} 
-                  onChange={(e) => handleChange('contatoEmergenciaNome', e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Parentesco</label>
-                <Input 
-                  value={data.contatoEmergenciaParentesco} 
-                  onChange={(e) => handleChange('contatoEmergenciaParentesco', e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Telefone</label>
-                <Input 
-                  value={data.contatoEmergenciaTelefone} 
-                  onChange={(e) => handleChange('contatoEmergenciaTelefone', e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
+        <FieldGroup
+          label="Data de admissao"
+          hint={canEditClinical ? undefined : 'Apenas profissionais podem alterar'}
+        >
+          <Input
+            value={data.dataAdmissao}
+            onChange={(e) => handleChange('dataAdmissao', e.target.value)}
+            disabled={!canEditClinical}
+            className={!canEditClinical ? 'bg-slate-50 text-slate-500' : ''}
+          />
+        </FieldGroup>
+      </div>
 
-          {/* Status - só admin */}
-          <div className="border-t pt-6">
-            <div className="flex items-center gap-3">
-              <label className="text-sm text-slate-500">Status do paciente</label>
-              <Button
-                variant={data.ativo ? 'default' : 'secondary'}
-                size="sm"
-                onClick={() => canEditStatus && handleChange('ativo', !data.ativo)}
-                disabled={!canEditStatus}
-                className={!canEditStatus ? 'opacity-60' : ''}
-              >
-                {data.ativo ? 'Ativo' : 'Inativo'}
-              </Button>
-              {!canEditStatus && (
-                <span className="text-[10px] text-slate-400">Somente administrador pode alterar</span>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="mb-8 border-t border-slate-200 pt-6">
+        <h3 className="mb-4 text-sm font-semibold text-slate-900">Contato de emergencia</h3>
+        <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-3">
+          <FieldGroup label="Nome">
+            <Input
+              value={data.contatoEmergenciaNome}
+              onChange={(e) => handleChange('contatoEmergenciaNome', e.target.value)}
+            />
+          </FieldGroup>
+          <FieldGroup label="Parentesco">
+            <Input
+              value={data.contatoEmergenciaParentesco}
+              onChange={(e) => handleChange('contatoEmergenciaParentesco', e.target.value)}
+            />
+          </FieldGroup>
+          <FieldGroup label="Telefone">
+            <Input
+              value={data.contatoEmergenciaTelefone}
+              onChange={(e) => handleChange('contatoEmergenciaTelefone', e.target.value)}
+            />
+          </FieldGroup>
+        </div>
+      </div>
+
+      <div className="mb-8 border-t border-slate-200 pt-6">
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-slate-500">Status do paciente</span>
+          <Button
+            variant={data.ativo ? 'default' : 'secondary'}
+            size="sm"
+            onClick={() => canEditStatus && handleChange('ativo', !data.ativo)}
+            disabled={!canEditStatus}
+            className={!canEditStatus ? 'opacity-60' : ''}
+          >
+            {data.ativo ? 'Ativo' : 'Inativo'}
+          </Button>
+          {!canEditStatus && (
+            <span className="text-xs text-slate-400">Somente administrador</span>
+          )}
+        </div>
+      </div>
 
       <div className="flex items-center gap-3">
         <Button onClick={handleSave} disabled={isSaving}>
-          {isSaving ? 'Salvando...' : 'Salvar alterações'}
+          {isSaving ? 'Salvando...' : 'Salvar alteracoes'}
         </Button>
-
-        {saveMessage && (
-          <span className="text-sm text-emerald-600">{saveMessage}</span>
-        )}
-
-        <span className="text-xs text-slate-400 ml-auto">
-          ID do paciente: {params.id}
-        </span>
+        {saveMessage && <span className="text-sm text-emerald-600">{saveMessage}</span>}
+        <span className="ml-auto text-xs text-slate-400">ID: {params.id}</span>
       </div>
-
-      <p className="text-[10px] text-slate-400">
-        Este é um formulário simulado. Os dados não são persistidos. O papel atual controla quais campos podem ser editados.
-      </p>
     </div>
   );
 }
