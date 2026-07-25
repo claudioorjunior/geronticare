@@ -1,7 +1,7 @@
 'use client';
 
-import { Activity, AlertTriangle, ClipboardList, HeartPulse, Calendar } from 'lucide-react';
-import { Card } from '@/components/ui/card';
+import Link from 'next/link';
+import { AlertTriangle, ClipboardList, Calendar, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDevRole } from '@/lib/dev/use-dev-role';
 
@@ -75,9 +75,9 @@ const pacientesRecentes: {
 
 function StatusBadge({ status }: { status: Status }) {
   const styles: Record<Status, string> = {
-    concluido: 'bg-emerald-50 text-emerald-700',
-    andamento: 'bg-amber-50 text-amber-700',
-    agendado: 'bg-slate-100 text-slate-600',
+    concluido: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    andamento: 'bg-amber-50 text-amber-700 ring-amber-200',
+    agendado: 'bg-slate-100 text-slate-600 ring-slate-200',
   };
   const labels: Record<Status, string> = {
     concluido: 'Concluido',
@@ -85,89 +85,107 @@ function StatusBadge({ status }: { status: Status }) {
     agendado: 'Agendado',
   };
   return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${styles[status]}`}>
+    <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${styles[status]}`}>
       {labels[status]}
     </span>
   );
 }
 
-function KpiCard({ label, value, delta }: { label: string; value: string; delta?: string }) {
+function KpiCard({ label, value, delta, accent }: { label: string; value: string; delta?: string; accent?: boolean }) {
   return (
-    <Card className="border border-slate-200 p-6 shadow-sm transition-colors hover:bg-slate-50/50">
+    <div className={`rounded-lg border p-6 ${accent ? 'border-teal-200 bg-teal-50/30' : 'border-slate-200 bg-white'}`}>
       <div className="text-sm text-slate-500">{label}</div>
-      <div className="mt-1 text-3xl font-semibold tabular-nums text-slate-900">{value}</div>
+      <div className="mt-2 text-3xl font-semibold tabular-nums text-slate-900">{value}</div>
       {delta && <div className="mt-1 text-xs text-emerald-600">{delta}</div>}
-    </Card>
+    </div>
   );
 }
+
+function TendenciaIcon({ tendencia }: { tendencia: 'alta' | 'baixa' | 'estavel' }) {
+  if (tendencia === 'alta') return <TrendingUp className="h-3.5 w-3.5 text-amber-600" />;
+  if (tendencia === 'baixa') return <TrendingDown className="h-3.5 w-3.5 text-amber-600" />;
+  return <Minus className="h-3.5 w-3.5 text-emerald-600" />;
+}
+
+const tipoLabels: Record<string, string> = {
+  medicina: 'Medicina',
+  enfermagem: 'Enfermagem',
+  fisioterapia: 'Fisioterapia',
+  terapia_ocupacional: 'T. Ocupacional',
+  fonoaudiologia: 'Fonoaudiologia',
+  nutricao: 'Nutricao',
+};
 
 function DashboardAdmin() {
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="mb-1 text-2xl font-semibold tracking-tight text-slate-900">Painel Administrativo</h1>
-        <p className="text-sm text-slate-500">Casa de Repouso Vila Nova</p>
+      <div className="mb-10">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900" style={{ textWrap: 'balance' }}>Painel Administrativo</h1>
+        <p className="mt-1.5 text-sm text-slate-500">Casa de Repouso Vila Nova</p>
       </div>
 
-      {/* KPIs */}
-      <div className="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Pacientes Ativos" value="142" delta="+3 este mes" />
+      {/* KPIs — asymmetric: 1 featured + 3 standard */}
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard label="Pacientes Ativos" value="142" delta="+3 este mes" accent />
         <KpiCard label="Profissionais" value="8" />
         <KpiCard label="AGAs Pendentes" value="5" />
         <KpiCard label="Intercorrencias (30d)" value="3" />
       </div>
 
-      {/* Two-column layout */}
+      {/* Two-column: 2/3 + 1/3 */}
       <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Atendimentos Recentes */}
-        <Card className="border border-slate-200 p-0 shadow-sm lg:col-span-2">
-          <div className="border-b border-slate-200 px-6 py-4">
+        {/* Atendimentos Recentes — 2/3 */}
+        <div className="lg:col-span-2">
+          <div className="mb-3 flex items-baseline justify-between">
             <h2 className="text-lg font-semibold text-slate-900">Atendimentos Recentes</h2>
+            <span className="text-xs text-slate-400">Ultimos 7 dias</span>
           </div>
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50/50">
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Paciente</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Tipo</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Profissional</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Data</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {atendimentosRecentes.map((a, i) => (
-                <tr key={i} className="transition-colors hover:bg-slate-50">
-                  <td className="px-4 py-3 text-sm font-medium text-slate-900">{a.paciente}</td>
-                  <td className="px-4 py-3 text-sm leading-relaxed text-slate-600">{a.tipo}</td>
-                  <td className="px-4 py-3 text-sm leading-relaxed text-slate-600">{a.profissional}</td>
-                  <td className="px-4 py-3 text-sm tabular-nums text-slate-600">{a.data}</td>
-                  <td className="px-4 py-3"><StatusBadge status={a.status} /></td>
+          <div className="overflow-hidden rounded-lg border border-slate-200">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50">
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-500">Paciente</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-500">Tipo</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-500">Profissional</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-500">Data</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-500">Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {atendimentosRecentes.map((a, i) => (
+                  <tr key={i} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 text-sm font-medium text-slate-900">{a.paciente}</td>
+                    <td className="px-4 py-3 text-sm text-slate-600">{a.tipo}</td>
+                    <td className="px-4 py-3 text-sm text-slate-600">{a.profissional}</td>
+                    <td className="px-4 py-3 text-sm tabular-nums text-slate-600">{a.data}</td>
+                    <td className="px-4 py-3"><StatusBadge status={a.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-        {/* Alertas Vitais */}
-        <Card className="border border-slate-200 p-0 shadow-sm">
-          <div className="border-b border-slate-200 px-6 py-4">
+        {/* Alertas Vitais — 1/3 */}
+        <div>
+          <div className="mb-3">
             <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
               <AlertTriangle className="h-4 w-4 text-amber-600" />
-              Sinais Vitais - Alertas
+              Alertas de Sinais Vitais
             </h2>
           </div>
-          <div className="divide-y divide-slate-100 p-6">
+          <div className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
             {alertasVitais.map((a, i) => (
-              <div key={i} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
+              <div key={i} className="flex items-center justify-between px-5 py-4">
                 <div>
                   <div className="text-sm font-medium text-slate-900">{a.paciente}</div>
-                  <div className="text-xs text-slate-500">{a.sinal}</div>
+                  <div className="mt-0.5 text-xs tabular-nums text-slate-500">{a.sinal}</div>
                 </div>
                 <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                  className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${
                     a.severidade === 'critico'
-                      ? 'bg-red-50 text-red-700'
-                      : 'bg-amber-50 text-amber-700'
+                      ? 'bg-red-50 text-red-700 ring-red-200'
+                      : 'bg-amber-50 text-amber-700 ring-amber-200'
                   }`}
                 >
                   {a.severidade === 'critico' ? 'Critico' : 'Atencao'}
@@ -175,28 +193,29 @@ function DashboardAdmin() {
               </div>
             ))}
           </div>
-        </Card>
+        </div>
       </div>
 
       {/* AGAs Proximas */}
       <div>
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">Avaliacoes AGA - Proximas</h2>
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+        <div className="mb-3 flex items-baseline justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Avaliacoes AGA Proximas</h2>
+          <Link href="/pacientes" className="text-xs font-medium text-teal-600 hover:text-teal-700">Ver todos</Link>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           {agasProximas.map((a, i) => (
-            <Card key={i} className="border border-slate-200 p-6 shadow-sm transition-colors hover:bg-slate-50/50">
+            <div key={i} className="rounded-lg border border-slate-200 bg-white p-5">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-50">
-                  <ClipboardList className="h-5 w-5 text-teal-600" />
-                </div>
+                <ClipboardList className="h-5 w-5 text-teal-600" />
                 <div>
                   <div className="text-sm font-medium text-slate-900">{a.paciente}</div>
-                  <div className="flex items-center gap-1 text-xs text-slate-500">
+                  <div className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
                     <Calendar className="h-3 w-3" />
-                    {a.data}
+                    <time>{a.data}</time>
                   </div>
                 </div>
               </div>
-            </Card>
+            </div>
           ))}
         </div>
       </div>
@@ -205,87 +224,67 @@ function DashboardAdmin() {
 }
 
 function DashboardProfissional() {
-  const tipoLabels: Record<string, string> = {
-    medicina: 'Medicina',
-    enfermagem: 'Enfermagem',
-    fisioterapia: 'Fisioterapia',
-    terapia_ocupacional: 'T. Ocupacional',
-    fonoaudiologia: 'Fonoaudiologia',
-    nutricao: 'Nutricao',
-  };
-  const tendenciaIcon: Record<string, string> = {
-    alta: 'text-amber-600',
-    baixa: 'text-amber-600',
-    estavel: 'text-emerald-600',
-  };
-  const tendenciaLabel: Record<string, string> = {
-    alta: 'Em alta',
-    baixa: 'Em baixa',
-    estavel: 'Estavel',
-  };
-
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="mb-1 text-2xl font-semibold tracking-tight text-slate-900">Meus Atendimentos</h1>
-        <p className="text-sm text-slate-500">Dra. Helena Costa - Geriatria</p>
+      <div className="mb-10">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900" style={{ textWrap: 'balance' }}>Meus Atendimentos</h1>
+        <p className="mt-1.5 text-sm text-slate-500">Dra. Helena Costa - Geriatria</p>
       </div>
 
       {/* KPIs */}
-      <div className="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-3">
-        <KpiCard label="Atendimentos Hoje" value="7" />
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <KpiCard label="Atendimentos Hoje" value="7" accent />
         <KpiCard label="Pacientes Sob Cuidado" value="23" />
         <KpiCard label="AGAs Pendentes" value="4" />
       </div>
 
       {/* Registros de Hoje */}
-      <Card className="mb-8 border border-slate-200 p-0 shadow-sm">
-        <div className="border-b border-slate-200 px-6 py-4">
+      <div className="mb-8">
+        <div className="mb-3">
           <h2 className="text-lg font-semibold text-slate-900">Registros de Hoje</h2>
         </div>
-        <div className="divide-y divide-slate-100 p-6">
+        <div className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
           {registrosHoje.map((r, i) => (
-            <div key={i} className="flex gap-4 py-3 first:pt-0 last:pb-0">
-              <div className="flex flex-col items-center pt-0.5">
-                <div className="text-xs font-medium tabular-nums text-slate-500">{r.hora}</div>
-                <div className="mt-1 h-full w-px bg-slate-200" />
+            <div key={i} className="flex gap-5 px-5 py-4">
+              <div className="w-12 shrink-0">
+                <time className="text-xs font-medium tabular-nums text-slate-500">{r.hora}</time>
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-slate-900">{r.paciente}</span>
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                  <span className="inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600">
                     {tipoLabels[r.tipo] || r.tipo}
                   </span>
                 </div>
-                <p className="mt-0.5 text-sm leading-relaxed text-slate-600">{r.conteudo}</p>
+                <p className="mt-1 text-sm leading-relaxed text-slate-600">{r.conteudo}</p>
               </div>
             </div>
           ))}
         </div>
-      </Card>
+      </div>
 
       {/* Sinais Vitais - Monitorar */}
-      <Card className="border border-slate-200 p-0 shadow-sm">
-        <div className="border-b border-slate-200 px-6 py-4">
-          <h2 className="flex items-center gap-2 text-lg font-semibold text-slate-900">
-            <HeartPulse className="h-4 w-4 text-teal-600" />
-            Sinais Vitais - Monitorar
-          </h2>
+      <div>
+        <div className="mb-3">
+          <h2 className="text-lg font-semibold text-slate-900">Sinais Vitais para Monitorar</h2>
         </div>
-        <div className="divide-y divide-slate-100 p-6">
+        <div className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
           {sinaisMonitorar.map((s, i) => (
-            <div key={i} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
+            <div key={i} className="flex items-center justify-between px-5 py-4">
               <div>
                 <div className="text-sm font-medium text-slate-900">{s.paciente}</div>
-                <div className="text-xs tabular-nums text-slate-500">{s.sinal}</div>
+                <div className="mt-0.5 text-xs tabular-nums text-slate-500">{s.sinal}</div>
               </div>
-              <span className={`text-xs font-medium ${tendenciaIcon[s.tendencia]}`}>
-                {tendenciaLabel[s.tendencia]}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <TendenciaIcon tendencia={s.tendencia} />
+                <span className="text-xs text-slate-600">
+                  {s.tendencia === 'alta' ? 'Em alta' : s.tendencia === 'baixa' ? 'Em baixa' : 'Estavel'}
+                </span>
+              </div>
             </div>
           ))}
         </div>
-      </Card>
+      </div>
     </div>
   );
 }
@@ -293,26 +292,19 @@ function DashboardProfissional() {
 function DashboardUsuario() {
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="mb-1 text-2xl font-semibold tracking-tight text-slate-900">Painel de Cadastro</h1>
-        <p className="text-sm text-slate-500">Casa de Repouso Vila Nova</p>
+      <div className="mb-10">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900" style={{ textWrap: 'balance' }}>Painel de Cadastro</h1>
+        <p className="mt-1.5 text-sm text-slate-500">Casa de Repouso Vila Nova</p>
       </div>
 
       {/* Welcome card */}
-      <Card className="mb-8 border border-slate-200 p-6 shadow-sm">
-        <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-teal-50">
-            <Activity className="h-6 w-6 text-teal-600" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">Bem-vindo(a)</h2>
-            <p className="mt-1 text-sm leading-relaxed text-slate-600">
-              Seu perfil tem acesso aos dados cadastrais de pacientes. Registros clinicos,
-              avaliacoes geriatricas, sinais vitais e anexos sao restritos a profissionais de saude.
-            </p>
-          </div>
-        </div>
-      </Card>
+      <div className="mb-8 rounded-lg border border-slate-200 bg-white p-6">
+        <h2 className="text-lg font-semibold text-slate-900">Bem-vindo(a)</h2>
+        <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-slate-600">
+          Seu perfil tem acesso aos dados cadastrais de pacientes. Registros clinicos,
+          avaliacoes geriatricas, sinais vitais e anexos sao restritos a profissionais de saude.
+        </p>
+      </div>
 
       {/* Pacientes Recentes */}
       <div className="mb-4 flex items-center justify-between">
@@ -322,26 +314,26 @@ function DashboardUsuario() {
         </Button>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 shadow-sm">
+      <div className="overflow-hidden rounded-lg border border-slate-200">
         <table className="w-full">
-          <thead className="bg-slate-50/50">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Nome</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">CPF</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Idade</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Data Admissao</th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Status</th>
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50">
+              <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-500">Nome</th>
+              <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-500">CPF</th>
+              <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-500">Idade</th>
+              <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-500">Data Admissao</th>
+              <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-500">Status</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200 bg-white">
+          <tbody className="divide-y divide-slate-100 bg-white">
             {pacientesRecentes.map((p, i) => (
-              <tr key={i} className="transition-colors hover:bg-slate-50">
+              <tr key={i} className="hover:bg-slate-50">
                 <td className="px-4 py-3 text-sm font-medium text-slate-900">{p.nome}</td>
                 <td className="px-4 py-3 text-sm tabular-nums text-slate-600">{p.cpf}</td>
                 <td className="px-4 py-3 text-sm tabular-nums text-slate-700">{p.idade} anos</td>
                 <td className="px-4 py-3 text-sm text-slate-700">{p.dataAdmissao}</td>
                 <td className="px-4 py-3">
-                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                  <span className="inline-flex items-center rounded bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
                     Ativo
                   </span>
                 </td>

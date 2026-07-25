@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
-import { Activity, Search, User, LogOut, X } from 'lucide-react';
+import { Search, User, LogOut, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useDevRole } from '@/lib/dev/use-dev-role';
@@ -60,38 +60,39 @@ export function TopNav() {
   }
 
   return (
-    <header className="sticky top-0 z-50 h-16 border-b border-slate-200 bg-white">
-      <div className="mx-auto flex h-full max-w-7xl items-center gap-6 px-8">
-        {/* Logo + Nav — grouped left */}
-        <div className="flex items-center gap-6 shrink-0">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <Activity className="h-5 w-5 text-teal-600" strokeWidth={2} />
-            <span className="text-lg font-semibold text-slate-900">GerontiCare</span>
-          </Link>
+    <header className="sticky top-0 z-50 border-b border-slate-200 bg-white">
+      <div className="mx-auto flex h-14 max-w-[1200px] items-center gap-6 px-8">
+        {/* Brand */}
+        <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
+          <span className="text-base font-semibold text-slate-900">GerontiCare</span>
+        </Link>
 
-          <nav className="flex items-center gap-4">
-            {navLinks.map((link) => {
-              const active =
-                pathname === link.href || pathname.startsWith(link.href + '/');
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`px-3 py-1.5 text-sm font-medium transition-colors ${
-                    active
-                      ? 'text-teal-600'
-                      : 'text-slate-600 hover:text-teal-600'
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
+        {/* Divider */}
+        <div className="h-4 w-px bg-slate-200" />
 
-        {/* Search — centered */}
-        <div ref={searchRef} className="relative mx-auto w-full max-w-xs">
+        {/* Nav links */}
+        <nav className="flex items-center gap-4">
+          {navLinks.map((link) => {
+            const active =
+              pathname === link.href || pathname.startsWith(link.href + '/');
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`text-sm transition-colors ${
+                  active
+                    ? 'font-medium text-slate-900'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Search */}
+        <div ref={searchRef} className="relative ml-auto w-64">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
             type="text"
@@ -102,7 +103,7 @@ export function TopNav() {
               setSearchOpen(true);
             }}
             onFocus={() => setSearchOpen(true)}
-            className="h-9 pl-9 pr-8 text-sm"
+            className="h-8 pl-9 pr-7 text-sm"
           />
           {search && (
             <button
@@ -116,22 +117,19 @@ export function TopNav() {
             </button>
           )}
           {searchOpen && search.length > 0 && (
-            <div className="absolute mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg">
+            <div className="absolute mt-1.5 w-full overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
               {results.length > 0 ? (
                 <>
                   {results.map((p) => (
                     <button
                       key={p.id}
                       onClick={() => handleResultClick(p.id)}
-                      className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-slate-50"
+                      className="flex w-full flex-col items-start px-3 py-2.5 text-left hover:bg-slate-50"
                     >
                       <span className="font-medium text-sm text-slate-900">{p.nome}</span>
-                      <span className="text-xs text-slate-500">CPF: {p.cpf}</span>
+                      <span className="mt-0.5 text-xs tabular-nums text-slate-400">{p.cpf}</span>
                     </button>
                   ))}
-                  <div className="border-t border-slate-100 px-3 py-1.5 text-[10px] text-slate-400">
-                    {results.length} resultado(s)
-                  </div>
                 </>
               ) : (
                 <div className="px-3 py-3 text-sm text-slate-500">
@@ -143,7 +141,7 @@ export function TopNav() {
         </div>
 
         {/* User area */}
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-3">
           {process.env.NODE_ENV === 'development' && (
             <div className="flex items-center gap-0.5 rounded-md border border-slate-200 bg-slate-50 p-0.5">
               {(['admin', 'profissional', 'usuario'] as const).map((r) => (
@@ -152,8 +150,8 @@ export function TopNav() {
                   onClick={() => setRole(r)}
                   className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
                     role === r
-                      ? 'bg-teal-600 text-white'
-                      : 'text-slate-600 hover:text-slate-900'
+                      ? 'bg-slate-900 text-white'
+                      : 'text-slate-500 hover:text-slate-900'
                   }`}
                 >
                   {r}
@@ -163,12 +161,12 @@ export function TopNav() {
           )}
 
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200">
-              <User className="h-4 w-4 text-slate-600" />
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-200">
+              <User className="h-3.5 w-3.5 text-slate-600" />
             </div>
-            <div className="hidden flex-col sm:flex">
-              <span className="font-medium text-sm text-slate-900">Usuario Dev</span>
-              <span className="text-xs capitalize text-slate-500">{role}</span>
+            <div className="hidden flex-col leading-tight sm:flex">
+              <span className="text-sm font-medium text-slate-900">Usuario Dev</span>
+              <span className="text-xs capitalize text-slate-400">{role}</span>
             </div>
           </div>
 

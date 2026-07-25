@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { Search, ChevronRight, Users, Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -50,10 +51,10 @@ export default function PacientesPage() {
   return (
     <div>
       {/* Header */}
-      <div className="mb-8 flex items-start justify-between">
+      <div className="mb-8 flex items-end justify-between">
         <div>
-          <h1 className="mb-1 text-2xl font-semibold tracking-tight text-slate-900">Pacientes</h1>
-          <p className="text-sm text-slate-500">Casa de Repouso Vila Nova</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900" style={{ textWrap: 'balance' }}>Pacientes</h1>
+          <p className="mt-1.5 text-sm text-slate-500">Casa de Repouso Vila Nova</p>
         </div>
         {podeCriar && (
           <Button className="bg-teal-600 text-white hover:bg-teal-700">
@@ -64,7 +65,7 @@ export default function PacientesPage() {
       </div>
 
       {/* Search + filters */}
-      <div className="mb-8 flex items-center gap-4">
+      <div className="mb-6 flex items-center gap-4">
         <div className="relative max-w-xs flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
@@ -80,10 +81,10 @@ export default function PacientesPage() {
             <button
               key={f}
               onClick={() => setFiltroStatus(f)}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
                 filtroStatus === f
-                  ? 'bg-teal-600 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  ? 'bg-slate-900 text-white'
+                  : 'text-slate-600 hover:bg-slate-200'
               }`}
             >
               {f === 'todos' ? 'Todos' : f === 'ativos' ? 'Ativos' : 'Inativos'}
@@ -94,53 +95,53 @@ export default function PacientesPage() {
 
       {/* Table or empty state */}
       {pacientesFiltrados.length > 0 ? (
-        <div className="overflow-hidden rounded-lg border border-slate-200 shadow-sm">
+        <div className="overflow-hidden rounded-lg border border-slate-200">
           <table className="w-full">
-            <thead className="bg-slate-50/50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Nome</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Idade</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Data Admissao</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Ultima AGA</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500">Status</th>
-                <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wide text-slate-500">Acoes</th>
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50">
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-500">Nome</th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-500">Idade</th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-500">Data Admissao</th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-500">Ultima AGA</th>
+                <th className="px-4 py-2.5 text-left text-xs font-medium text-slate-500">Status</th>
+                <th className="px-4 py-2.5 text-right text-xs font-medium text-slate-500">Acoes</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 bg-white">
+            <tbody className="divide-y divide-slate-100 bg-white">
               {pacientesFiltrados.map((p) => (
-                <tr key={p.id} className="transition-colors hover:bg-slate-50">
+                <tr key={p.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3">
                     <div className="font-medium text-sm text-slate-900">{p.nome}</div>
-                    <div className="text-xs text-slate-500">{p.cpf}</div>
+                    <div className="mt-0.5 text-xs tabular-nums text-slate-400">{p.cpf}</div>
                   </td>
                   <td className="px-4 py-3 text-sm tabular-nums text-slate-700">{p.idade} anos</td>
-                  <td className="px-4 py-3 text-sm text-slate-700">{p.dataAdmissao}</td>
+                  <td className="px-4 py-3 text-sm tabular-nums text-slate-600">{p.dataAdmissao}</td>
                   <td className="px-4 py-3 text-sm">
                     {p.ultimaAga ? (
-                      <span className="text-slate-700">{p.ultimaAga}</span>
+                      <span className="tabular-nums text-slate-600">{p.ultimaAga}</span>
                     ) : (
                       <span className="text-slate-400">Nao realizada</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${
                         p.status === 'ativo'
-                          ? 'bg-emerald-50 text-emerald-700'
-                          : 'bg-slate-100 text-slate-600'
+                          ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                          : 'bg-slate-100 text-slate-600 ring-slate-200'
                       }`}
                     >
                       {p.status === 'ativo' ? 'Ativo' : 'Inativo'}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <a
+                    <Link
                       href={`/pacientes/${p.id}`}
-                      className="inline-flex items-center text-sm font-medium text-teal-600 transition-colors hover:text-teal-700"
+                      className="inline-flex items-center text-sm font-medium text-teal-600 hover:text-teal-700"
                     >
                       Abrir
                       <ChevronRight className="ml-0.5 h-4 w-4" />
-                    </a>
+                    </Link>
                   </td>
                 </tr>
               ))}
@@ -148,7 +149,7 @@ export default function PacientesPage() {
           </table>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 py-16">
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 py-20">
           <Users className="mb-3 h-10 w-10 text-slate-300" />
           <p className="text-sm text-slate-500">Nenhum paciente encontrado</p>
         </div>
@@ -156,7 +157,7 @@ export default function PacientesPage() {
 
       {/* Pagination info */}
       {pacientesFiltrados.length > 0 && (
-        <p className="mt-4 text-xs text-slate-500">
+        <p className="mt-4 text-xs text-slate-400">
           Mostrando {pacientesFiltrados.length} de {mockPacientes.length} pacientes
         </p>
       )}
