@@ -91,7 +91,7 @@ const mockRegistros: Registro[] = [
 // ---- Component ----
 
 export default function RegistrosPage() {
-  const params = useParams<{ id: string }>();
+  useParams<{ id: string }>();
   const { role } = useDevRole();
 
   const [registros, setRegistros] = useState<Registro[]>(mockRegistros);

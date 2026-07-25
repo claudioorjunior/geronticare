@@ -59,7 +59,7 @@ function gerarInterpretacao(scores: AGAScore): string {
 }
 
 export default function AGAPage() {
-  const params = useParams<{ id: string }>();
+  useParams<{ id: string }>();
   const { role } = useDevRole();
 
   const [agAs, setAGAs] = useState<AGA[]>([
