@@ -1,30 +1,9 @@
 import { z } from 'zod';
 import { createTRPCRouter, clinicalProcedure } from '../server';
-import { avaliacoesGeriatricas, pacientes, usuarios } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { avaliacoesGeriatricas, usuarios } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 import { criarAvaliacaoSchema, interpretarEscala } from '@/lib/validations/escalas';
-import { TRPCError } from '@trpc/server';
-
-// Helper: valida que paciente pertence à mesma instituição
-async function verificarOwnershipPaciente(
-  db: typeof import('@/lib/db').db,
-  pacienteId: string,
-  instituicaoId: string
-) {
-  const paciente = await db.query.pacientes.findFirst({
-    where: and(
-      eq(pacientes.id, pacienteId),
-      eq(pacientes.instituicaoId, instituicaoId)
-    ),
-  });
-  if (!paciente) {
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Paciente não encontrado ou não pertence à sua instituição',
-    });
-  }
-  return paciente;
-}
+import { verificarOwnershipPaciente } from '../ownership';
 
 export const avaliacoesGeriatricasRouter = createTRPCRouter({
   listar: clinicalProcedure
@@ -47,7 +26,7 @@ export const avaliacoesGeriatricasRouter = createTRPCRouter({
 
       if (!avaliacao) return null;
 
-      // Verifica ownership do paciente antes de retornar
+      // Verifica ownership antes de retornar dados clínicos
       await verificarOwnershipPaciente(ctx.db, avaliacao.pacienteId, ctx.instituicaoId);
 
       return {

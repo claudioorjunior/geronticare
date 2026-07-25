@@ -1,29 +1,9 @@
 import { z } from 'zod';
 import { createTRPCRouter, clinicalProcedure } from '../server';
-import { registros, pacientes, avaliacoesGeriatricas, sinaisVitais } from '@/lib/db/schema';
+import { registros, avaliacoesGeriatricas, sinaisVitais } from '@/lib/db/schema';
 import { eq, and, gte, lte } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-
-// Helper: valida que paciente pertence à mesma instituição
-async function verificarOwnershipPaciente(
-  db: typeof import('@/lib/db').db,
-  pacienteId: string,
-  instituicaoId: string
-) {
-  const paciente = await db.query.pacientes.findFirst({
-    where: and(
-      eq(pacientes.id, pacienteId),
-      eq(pacientes.instituicaoId, instituicaoId)
-    ),
-  });
-  if (!paciente) {
-    throw new TRPCError({
-      code: 'NOT_FOUND',
-      message: 'Paciente não encontrado ou não pertence à sua instituição',
-    });
-  }
-  return paciente;
-}
+import { verificarOwnershipPaciente } from '../ownership';
 
 export const registrosRouter = createTRPCRouter({
   listar: clinicalProcedure
