@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { Search, User, LogOut, X } from 'lucide-react';
+import { Search, User, LogOut, X, Bell } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useDevRole, type DevRole } from '@/lib/dev/use-dev-role';
@@ -43,52 +43,47 @@ export function TopNav() {
     setIsSearchOpen(false);
   };
 
+  const navLinkClass = (path: string) =>
+    `pb-1 transition-colors h-full flex items-center ${
+      isActive(path)
+        ? 'text-m3-on-surface border-b-2 border-m3-primary font-semibold'
+        : 'text-m3-secondary hover:text-m3-on-surface'
+    }`;
+
   return (
-    <nav className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-      <div className="flex h-14 items-center px-4">
+    <nav className="sticky top-0 z-50 w-full border-b border-m3-outline-variant bg-m3-surface">
+      <div className="flex h-14 items-center px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto">
         {/* Logo + Brand */}
-        <Link href="/dashboard" className="flex items-center gap-2 font-semibold text-lg mr-8">
-          <span className="text-teal-600">GerontiCare</span>
+        <Link href="/dashboard" className="flex items-center gap-2 font-semibold text-lg mr-8 shrink-0">
+          <span className="text-m3-primary">GerontiCare</span>
         </Link>
 
-        {/* Global Navigation */}
-        <div className="flex items-center gap-6 text-sm font-medium">
-          <Link 
-            href="/dashboard" 
-            className={`transition-colors hover:text-teal-600 ${isActive('/dashboard') ? 'text-teal-600' : 'text-slate-600'}`}
-          >
+        {/* Global Navigation — persistent, shows active page */}
+        <nav className="hidden md:flex items-end gap-6 h-full text-sm font-medium">
+          <Link href="/dashboard" className={navLinkClass('/dashboard')}>
             Dashboard
           </Link>
-          <Link 
-            href="/pacientes" 
-            className={`transition-colors hover:text-teal-600 ${isActive('/pacientes') ? 'text-teal-600' : 'text-slate-600'}`}
-          >
+          <Link href="/pacientes" className={navLinkClass('/pacientes')}>
             Pacientes
           </Link>
 
           {/* Admin-only links */}
           {userRole === 'admin' && (
             <>
-              <Link 
-                href="/usuarios" 
-                className={`transition-colors hover:text-teal-600 ${isActive('/usuarios') ? 'text-teal-600' : 'text-slate-600'}`}
-              >
-                Usuários
+              <Link href="/profissionais" className={navLinkClass('/profissionais')}>
+                Profissionais
               </Link>
-              <Link 
-                href="/instituicao" 
-                className={`transition-colors hover:text-teal-600 ${isActive('/instituicao') ? 'text-teal-600' : 'text-slate-600'}`}
-              >
-                Instituição
+              <Link href="/configuracoes" className={navLinkClass('/configuracoes')}>
+                Configurações
               </Link>
             </>
           )}
-        </div>
+        </nav>
 
         {/* Global Patient Search */}
         <div className="flex-1 max-w-sm mx-6 relative">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-m3-outline pointer-events-none" />
             <Input
               type="text"
               placeholder="Buscar paciente (nome, CPF, CN)"
@@ -103,7 +98,7 @@ export function TopNav() {
             {searchTerm && (
               <button
                 onClick={clearSearch}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-m3-outline hover:text-m3-secondary"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -112,43 +107,53 @@ export function TopNav() {
 
           {/* Search Results Dropdown */}
           {isSearchOpen && filteredPatients.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-md shadow-lg z-50 py-1 text-sm">
+            <div className="absolute top-full left-0 right-0 mt-1 bg-m3-surface-container-lowest border border-m3-outline-variant rounded-m3-xl shadow-lg z-50 py-1 text-sm">
               {filteredPatients.map((patient) => (
                 <button
                   key={patient.id}
                   onClick={() => handleSelectPatient(patient.id)}
-                  className="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center justify-between group"
+                  className="w-full text-left px-4 py-2 hover:bg-m3-surface-variant flex items-center justify-between group"
                 >
                   <div>
-                    <div className="font-medium text-slate-900 group-hover:text-teal-700">{patient.nome}</div>
-                    <div className="text-xs text-slate-500">{patient.cpf} • {patient.idade} anos</div>
+                    <div className="font-medium text-m3-on-surface group-hover:text-m3-primary">{patient.nome}</div>
+                    <div className="text-label-sm text-m3-secondary">{patient.cpf} • {patient.idade} anos</div>
                   </div>
-                  <div className="text-[10px] text-teal-600 opacity-0 group-hover:opacity-100 transition">Abrir →</div>
+                  <div className="text-label-sm text-m3-primary opacity-0 group-hover:opacity-100 transition">Abrir →</div>
                 </button>
               ))}
-              <div className="px-4 pt-2 pb-1 text-[10px] text-slate-400 border-t">
+              <div className="px-4 pt-2 pb-1 text-label-sm text-m3-secondary border-t border-m3-outline-variant">
                 {filteredPatients.length} resultado(s) — clique para abrir o prontuário
               </div>
             </div>
           )}
 
           {isSearchOpen && searchTerm.length > 1 && filteredPatients.length === 0 && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-md shadow-lg z-50 p-3 text-sm text-slate-500">
+            <div className="absolute top-full left-0 right-0 mt-1 bg-m3-surface-container-lowest border border-m3-outline-variant rounded-m3-xl shadow-lg z-50 p-3 text-body-md text-m3-secondary">
               Nenhum paciente encontrado.
             </div>
           )}
         </div>
 
         {/* User Menu + Dev Role Switcher */}
-        <div className="flex items-center gap-3 ml-auto">
+        <div className="flex items-center gap-3 ml-auto shrink-0">
+          {/* Notification bell */}
+          <button className="relative p-2 text-m3-secondary hover:text-m3-primary transition-colors rounded-full hover:bg-m3-surface-variant">
+            <Bell className="h-5 w-5" />
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-m3-error rounded-full" />
+          </button>
+
           {/* Dev role switcher — só renderiza em desenvolvimento */}
           {process.env.NODE_ENV === 'development' && (
-            <div className="flex items-center gap-1 text-xs border rounded-md p-0.5 bg-slate-50">
+            <div className="flex items-center gap-1 text-label-sm border border-m3-outline-variant rounded-m3-lg p-0.5 bg-m3-surface-container-low">
               {(['admin', 'profissional', 'usuario'] as DevRole[]).map((r) => (
                 <button
                   key={r}
                   onClick={() => setRole(r)}
-                  className={`px-2 py-0.5 rounded ${userRole === r ? 'bg-teal-600 text-white' : 'hover:bg-white'}`}
+                  className={`px-2 py-0.5 rounded-m3-lg ${
+                    userRole === r
+                      ? 'bg-m3-primary text-m3-on-primary'
+                      : 'hover:bg-m3-surface-container-lowest'
+                  }`}
                 >
                   {r}
                 </button>
@@ -158,16 +163,16 @@ export function TopNav() {
 
           <div className="flex items-center gap-2 text-sm">
             <div className="text-right">
-              <div className="font-medium text-slate-900">Usuário Dev</div>
-              <div className="text-xs text-slate-500 capitalize">{userRole}</div>
+              <div className="text-label-md font-medium text-m3-on-surface">Usuário Dev</div>
+              <div className="text-label-sm text-m3-secondary capitalize">{userRole}</div>
             </div>
-            <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center">
-              <User className="h-4 w-4 text-slate-600" />
+            <div className="h-8 w-8 rounded-full bg-m3-surface-variant flex items-center justify-center">
+              <User className="h-4 w-4 text-m3-on-surface-variant" />
             </div>
           </div>
 
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             size="icon"
             onClick={() => {/* TODO: logout via better-auth */}}
             title="Sair"

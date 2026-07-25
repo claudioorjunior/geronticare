@@ -43,3 +43,6 @@ next-env.d.ts
 # drizzle
 /lib/db/migrations/*.sql
 !lib/db/migrations/.gitkeep
+
+# hermes internal
+.hermes/
