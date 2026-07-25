@@ -280,36 +280,6 @@ const mnaScreenItems: RadioItem[] = [
   },
 ];
 
-const tugItems: RadioItem[] = [
-  {
-    id: 'tug1', label: '1ª medição — Tempo (segundos)', icon: <Timer className="h-4 w-4" />,
-    options: [
-      { value: 0, label: '< 10 s', desc: 'Independente e sem risco de queda.' },
-      { value: 1, label: '10 a 19 s', desc: 'Independente em transferências básicas — sem risco significativo.' },
-      { value: 2, label: '20 a 29 s', desc: 'Independência variável — risco de queda moderado.' },
-      { value: 3, label: '≥ 30 s', desc: 'Dependência — risco de queda elevado.' },
-    ],
-  },
-  {
-    id: 'tug2', label: '2ª medição — Tempo (segundos)', icon: <Timer className="h-4 w-4" />,
-    options: [
-      { value: 0, label: '< 10 s', desc: 'Independente.' },
-      { value: 1, label: '10 a 19 s', desc: 'Sem risco.' },
-      { value: 2, label: '20 a 29 s', desc: 'Risco moderado.' },
-      { value: 3, label: '≥ 30 s', desc: 'Risco elevado.' },
-    ],
-  },
-  {
-    id: 'tug3', label: '3ª medição — Tempo (segundos)', icon: <Timer className="h-4 w-4" />,
-    options: [
-      { value: 0, label: '< 10 s', desc: 'Independente.' },
-      { value: 1, label: '10 a 19 s', desc: 'Sem risco.' },
-      { value: 2, label: '20 a 29 s', desc: 'Risco moderado.' },
-      { value: 3, label: '≥ 30 s', desc: 'Risco elevado.' },
-    ],
-  },
-];
-
 const scales: ScaleDef[] = [
   {
     key: 'katz',
@@ -389,17 +359,14 @@ const scales: ScaleDef[] = [
   {
     key: 'tug',
     title: 'TUG (Timed Up and Go)',
-    subtitle: '3 medições de tempo. Escore sintético (0–9) reflete classificação clínica.',
+    subtitle: 'Tempo em segundos. O paciente levanta de uma cadeira, caminha 3 metros, gira, volta e senta. Valor 0–300.',
     icon: <Timer className="h-5 w-5" />,
     cardTitle: 'TUG',
-    max: 9, unit: '/9',
-    items: tugItems,
+    max: 300, unit: ' segundos',
     interpret: (s) => {
-      const avg = s; // classificação aditiva: cada medição contribui com 0–3
-      if (avg === 0) return { label: 'Independente / sem risco', desc: 'Todas as medições < 10 s. Sem risco aumentado de queda.', tone: 'ok' };
-      if (avg <= 3) return { label: 'Independência preservada', desc: 'Medições entre 10 e 19 s. Sem risco significativo.', tone: 'ok' };
-      if (avg <= 6) return { label: 'Independência variável', desc: 'Risco de queda moderado (20–29 s).', tone: 'warn' };
-      return { label: 'Risco elevado', desc: 'Dependência e risco de queda significativo (≥ 30 s em ao menos uma medição).', tone: 'risk' };
+      if (s < 10) return { label: 'Mobilidade normal', desc: 'Sem risco aumentado de queda. Independente em transferências.', tone: 'ok' };
+      if (s < 20) return { label: 'Risco de queda', desc: 'Independência preservada mas atenção a fatores ambientais.', tone: 'warn' };
+      return { label: 'Alto risco de queda', desc: 'Dependência em transferências. Avaliar intervenção e adaptação ambiental.', tone: 'risk' };
     },
   },
 ];
@@ -490,7 +457,7 @@ export function AgaTab() {
     meem: sumObj(meem),
     gds15: sumObj(gds15),
     mna: sumObj(mna),
-    tug: sumObj(tug),
+    tug: tug['tug-segundos'] ?? 0,
   }), [katz, lawton, meem, gds15, mna, tug]);
 
   const current = scales.find((s) => s.key === activeScale)!;
@@ -502,9 +469,11 @@ export function AgaTab() {
   const goPrev = () => setActiveScale(scales[Math.max(0, activeIdx - 1)].key);
   const goNext = () => setActiveScale(scales[Math.min(scales.length - 1, activeIdx + 1)].key);
 
-  const totalAnswered = currentItems.length
-    ? currentItems.filter((it) => currentValues[it.id] !== undefined).length
-    : 0;
+  const totalAnswered = activeScale === 'tug'
+    ? (currentValues['tug-segundos'] !== undefined ? 1 : 0)
+    : currentItems.length
+      ? currentItems.filter((it) => currentValues[it.id] !== undefined).length
+      : 0;
 
   return (
     <div className="flex flex-col gap-gutter">
@@ -554,15 +523,38 @@ export function AgaTab() {
             </div>
 
             <div className="space-y-4">
-              {currentItems.map((item) => (
-                <RadioCard
-                  key={item.id}
-                  item={item}
-                  value={currentValues[item.id]}
-                  onChange={(v) => setCurrentValues((prev) => ({ ...prev, [item.id]: v }))}
-                />
-              ))}
-              {currentItems.length === 0 && (
+              {activeScale === 'tug' ? (
+                <div className="p-6 rounded-m3-xl border border-m3-outline-variant bg-m3-surface-container-lowest">
+                  <label className="block text-label-md text-m3-on-surface mb-3 flex items-center gap-2">
+                    <Timer className="h-4 w-4 text-m3-primary" />
+                    Tempo total (segundos)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={300}
+                    value={currentValues['tug-segundos'] ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value === '' ? undefined : Math.max(0, Math.min(300, Number(e.target.value)));
+                      setCurrentValues((prev) => ({ ...prev, 'tug-segundos': v }));
+                    }}
+                    placeholder="Ex: 14 (segundos)"
+                    className="w-full max-w-xs px-4 py-3 bg-m3-background border border-m3-outline-variant rounded-m3-lg focus:ring-2 focus:ring-m3-primary focus:border-transparent text-body-md text-m3-on-surface placeholder-m3-secondary outline-none tabular-nums"
+                  />
+                  <p className="text-label-sm text-m3-secondary mt-2">
+                    Insira o tempo total do teste em segundos (0–300). Pacientes que não conseguem completar o teste devem ser registrados com valor máximo (300).
+                  </p>
+                </div>
+              ) : currentItems.length > 0 ? (
+                currentItems.map((item) => (
+                  <RadioCard
+                    key={item.id}
+                    item={item}
+                    value={currentValues[item.id]}
+                    onChange={(v) => setCurrentValues((prev) => ({ ...prev, [item.id]: v }))}
+                  />
+                ))
+              ) : (
                 <p className="text-body-md text-m3-secondary">Selecione uma das escalas acima para iniciar.</p>
               )}
             </div>
