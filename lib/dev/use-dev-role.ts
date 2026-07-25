@@ -20,7 +20,8 @@ export function useDevRole() {
     if (!IS_DEV) return;
     const saved = localStorage.getItem(STORAGE_KEY) as DevRole | null;
     if (saved && ['admin', 'profissional', 'usuario'].includes(saved)) {
-      setRoleState(saved);
+      // Usa microtask para não chamar setState sincronamente no effect
+      queueMicrotask(() => setRoleState(saved));
     }
   }, []);
 

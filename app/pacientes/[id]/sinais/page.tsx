@@ -140,7 +140,7 @@ const chartData = [...mockHistorico]
 // ---- Component ----
 
 export default function SinaisVitaisPage() {
-  const params = useParams<{ id: string }>();
+  useParams<{ id: string }>();
   const { role } = useDevRole();
 
   const [historico, setHistorico] = useState<SinalVital[]>(mockHistorico);
@@ -262,9 +262,10 @@ export default function SinaisVitaisPage() {
                 contentStyle={{ fontSize: 12, borderRadius: 6, border: '1px solid #e2e8f0' }}
                 labelFormatter={(label, payload) => {
                   if (payload && payload.length > 0) {
-                    return `${label} — ${(payload[0].payload as any).hora}`;
+                    const item = payload[0].payload as { hora?: string };
+                    return item.hora ? `${label} — ${item.hora}` : String(label);
                   }
-                  return label;
+                  return String(label);
                 }}
               />
               <Legend wrapperStyle={{ fontSize: 12 }} />

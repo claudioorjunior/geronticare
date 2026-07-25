@@ -5,9 +5,6 @@ import { usePathname, useParams } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { useDevRole } from '@/lib/dev/use-dev-role';
 
-// Dev-only shared role
-type Role = 'admin' | 'profissional' | 'usuario';
-
 const allTabs = [
   { label: 'Dados', path: '', roles: ['admin', 'profissional', 'usuario'] as const },
   { label: 'AGA', path: 'aga', roles: ['admin', 'profissional'] as const },
