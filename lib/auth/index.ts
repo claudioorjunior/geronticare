@@ -1,6 +1,7 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { db } from '@/lib/db';
+import { env } from '@/lib/env';
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -69,6 +70,6 @@ export const auth = betterAuth({
     expiresIn: 60 * 60 * 24 * 7, // 7 days
     updateAge: 60 * 60 * 24, // 1 day
   },
-  secret: process.env.AUTH_SECRET!,
-  baseURL: process.env.AUTH_URL!,
+  secret: env.AUTH_SECRET,
+  baseURL: env.AUTH_URL,
 });

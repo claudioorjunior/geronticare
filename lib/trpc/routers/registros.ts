@@ -234,6 +234,14 @@ export const registrosRouter = createTRPCRouter({
       const anexosAtuais = registro.anexos ?? [];
       const novosAnexos = [...anexosAtuais, ...input.anexos];
 
+      // Limite de 50 anexos por registro (prevenção de abuso)
+      if (novosAnexos.length > 50) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Limite de 50 anexos por registro excedido (atual: ${anexosAtuais.length}, adicionando: ${input.anexos.length})`,
+        });
+      }
+
       const [atualizado] = await ctx.db
         .update(registros)
         .set({ anexos: novosAnexos })

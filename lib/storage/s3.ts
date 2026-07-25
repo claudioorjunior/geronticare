@@ -1,18 +1,19 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
+import { env } from '@/lib/env';
 
 const s3Client = new S3Client({
-  region: process.env.S3_REGION || 'us-east-1',
-  endpoint: process.env.S3_ENDPOINT,
+  region: env.S3_REGION,
+  endpoint: env.S3_ENDPOINT || undefined,
   credentials: {
-    accessKeyId: process.env.S3_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
+    accessKeyId: env.S3_ACCESS_KEY_ID,
+    secretAccessKey: env.S3_SECRET_ACCESS_KEY,
   },
-  forcePathStyle: !!process.env.S3_ENDPOINT,
+  forcePathStyle: !!env.S3_ENDPOINT,
 });
 
-const bucket = process.env.S3_BUCKET || 'geronticare-anexos';
+const bucket = env.S3_BUCKET;
 
 // Tipos MIME permitidos para upload
 const MIME_PERMITIDOS = new Set([
@@ -67,13 +68,13 @@ export async function gerarUrlUpload(
  * Gera a URL pública para acessar um anexo.
  */
 export function gerarUrlPublica(chave: string): string {
-  if (process.env.S3_PUBLIC_URL) {
-    return `${process.env.S3_PUBLIC_URL}/${chave}`;
+  if (env.S3_PUBLIC_URL) {
+    return `${env.S3_PUBLIC_URL}/${chave}`;
   }
-  if (process.env.S3_ENDPOINT) {
-    return `${process.env.S3_ENDPOINT}/${bucket}/${chave}`;
+  if (env.S3_ENDPOINT) {
+    return `${env.S3_ENDPOINT}/${bucket}/${chave}`;
   }
-  return `https://${bucket}.s3.${process.env.S3_REGION || 'us-east-1'}.amazonaws.com/${chave}`;
+  return `https://${bucket}.s3.${env.S3_REGION}.amazonaws.com/${chave}`;
 }
 
 /**
