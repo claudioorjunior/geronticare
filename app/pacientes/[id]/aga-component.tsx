@@ -64,7 +64,7 @@ const katzItems: RadioItem[] = [
   {
     id: 'continencia', label: 'Continência', icon: <DropletOff className="h-4 w-4" />,
     options: [
-      { value: 0, label: 'Independente', desc: 'Controle total de urina e fezes (inclui uso de fraldas/cate-teter Autossuficiente).' },
+      { value: 0, label: 'Independente', desc: 'Controle total de urina e fezes (inclui uso de fraldas/cateter autossuficiente).' },
       { value: 1, label: 'Dependente', desc: 'Incontinência parcial ou total; ou necessita de ajuda para usar coletor/fralda.' },
     ],
   },
@@ -192,34 +192,38 @@ const meemItems: RadioItem[] = [
   },
 ];
 
-const gdsItems: RadioItem[] = Array.from({ length: 15 }, (_, i) => {
+// GDS-15 — Escala de Depressão Geriátrica (Yesavage)
+// 4 itens invertidos (Não = 1 ponto): Q1, Q5, Q7, Q11
+// 11 itens diretos (Sim = 1 ponto): Q2, Q3, Q4, Q6, Q8, Q9, Q10, Q12, Q13, Q14, Q15
+const gdsQuestions: { pergunta: string; invertido: boolean }[] = [
+  { pergunta: 'Você está basicamente satisfeito com sua vida?', invertido: true },
+  { pergunta: 'Você deixou muitos de seus interesses e atividades?', invertido: false },
+  { pergunta: 'Sente que sua vida está vazia?', invertido: false },
+  { pergunta: 'Costuma ficar aborrecido/entediado com frequência?', invertido: false },
+  { pergunta: 'Está de bom humor na maior parte do tempo?', invertido: true },
+  { pergunta: 'Tem receio que algo ruim vai acontecer com você?', invertido: false },
+  { pergunta: 'Sente-se feliz a maior parte do tempo?', invertido: true },
+  { pergunta: 'Sente-se frequentemente impotente/inútil?', invertido: false },
+  { pergunta: 'Prefere ficar em casa a sair para coisas novas?', invertido: false },
+  { pergunta: 'Sente que tem mais problemas de memória que outros?', invertido: false },
+  { pergunta: 'Acha que é maravilhoso estar vivo?', invertido: true },
+  { pergunta: 'Sente que vale a pena viver, atualmente?', invertido: false },
+  { pergunta: 'Sente que sua situação é sem esperança?', invertido: false },
+  { pergunta: 'Acha que as pessoas são melhores que você?', invertido: false },
+  { pergunta: 'Tem diminuído o bem-estar e capacidade de realizar coisas?', invertido: false },
+];
+
+const gdsItems: RadioItem[] = gdsQuestions.map((q, i) => {
   const n = i + 1;
-  const perguntas = [
-    'Você está Basicamente satisfeito com sua vida?',
-    'Você deixou muitos de seus interesses e atividades?',
-    'Sente que sua vida está vazia?',
-    'Costuma ficar aborrecido/entediado com frequência?',
-    'Está de bom humor na maior parte do tempo?',
-    'Tem receio que algo ruim vai acontecer com você?',
-    'Sente-se feliz a maior parte do tempo?',
-    'Sente-se frequentemente impotente/inútil?',
-    'Prefere ficar em casa a sair para coisas novas?',
-    'Sente que tem mais problemas de memória que outros?',
-    'Acha que é maravilhoso estar vivo?',
-    'Sente que vale a pena viver, atualmente?',
-    'Sente que sua situação é sem esperança?',
-    'Acha que as pessoas são melhores que você?',
-    'Tem diminuído o bem-estar e capacidade de realizar coisas?',
-  ];
-  const opSim = n % 2 === 1 ? 1 : 0;
-  const opNao = 1 - opSim;
+  const simVale = q.invertido ? 0 : 1;
+  const naoVale = q.invertido ? 1 : 0;
   return {
     id: `g${n}`,
-    label: `${n}. ${perguntas[i]}`,
+    label: `${n}. ${q.pergunta}`,
     icon: <HeartPulse className="h-4 w-4" />,
     options: [
-      { value: opSim, label: 'Sim', desc: 'Indica presença do sintoma depressivo.' },
-      { value: opNao, label: 'Não', desc: 'Sem indicação de sintoma depressivo.' },
+      { value: simVale, label: 'Sim', desc: simVale === 1 ? 'Indica presença do sintoma depressivo.' : 'Resposta não-depressiva.' },
+      { value: naoVale, label: 'Não', desc: naoVale === 1 ? 'Indica presença do sintoma depressivo.' : 'Resposta não-depressiva.' },
     ],
   };
 });

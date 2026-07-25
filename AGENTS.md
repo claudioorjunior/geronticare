@@ -85,3 +85,17 @@ lib/
 - Ler `SETUP_COMPLETO.txt` (contexto de criação, roadmap MVP, decisões de schema).
 - Mudanças em `lib/db/schema.ts` exigem `db:generate` + `db:push` e atualização de queries dependentes.
 - Adicionar nova procedure: registrar no `appRouter` em `root.ts`, senão não fica exposta.
+
+## Agent skills
+
+### Issue tracker
+
+Issues vivem no GitHub Issues deste repo (`gh` CLI). Veja `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Labels padrão: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. Veja `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context — `CONTEXT.md` + `docs/adr/` na raiz do repo. Veja `docs/agents/domain.md`.

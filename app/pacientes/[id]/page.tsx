@@ -91,16 +91,6 @@ const typeMeta: Record<string, { icon: React.ReactNode; colorClass: string; bgCl
   psicologia: { icon: <User className="h-4 w-4" />, colorClass: 'text-white', bgClass: 'bg-purple-500' },
 };
 
-function React95String(name: string): string {
-  return name
-    .split(' ')
-    .map((n) => n[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-}
-
 // ── Patient Header Card ──
 
 function PatientHeaderCard() {
