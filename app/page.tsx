@@ -1,7 +1,16 @@
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
+import { auth } from '@/lib/auth';
 
-export default function Home() {
-  // Temporário durante M4: vai direto para o dashboard.
-  // Depois que o login com Better-Auth estiver pronto, isso deve checar sessão.
-  redirect('/dashboard');
+export default async function Home() {
+  // Checa sessão server-side: autenticado → dashboard; não autenticado → login Better-Auth
+  const session = await auth.api
+    .getSession({ headers: await headers() })
+    .catch(() => null);
+
+  if (session?.user) {
+    redirect('/dashboard');
+  }
+
+  redirect('/api/auth/sign-in');
 }
