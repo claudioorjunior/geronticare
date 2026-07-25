@@ -86,7 +86,7 @@ export const pacientes = pgTable('pacientes', {
   instituicaoId: uuid('instituicao_id').references(() => instituicoes.id).notNull(),
   nome: text('nome').notNull(),
   dataNascimento: timestamp('data_nascimento').notNull(),
-  cpf: text('cpf').unique(),
+  cpf: text('cpf'), // unicidade verificada por instituição na procedure (não unique global)
   rg: text('rg'),
   sexo: sexoEnum('sexo').notNull(),
   estadoCivil: estadoCivilEnum('estado_civil'),
@@ -183,6 +183,7 @@ export const sinaisVitais = pgTable('sinais_vitais', {
   altura: integer('altura'), // em centímetros
   observacoes: text('observacoes'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
 export type Instituicao = typeof instituicoes.$inferSelect;

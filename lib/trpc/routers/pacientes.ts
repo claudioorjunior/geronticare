@@ -43,6 +43,15 @@ export const pacientesRouter = createTRPCRouter({
           parentesco: z.string(),
           telefone: z.string(),
         }).optional(),
+        endereco: z.object({
+          logradouro: z.string(),
+          numero: z.string(),
+          complemento: z.string().optional(),
+          bairro: z.string(),
+          cidade: z.string(),
+          estado: z.string(),
+          cep: z.string(),
+        }).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -78,6 +87,7 @@ export const pacientesRouter = createTRPCRouter({
       z.object({
         id: z.string().uuid(),
         nome: z.string().min(3).optional(),
+        cpf: z.string().optional(),
         telefone: z.string().optional(),
         email: z.string().email().optional(),
         dataAdmissao: z.coerce.date().optional(),
@@ -87,10 +97,37 @@ export const pacientesRouter = createTRPCRouter({
           telefone: z.string(),
         }).optional(),
         ativo: z.boolean().optional(),
+        endereco: z.object({
+          logradouro: z.string(),
+          numero: z.string(),
+          complemento: z.string().optional(),
+          bairro: z.string(),
+          cidade: z.string(),
+          estado: z.string(),
+          cep: z.string(),
+        }).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
+
+      // Valida unicidade de CPF (mesmo padrão de pacientes.criar)
+      if (data.cpf) {
+        const cpfExistente = await ctx.db.query.pacientes.findFirst({
+          where: and(
+            eq(pacientes.cpf, data.cpf),
+            eq(pacientes.instituicaoId, ctx.instituicaoId),
+          ),
+          columns: { id: true },
+        });
+        if (cpfExistente && cpfExistente.id !== id) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Já existe um paciente cadastrado com este CPF',
+          });
+        }
+      }
+
       const [pacienteAtualizado] = await ctx.db
         .update(pacientes)
         .set(data)

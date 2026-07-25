@@ -136,10 +136,9 @@ export function TopNav() {
 
         {/* User Menu + Dev Role Switcher */}
         <div className="flex items-center gap-3 ml-auto shrink-0">
-          {/* Notification bell */}
+          {/* Notification bell — dot only shows when unread > 0 (stub, always 0 for now) */}
           <button className="relative p-2 text-m3-secondary hover:text-m3-primary transition-colors rounded-full hover:bg-m3-surface-variant">
             <Bell className="h-5 w-5" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-m3-error rounded-full" />
           </button>
 
           {/* Dev role switcher — só renderiza em desenvolvimento */}
