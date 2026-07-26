@@ -116,8 +116,10 @@ export default function AGAPage() {
   const canEdit = role === 'admin' || role === 'profissional';
 
   const handleScoreChange = (field: keyof AGAScore, value: string) => {
+    const fieldDef = scoreFields.find((f) => f.key === field);
     const num = parseInt(value) || 0;
-    setScores((prev) => ({ ...prev, [field]: num }));
+    const clamped = fieldDef ? Math.max(0, Math.min(fieldDef.max, num)) : num;
+    setScores((prev) => ({ ...prev, [field]: clamped }));
   };
 
   const interpretacaoAtual = gerarInterpretacao(scores);
@@ -185,10 +187,11 @@ export default function AGAPage() {
               <div className="mb-6 grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-3">
                 {scoreFields.map(({ key, label, max, help }) => (
                   <div key={key}>
-                    <label className="mb-1.5 block text-xs font-medium text-slate-500">
+                    <label htmlFor={`aga-${key}`} className="mb-1.5 block text-xs font-medium text-slate-500">
                       {label} <span className="text-slate-400">(max {max})</span>
                     </label>
                     <Input
+                      id={`aga-${key}`}
                       type="number"
                       min={0}
                       max={max}

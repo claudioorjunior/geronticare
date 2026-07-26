@@ -64,6 +64,7 @@ const mockRegistros: Registro[] = [
 function formatDate(dateStr: string) {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('pt-BR', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+    timeZone: 'UTC',
   });
 }
 
