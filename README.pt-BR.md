@@ -5,8 +5,15 @@
 </p>
 
 <p align="center">
+  <img src="geronticare-logo.png" alt="GerontiCare logo" width="400">
+</p>
+
+<p align="center">
   <strong>Prontuário eletrônico open-source especializado em cuidado geriátrico.</strong><br>
   Um sistema multi-tenant para ILPIs e clínicas geriátricas.
+</p>
+
+> **⚠️ NÃO ESTÁ PRONTO PARA PRODUÇÃO** — O GerontiCare está em desenvolvimento pré-alfa. **Não utilize com pacientes reais ou em ambientes de produção.** O sistema pode produzir avaliações incorretas, falsos positivos ou perda de dados. Use apenas para desenvolvimento, testes e avaliação.
 </p>
 
 <p align="center">
