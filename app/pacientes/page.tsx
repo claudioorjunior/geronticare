@@ -105,27 +105,27 @@ export default function PacientesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-m3-xl bg-m3-primary/10">
-            <Users className="h-5 w-5 text-m3-primary" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50">
+            <Users className="h-5 w-5 text-teal-600" />
           </div>
           <div>
-            <h1 className="text-headline-lg text-m3-on-surface">Pacientes</h1>
-            <p className="text-body-md text-m3-secondary mt-0.5">{mockPacientes.length} cadastrados</p>
+            <h1 className="text-2xl font-bold text-slate-900">Pacientes</h1>
+            <p className="text-sm text-slate-500 mt-0.5">{mockPacientes.length} cadastrados</p>
           </div>
         </div>
         {canCreate ? (
-          <Button className="gap-2 text-label-md bg-m3-primary text-m3-on-primary hover:bg-m3-primary-container hover:text-m3-on-primary-container shadow-sm transition-all hover:shadow-m3-2">
+          <Button className="gap-2 text-sm font-medium bg-teal-600 text-white hover:bg-teal-700 shadow-sm transition-all">
             <Plus className="h-[18px] w-[18px]" /> Novo Paciente
           </Button>
         ) : (
-          <span className="text-label-md text-m3-secondary bg-m3-surface-container-low px-3 py-1.5 rounded-m3-lg">
+          <span className="text-sm text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg">
             Apenas profissionais e admin podem cadastrar
           </span>
         )}
       </div>
 
       {/* Search + Filters Card */}
-      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm transition-shadow hover:shadow-m3-2">
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm transition-shadow hover:shadow-md">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Search */}
           <div className="md:col-span-2 relative">
@@ -187,7 +187,7 @@ export default function PacientesPage() {
       </div>
 
       {/* Data Table */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm transition-shadow hover:shadow-m3-2">
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm transition-shadow hover:shadow-md">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[750px]">
             <thead>
@@ -210,7 +210,6 @@ export default function PacientesPage() {
                     onClick={() => router.push(`/pacientes/${p.id}`)}
                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/pacientes/${p.id}`); } }}
                     tabIndex={0}
-                    role="link"
                     className="group cursor-pointer transition-all hover:bg-teal-50/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-600"
                     aria-label={`Abrir prontuário de ${p.nome}`}
                     style={{ animationDelay: `${idx * 30}ms` }}

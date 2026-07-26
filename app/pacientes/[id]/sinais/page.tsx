@@ -36,7 +36,7 @@ function classificarPA(sistolica: number, diastolica: number): { label: string; 
   if (sistolica < 90 || diastolica < 60) return { label: 'Hipotensao', color: 'text-amber-600' };
   if (sistolica < 120 && diastolica < 80) return { label: 'Normal', color: 'text-emerald-600' };
   if (sistolica < 130 && diastolica < 85) return { label: 'Pre-hipertensao', color: 'text-amber-600' };
-  if (sistolica < 140 || diastolica < 90) return { label: 'Hipertensao Estagio 1', color: 'text-red-600' };
+  if (sistolica < 140 && diastolica < 90) return { label: 'Hipertensao Estagio 1', color: 'text-red-600' };
   return { label: 'Hipertensao Estagio 2+', color: 'text-red-600' };
 }
 
@@ -97,6 +97,8 @@ export default function SinaisVitaisPage() {
       data: now.toISOString().slice(0, 10),
       hora: now.toTimeString().slice(0, 5),
       ...form,
+      glicemia: form.glicemia || undefined,
+      peso: form.peso || undefined,
       profissional: role === 'admin' ? 'Admin' : 'Profissional (voce)',
     };
     setHistorico((prev) => [novo, ...prev]);

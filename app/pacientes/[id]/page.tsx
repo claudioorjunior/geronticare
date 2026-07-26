@@ -24,10 +24,10 @@ const initialData = {
 
 type PatientData = typeof initialData;
 
-function FieldGroup({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
+function FieldGroup({ label, children, hint, fieldId }: { label: string; children: React.ReactNode; hint?: string; fieldId?: string }) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-medium text-slate-500">{label}</label>
+      <label htmlFor={fieldId} className="mb-1.5 block text-xs font-medium text-slate-500">{label}</label>
       {children}
       {hint && <p className="mt-1 text-[11px] text-slate-400">{hint}</p>}
     </div>
@@ -153,7 +153,7 @@ export default function PatientDadosPage() {
             <Button onClick={handleSave} disabled={isSaving}>
               {isSaving ? 'Salvando...' : 'Salvar alteracoes'}
             </Button>
-            {saveMessage && <span className="text-sm text-emerald-600">{saveMessage}</span>}
+            {saveMessage && <span role="status" aria-live="polite" className="text-sm text-emerald-600">{saveMessage}</span>}
             <span className="ml-auto text-xs text-slate-400">ID: {params.id}</span>
           </div>
         </section>
