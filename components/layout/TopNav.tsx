@@ -98,6 +98,7 @@ export function TopNav() {
             {searchTerm && (
               <button
                 onClick={clearSearch}
+                aria-label="Limpar busca"
                 className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-m3-outline hover:text-m3-secondary"
               >
                 <X className="h-3.5 w-3.5" />

@@ -46,3 +46,8 @@ next-env.d.ts
 
 # hermes internal
 .hermes/
+docs/
+AGENTS.md
+INVENTARIO_TELAS_M4.md
+SETUP_COMPLETO.txt
+performance-audit.md
