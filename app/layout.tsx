@@ -31,7 +31,7 @@ export default function RootLayout({
       >
         <Providers>
           <TopNav />
-          <main>{children}</main>
+          <main className="mx-auto max-w-container-max px-margin-mobile pb-16 md:px-margin-desktop">{children}</main>
         </Providers>
       </body>
     </html>
