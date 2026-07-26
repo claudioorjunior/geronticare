@@ -2,8 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { Plus, Search, ChevronRight, ChevronLeft, ArrowLeft } from 'lucide-react';
+import { Plus, Search, ChevronRight, ChevronLeft, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDevRole } from '@/lib/dev/use-dev-role';
 
@@ -49,16 +48,11 @@ function getInitials(nome: string): string {
     .toUpperCase();
 }
 
-function statusStyle(status: PacienteStatus): string {
-  switch (status) {
-    case 'Ativo':
-      return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-    case 'Alerta':
-      return 'bg-amber-50 text-amber-700 border-amber-200';
-    case 'Inativo':
-      return 'bg-m3-surface-container text-slate-600 border-m3-outline-variant';
-  }
-}
+const statusConfig: Record<PacienteStatus, { bg: string; text: string; dot: string }> = {
+  Ativo: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+  Alerta: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
+  Inativo: { bg: 'bg-slate-100', text: 'text-slate-500', dot: 'bg-slate-400' },
+};
 
 // ── Quick Filter Chips ──
 
@@ -91,7 +85,6 @@ export default function PacientesPage() {
       }
       if (statusFilter && p.status !== statusFilter) return false;
 
-      // Quick filters
       if (activeQuickFilter === 'recentes' && p.ultimaAga === 'Pendente') return false;
       if (activeQuickFilter === 'risco' && p.status !== 'Alerta') return false;
       if (activeQuickFilter === 'sem_aga' && p.ultimaAga !== 'Pendente') return false;
@@ -101,38 +94,48 @@ export default function PacientesPage() {
     .sort((a, b) => {
       if (order === 'nome') return a.nome.localeCompare(b.nome);
       if (order === 'idade_desc') return b.idade - a.idade;
-      return 0; // recentes — keep mock order
+      return 0;
     });
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
-    <div className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-section-gap flex flex-col gap-gutter">
+    <div className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-8 flex flex-col gap-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-headline-lg text-m3-on-surface">Lista de Pacientes</h1>
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-m3-xl bg-m3-primary/10">
+            <Users className="h-5 w-5 text-m3-primary" />
+          </div>
+          <div>
+            <h1 className="text-headline-lg text-m3-on-surface">Pacientes</h1>
+            <p className="text-body-md text-m3-secondary mt-0.5">{mockPacientes.length} cadastrados</p>
+          </div>
+        </div>
         {canCreate ? (
-          <Button className="gap-2 text-label-md bg-m3-primary text-m3-on-primary hover:bg-m3-primary-container hover:text-m3-on-primary-container shadow-sm">
+          <Button className="gap-2 text-label-md bg-m3-primary text-m3-on-primary hover:bg-m3-primary-container hover:text-m3-on-primary-container shadow-sm transition-all hover:shadow-m3-2">
             <Plus className="h-[18px] w-[18px]" /> Novo Paciente
           </Button>
         ) : (
-          <span className="text-label-md text-m3-secondary">Apenas profissionais e admin podem cadastrar</span>
+          <span className="text-label-md text-m3-secondary bg-m3-surface-container-low px-3 py-1.5 rounded-m3-lg">
+            Apenas profissionais e admin podem cadastrar
+          </span>
         )}
       </div>
 
       {/* Search + Filters Card */}
-      <div className="bg-m3-surface border border-m3-outline-variant rounded-m3-xl p-4 sm:p-gutter shadow-sm">
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm transition-shadow hover:shadow-m3-2">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Search */}
           <div className="md:col-span-2 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-m3-outline pointer-events-none" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
             <input
               type="text"
               placeholder="Buscar por nome ou CPF..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="w-full pl-10 pr-4 py-2 bg-m3-surface h-10 border border-m3-outline-variant rounded-m3-lg focus:ring-1 focus:ring-m3-primary focus:border-m3-primary text-body-md text-m3-on-surface placeholder-m3-secondary transition-colors outline-none"
+              className="w-full pl-10 pr-4 py-2 h-10 border border-slate-200 rounded-lg bg-white text-sm text-slate-900 placeholder-slate-400 focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition-all outline-none"
             />
           </div>
 
@@ -141,7 +144,7 @@ export default function PacientesPage() {
             <select
               value={statusFilter}
               onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-              className="w-full px-3 py-2 bg-m3-surface h-10 border border-m3-outline-variant rounded-m3-lg focus:ring-1 focus:ring-m3-primary focus:border-m3-primary text-body-md text-m3-on-surface transition-colors outline-none appearance-none"
+              className="w-full px-3 py-2 h-10 border border-slate-200 rounded-lg bg-white text-sm text-slate-700 focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition-all outline-none appearance-none"
             >
               <option value="">Status (Todos)</option>
               <option value="Ativo">Ativo</option>
@@ -155,7 +158,7 @@ export default function PacientesPage() {
             <select
               value={order}
               onChange={(e) => setOrder(e.target.value as OrderKey)}
-              className="w-full px-3 py-2 bg-m3-surface h-10 border border-m3-outline-variant rounded-m3-lg focus:ring-1 focus:ring-m3-primary focus:border-m3-primary text-body-md text-m3-on-surface transition-colors outline-none appearance-none"
+              className="w-full px-3 py-2 h-10 border border-slate-200 rounded-lg bg-white text-sm text-slate-700 focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600 transition-all outline-none appearance-none"
             >
               <option value="recentes">Mais Recentes</option>
               <option value="nome">Nome (A-Z)</option>
@@ -165,16 +168,16 @@ export default function PacientesPage() {
         </div>
 
         {/* Quick Filter Chips */}
-        <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-m3-outline-variant/30">
-          <span className="text-label-sm text-m3-secondary self-center mr-2">Filtros Rápidos:</span>
+        <div className="flex flex-wrap items-center gap-2 mt-5 pt-4 border-t border-slate-100">
+          <span className="text-xs font-medium text-slate-500 mr-1">Filtros:</span>
           {quickFilters.map((f) => (
             <button
               key={f.id}
               onClick={() => { setActiveQuickFilter(f.id); setPage(1); }}
-              className={`px-3 py-1 text-label-md rounded-full transition-colors border ${
+              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all ${
                 activeQuickFilter === f.id
-                  ? 'bg-m3-primary-container text-m3-on-primary-container border-transparent'
-                  : 'bg-m3-surface-container-lowest text-m3-on-surface border-m3-outline-variant hover:bg-m3-surface-variant'
+                  ? 'bg-teal-600 text-white shadow-sm'
+                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-slate-300'
               }`}
             >
               {f.label}
@@ -184,85 +187,107 @@ export default function PacientesPage() {
       </div>
 
       {/* Data Table */}
-      <div className="bg-m3-surface border border-m3-outline-variant rounded-m3-xl overflow-hidden shadow-sm">
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm transition-shadow hover:shadow-m3-2">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[800px]">
+          <table className="w-full text-left border-collapse min-w-[750px]">
             <thead>
-              <tr className="bg-m3-surface-container-low border-b border-m3-outline-variant text-label-md text-m3-secondary">
-                <th className="py-4 px-6 font-medium">Nome</th>
-                <th className="py-4 px-6 font-medium">CPF</th>
-                <th className="py-4 px-6 font-medium">Idade</th>
-                <th className="py-4 px-6 font-medium">Data de Admissão</th>
-                <th className="py-4 px-6 font-medium">Última AGA</th>
-                <th className="py-4 px-6 font-medium">Status</th>
-                <th className="py-4 px-6 font-medium text-right">Ações</th>
+              <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                <th className="py-4 px-5">Nome</th>
+                <th className="py-4 px-5">CPF</th>
+                <th className="py-4 px-5">Idade</th>
+                <th className="py-4 px-5">Admissão</th>
+                <th className="py-4 px-5">Última AGA</th>
+                <th className="py-4 px-5">Status</th>
+                <th className="py-4 px-5 text-right">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-m3-outline-variant/50 text-body-md bg-m3-surface-container-lowest">
-              {paged.map((p) => (
-                <tr
-                  key={p.id}
-                  onClick={() => router.push(`/pacientes/${p.id}`)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') router.push(`/pacientes/${p.id}`); }}
-                  tabIndex={0}
-                  role="link"
-                  className="hover:bg-m3-surface-container-low transition-colors cursor-pointer group focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-m3-primary"
-                  aria-label={`Abrir prontuário de ${p.nome}`}
-                >
-                  <td className="py-4 px-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-m3-primary-container text-m3-on-primary-container flex items-center justify-center text-title-lg text-xs font-bold">
-                        {getInitials(p.nome)}
+            <tbody className="divide-y divide-slate-100 bg-white">
+              {paged.map((p, idx) => {
+                const cfg = statusConfig[p.status];
+                return (
+                  <tr
+                    key={p.id}
+                    onClick={() => router.push(`/pacientes/${p.id}`)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/pacientes/${p.id}`); } }}
+                    tabIndex={0}
+                    role="link"
+                    className="group cursor-pointer transition-all hover:bg-teal-50/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-600"
+                    aria-label={`Abrir prontuário de ${p.nome}`}
+                    style={{ animationDelay: `${idx * 30}ms` }}
+                  >
+                    <td className="py-4 px-5">
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 shrink-0 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 text-white flex items-center justify-center text-xs font-bold shadow-sm">
+                          {getInitials(p.nome)}
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-slate-900 group-hover:text-teal-700 transition-colors">{p.nome}</div>
+                        </div>
                       </div>
-                      <div className="font-medium text-m3-on-surface">{p.nome}</div>
-                    </div>
-                  </td>
-                  <td className="py-4 px-6 font-mono text-sm text-m3-secondary">{p.cpf}</td>
-                  <td className="py-4 px-6 text-m3-on-surface tabular-nums">{p.idade} anos</td>
-                  <td className="py-4 px-6 font-mono text-sm text-m3-secondary">{p.dataAdmissao}</td>
-                  <td className="py-4 px-6">
-                    {p.ultimaAga === 'Pendente' ? (
-                      <span className="text-m3-secondary italic text-sm">Pendente</span>
-                    ) : (
-                      <span className="font-mono text-sm text-m3-secondary">{p.ultimaAga}</span>
-                    )}
-                  </td>
-                  <td className="py-4 px-6">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-label-sm ring-1 ring-inset border ${statusStyle(p.status)}`}>
-                      {p.status}
-                    </span>
-                  </td>
-                  <td className="py-4 px-6 text-right">
-                    <ChevronRight className="text-lg text-m3-secondary group-hover:text-m3-primary transition-colors inline-block" />
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="py-4 px-5 font-mono text-sm text-slate-500">{p.cpf}</td>
+                    <td className="py-4 px-5 text-sm text-slate-700 tabular-nums">{p.idade} anos</td>
+                    <td className="py-4 px-5 text-sm text-slate-500">{p.dataAdmissao}</td>
+                    <td className="py-4 px-5">
+                      {p.ultimaAga === 'Pendente' ? (
+                        <span className="text-xs text-slate-400 italic">Pendente</span>
+                      ) : (
+                        <span className="text-sm text-slate-500">{p.ultimaAga}</span>
+                      )}
+                    </td>
+                    <td className="py-4 px-5">
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${cfg.bg} ${cfg.text}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
+                        {p.status}
+                      </span>
+                    </td>
+                    <td className="py-4 px-5 text-right">
+                      <div className="inline-flex items-center gap-1 text-xs font-medium text-slate-400 group-hover:text-teal-600 transition-all opacity-0 group-hover:opacity-100">
+                        Abrir
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
 
+        {/* Empty state */}
+        {paged.length === 0 && (
+          <div className="py-16 text-center">
+            <Search className="mx-auto h-8 w-8 text-slate-300 mb-3" />
+            <p className="text-sm text-slate-500">Nenhum paciente encontrado</p>
+            <p className="text-xs text-slate-400 mt-1">Tente ajustar os filtros ou a busca</p>
+          </div>
+        )}
+
         {/* Pagination */}
-        <div className="px-6 py-4 border-t border-m3-outline-variant flex items-center justify-between bg-m3-surface-container-lowest">
-          <div className="text-label-md text-m3-secondary">
-            Mostrando {Math.min((page - 1) * PAGE_SIZE + 1, filtered.length)} a {Math.min(page * PAGE_SIZE, filtered.length)} de {filtered.length} pacientes
+        {filtered.length > PAGE_SIZE && (
+          <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <div className="text-xs text-slate-500">
+              Exibindo {Math.min((page - 1) * PAGE_SIZE + 1, filtered.length)}–{Math.min(page * PAGE_SIZE, filtered.length)} de {filtered.length}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage(Math.max(1, page - 1))}
+                disabled={page === 1}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" /> Anterior
+              </button>
+              <span className="text-xs text-slate-500 px-2 tabular-nums">{page}/{totalPages}</span>
+              <button
+                onClick={() => setPage(Math.min(totalPages, page + 1))}
+                disabled={page === totalPages || totalPages === 0}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Próximo <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setPage(Math.max(1, page - 1))}
-              disabled={page === 1}
-              className="p-1 rounded-m3-lg text-m3-secondary hover:bg-m3-surface-variant transition-colors disabled:opacity-50"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-            <button
-              onClick={() => setPage(Math.min(totalPages, page + 1))}
-              disabled={page === totalPages || totalPages === 0}
-              className="p-1 rounded-m3-lg text-m3-secondary hover:bg-m3-surface-variant transition-colors disabled:opacity-50"
-            >
-              <ChevronRight className="h-5 w-5" />
-            </button>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

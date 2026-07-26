@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useParams } from 'next/navigation';
 import { useDevRole } from '@/lib/dev/use-dev-role';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Stethoscope, FileText, Pill, AlertTriangle, Activity, ClipboardList, Plus } from 'lucide-react';
+import {
+  Stethoscope, Pill, AlertTriangle, Activity, ClipboardList, FileText,
+} from 'lucide-react';
 
 type TipoRegistro = 'evolucao' | 'prescricao' | 'intercorrencia' | 'procedimento' | 'observacao';
 
@@ -66,8 +67,16 @@ function formatDate(dateStr: string) {
   });
 }
 
+function Kpi({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="text-[11px] uppercase tracking-wider text-slate-400">{label}</div>
+      <div className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{value}</div>
+    </div>
+  );
+}
+
 export default function RegistrosPage() {
-  useParams<{ id: string }>();
   const { role } = useDevRole();
 
   const [registros, setRegistros] = useState<Registro[]>(mockRegistros);
@@ -77,6 +86,9 @@ export default function RegistrosPage() {
   const [novoConteudo, setNovoConteudo] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState('');
+
+  // filtro ativo no sidebar
+  const [filtroTipo, setFiltroTipo] = useState<TipoRegistro | null>(null);
 
   const canEdit = role === 'admin' || role === 'profissional';
 
@@ -99,122 +111,170 @@ export default function RegistrosPage() {
     setTimeout(() => setMessage(''), 2200);
   };
 
+  const registrosFiltrados = filtroTipo
+    ? registros.filter((r) => r.tipo === filtroTipo)
+    : registros;
+
   const grouped: Record<string, Registro[]> = {};
-  for (const r of registros) {
+  for (const r of registrosFiltrados) {
     if (!grouped[r.data]) grouped[r.data] = [];
     grouped[r.data].push(r);
   }
   const datas = Object.keys(grouped).sort().reverse();
 
+  const countsByTipo = (tipo: TipoRegistro) => registros.filter((r) => r.tipo === tipo).length;
+
   return (
-    <div className="max-w-3xl">
-      <div className="mb-6 flex items-center justify-between border-b border-slate-200 pb-4">
-        <h2 className="text-lg font-semibold text-slate-900">Registros Clinicos</h2>
-        {canEdit && (
-          <Button onClick={() => setShowForm(!showForm)} size="sm">
-            <Plus className="mr-1 h-3.5 w-3.5" />
-            Novo registro
-          </Button>
-        )}
+    <>
+      {/* KPIs */}
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Kpi label="Total" value={registros.length} />
+        <Kpi label="Evolucoes" value={countsByTipo('evolucao')} />
+        <Kpi label="Prescricoes" value={countsByTipo('prescricao')} />
+        <Kpi label="Intercorrencias" value={countsByTipo('intercorrencia')} />
       </div>
 
-      {canEdit && showForm && (
-        <div className="mb-8 rounded-lg border border-slate-200 bg-white p-6">
-          <h3 className="mb-4 text-sm font-medium text-slate-500">Novo registro clinico</h3>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Timeline */}
+        <section className="lg:col-span-2 space-y-6">
+          {/* Formulario novo registro */}
+          {canEdit && showForm && (
+            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-m3-2">
+              <h3 className="mb-4 text-sm font-medium text-slate-500">Novo registro clinico</h3>
 
-          <div className="mb-4 flex gap-2 flex-wrap">
-            {(Object.keys(tipoConfig) as TipoRegistro[]).map((tipo) => {
-              const cfg = tipoConfig[tipo];
-              const Icon = cfg.icon;
-              const active = novoTipo === tipo;
-              return (
-                <button
-                  key={tipo}
-                  type="button"
-                  onClick={() => setNovoTipo(tipo)}
-                  className={`inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-xs transition-colors ${
-                    active
-                      ? 'bg-slate-900 text-white'
-                      : 'border border-slate-200 text-slate-600 hover:border-slate-300'
-                  }`}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  {cfg.label}
-                </button>
-              );
-            })}
-          </div>
+              <div className="mb-4 flex gap-2 flex-wrap">
+                {(Object.keys(tipoConfig) as TipoRegistro[]).map((tipo) => {
+                  const cfg = tipoConfig[tipo];
+                  const Icon = cfg.icon;
+                  const active = novoTipo === tipo;
+                  return (
+                    <button
+                      key={tipo}
+                      type="button"
+                      onClick={() => setNovoTipo(tipo)}
+                      className={`inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-xs transition-colors ${
+                        active
+                          ? 'bg-slate-900 text-white'
+                          : 'border border-slate-200 text-slate-600 hover:border-slate-300'
+                      }`}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {cfg.label}
+                    </button>
+                  );
+                })}
+              </div>
 
-          <div className="mb-4">
-            <label className="mb-1.5 block text-xs font-medium text-slate-500">Titulo</label>
-            <Input
-              value={novoTitulo}
-              onChange={(e) => setNovoTitulo(e.target.value)}
-              placeholder="Ex: Evolucao vespertina, ajuste de medicacao..."
-            />
-          </div>
+              <div className="mb-4">
+                <label className="mb-1.5 block text-xs font-medium text-slate-500">Titulo</label>
+                <Input
+                  value={novoTitulo}
+                  onChange={(e) => setNovoTitulo(e.target.value)}
+                  placeholder="Ex: Evolucao vespertina, ajuste de medicacao..."
+                />
+              </div>
 
-          <div className="mb-4">
-            <label className="mb-1.5 block text-xs font-medium text-slate-500">Conteudo</label>
-            <textarea
-              value={novoConteudo}
-              onChange={(e) => setNovoConteudo(e.target.value)}
-              placeholder="Descreva a evolucao, prescricao, intercorrencia..."
-              rows={4}
-              className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 resize-y"
-            />
-          </div>
+              <div className="mb-4">
+                <label className="mb-1.5 block text-xs font-medium text-slate-500">Conteudo</label>
+                <textarea
+                  value={novoConteudo}
+                  onChange={(e) => setNovoConteudo(e.target.value)}
+                  placeholder="Descreva a evolucao, prescricao, intercorrencia..."
+                  rows={4}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 resize-y"
+                />
+              </div>
 
-          <div className="flex items-center gap-3">
-            <Button onClick={salvarRegistro} disabled={isSaving || !novoTitulo.trim() || !novoConteudo.trim()} size="sm">
-              {isSaving ? 'Salvando...' : 'Salvar registro'}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}>
-              Cancelar
-            </Button>
-            {message && <span className="text-sm text-emerald-600">{message}</span>}
-          </div>
-        </div>
-      )}
-
-      <div className="space-y-8">
-        {datas.map((data) => (
-          <div key={data}>
-            <div className="mb-4 flex items-center gap-3">
-              <span className="text-xs text-slate-400">{formatDate(data)}</span>
-              <div className="flex-1 border-t border-slate-100" />
+              <div className="flex items-center gap-3">
+                <Button onClick={salvarRegistro} disabled={isSaving || !novoTitulo.trim() || !novoConteudo.trim()} size="sm">
+                  {isSaving ? 'Salvando...' : 'Salvar registro'}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}>
+                  Cancelar
+                </Button>
+                {message && <span className="text-sm text-emerald-600">{message}</span>}
+              </div>
             </div>
+          )}
 
-            <div className="space-y-3">
-              {grouped[data].map((registro) => {
-                const cfg = tipoConfig[registro.tipo];
-                const Icon = cfg.icon;
-                return (
-                  <div key={registro.id} className="group rounded-lg border border-slate-200 bg-white p-5">
-                    <div className="mb-2 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Icon className="h-4 w-4 text-slate-400" />
-                        <span className="text-xs text-slate-400">{cfg.label}</span>
-                        <span className="text-sm font-medium text-slate-900">{registro.titulo}</span>
+          {datas.map((data) => (
+            <div key={data}>
+              <div className="mb-4 flex items-center gap-3">
+                <span className="text-xs text-slate-400 capitalize">{formatDate(data)}</span>
+                <div className="flex-1 border-t border-slate-100" />
+              </div>
+
+              <div className="space-y-3">
+                {grouped[data].map((registro) => {
+                  const cfg = tipoConfig[registro.tipo];
+                  const Icon = cfg.icon;
+                  return (
+                    <div key={registro.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-m3-2">
+                      <div className="mb-2 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Icon className="h-4 w-4 text-slate-400" />
+                          <span className="text-xs text-slate-400">{cfg.label}</span>
+                          <span className="text-sm font-medium text-slate-900">{registro.titulo}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-slate-400">
+                          <time>{registro.hora}</time>
+                          <span>&middot;</span>
+                          <span>{registro.profissional}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-slate-400">
-                        <time>{registro.hora}</time>
-                        <span>&middot;</span>
-                        <span>{registro.profissional}</span>
-                      </div>
+                      <p className="text-sm leading-relaxed text-slate-600 whitespace-pre-wrap">{registro.conteudo}</p>
                     </div>
-                    <p className="text-sm leading-relaxed text-slate-600 whitespace-pre-wrap">{registro.conteudo}</p>
-                  </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {registrosFiltrados.length === 0 && (
+            <p className="py-12 text-center text-sm text-slate-400">Nenhum registro clinico encontrado.</p>
+          )}
+        </section>
+
+        {/* Sidebar: quick filters */}
+        <aside className="space-y-4">
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-5">
+            <h3 className="mb-3 text-sm font-semibold text-slate-900">Filtrar por tipo</h3>
+            <div className="flex flex-col gap-1.5">
+              <button
+                type="button"
+                onClick={() => setFiltroTipo(null)}
+                className={`rounded px-3 py-2 text-left text-sm transition-colors ${
+                  !filtroTipo ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Todos ({registros.length})
+              </button>
+              {(Object.keys(tipoConfig) as TipoRegistro[]).map((tipo) => {
+                const cfg = tipoConfig[tipo];
+                const Icon = cfg.icon;
+                const count = countsByTipo(tipo);
+                const active = filtroTipo === tipo;
+                return (
+                  <button
+                    key={tipo}
+                    type="button"
+                    onClick={() => setFiltroTipo(active ? null : tipo)}
+                    className={`flex items-center justify-between rounded px-3 py-2 text-sm transition-colors ${
+                      active ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Icon className="h-3.5 w-3.5" />
+                      {cfg.label}
+                    </span>
+                    <span className="text-xs tabular-nums opacity-60">{count}</span>
+                  </button>
                 );
               })}
             </div>
           </div>
-        ))}
+        </aside>
       </div>
-
-      {registros.length === 0 && (
-        <p className="py-12 text-center text-sm text-slate-400">Nenhum registro clinico encontrado.</p>
-      )}
-    </div>
+    </>
   );
 }

@@ -358,18 +358,20 @@ function DashboardProfissional() {
       </header>
 
       {/* KPIs — one row */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-gutter shrink-0">
+      <section className="grid grid-cols-1 md:grid-cols-4 gap-gutter shrink-0">
         <KpiCardV2 label="Atendimentos Hoje" value="7" delta="+2" deltaType="positive" icon={<Activity className="h-5 w-5" />} />
         <KpiCardV2 label="Pacientes Sob Cuidado" value="23" icon={<Users className="h-5 w-5" />} />
         <KpiCardV2 label="AGAs Pendentes" value="4" delta="Atenção" deltaType="negative" icon={<ClipboardList className="h-5 w-5" />} />
+        <KpiCardV2 label="Alertas Críticos" value="2" delta="Crítico" deltaType="negative" icon={<Bell className="h-5 w-5" />} />
       </section>
 
-      {/* Registros + Sinais — adaptive 2-col blocks */}
+      {/* Linha 2: Registros + Sinais */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-gutter flex-1 min-h-0">
         {/* Registros de Hoje */}
         <div className="bg-m3-surface-container-lowest border border-m3-outline-variant rounded-m3-xl flex flex-col min-h-0">
-          <div className="p-gutter pb-0 shrink-0">
+          <div className="flex items-center justify-between p-gutter pb-0 shrink-0">
             <h2 className="text-title-lg text-m3-on-surface">Registros de Hoje</h2>
+            <ChevronRight className="h-4 w-4 text-m3-secondary" />
           </div>
           <div className="divide-y divide-m3-outline-variant/50 overflow-y-auto flex-1">
             {registrosHoje.map((r, i) => (
@@ -407,6 +409,85 @@ function DashboardProfissional() {
                     {s.tendencia === 'alta' ? 'Em alta' : s.tendencia === 'baixa' ? 'Em baixa' : 'Estável'}
                   </span>
                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Linha 3: Alertas + AGAs + Atendimentos Recentes */}
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-gutter shrink-0">
+        {/* Alertas Vitais */}
+        <div className="bg-m3-surface-container-lowest border border-m3-outline-variant rounded-m3-xl p-gutter">
+          <div className="flex items-center gap-2 mb-4">
+            <Heart className="h-5 w-5 text-m3-error" />
+            <h2 className="text-title-lg text-m3-on-surface">Alertas Vitais</h2>
+          </div>
+          <div className="space-y-3">
+            {alertasVitais.map((a, i) => (
+              <div key={i} className={`flex items-start gap-3 rounded-m3-lg p-3 ${
+                a.severidade === 'critico' ? 'bg-m3-error-container/20' : 'bg-amber-50'
+              }`}>
+                <AlertTriangle className={`h-4 w-4 mt-0.5 shrink-0 ${
+                  a.severidade === 'critico' ? 'text-m3-error' : 'text-amber-600'
+                }`} />
+                <div className="min-w-0 flex-1">
+                  <div className="text-label-md text-m3-on-surface">{a.paciente}</div>
+                  <div className="text-label-sm text-m3-secondary mt-0.5">{a.sinal}</div>
+                </div>
+                <span className={`text-label-sm px-2 py-0.5 rounded-full shrink-0 ${
+                  a.severidade === 'critico'
+                    ? 'bg-m3-error-container/40 text-m3-error'
+                    : 'bg-amber-100 text-amber-700'
+                }`}>
+                  {a.severidade === 'critico' ? 'Crítico' : 'Atenção'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* AGAs Próximas */}
+        <div className="bg-m3-surface-container-lowest border border-m3-outline-variant rounded-m3-xl p-gutter">
+          <div className="flex items-center gap-2 mb-4">
+            <Stethoscope className="h-5 w-5 text-m3-primary" />
+            <h2 className="text-title-lg text-m3-on-surface">AGAs Próximas</h2>
+          </div>
+          <div className="space-y-3">
+            {agasProximas.map((a, i) => (
+              <div key={i} className="flex items-center justify-between rounded-m3-lg border border-m3-outline-variant/40 p-3">
+                <div className="min-w-0">
+                  <div className="text-label-md text-m3-on-surface truncate">{a.paciente}</div>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <Calendar className="h-3.5 w-3.5 text-m3-secondary" />
+                    <span className="text-label-sm text-m3-secondary tabular-nums">{a.data}</span>
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-m3-secondary shrink-0 ml-2" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Atendimentos Recentes */}
+        <div className="bg-m3-surface-container-lowest border border-m3-outline-variant rounded-m3-xl p-gutter">
+          <div className="flex items-center gap-2 mb-4">
+            <Thermometer className="h-5 w-5 text-m3-secondary" />
+            <h2 className="text-title-lg text-m3-on-surface">Atendimentos Recentes</h2>
+          </div>
+          <div className="space-y-3">
+            {atendimentosRecentes.map((a, i) => (
+              <div key={i} className="flex items-start justify-between gap-3 rounded-m3-lg border border-m3-outline-variant/40 p-3">
+                <div className="min-w-0 flex-1">
+                  <div className="text-label-md text-m3-on-surface truncate">{a.paciente}</div>
+                  <div className="text-label-sm text-m3-secondary mt-0.5">{a.tipo}</div>
+                  <div className="flex items-center gap-2 mt-1 text-label-sm text-m3-on-surface-variant">
+                    <span>{a.profissional}</span>
+                    <span>&middot;</span>
+                    <span>{a.data}</span>
+                  </div>
+                </div>
+                <StatusBadge status={a.status} />
               </div>
             ))}
           </div>
