@@ -22,6 +22,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Setup env
+        run: |
+          echo 'DATABASE_URL="postgresql://ci:***@localhost:5432/ci-mock"' > .env.local
+          echo 'AUTH_SECRET="ci-mock-secret-do-not-use"' >> .env.local
+          echo 'AUTH_URL="http://localhost:3000"' >> .env.local
+          echo 'NEXT_PUBLIC_APP_URL="http://localhost:3000"' >> .env.local
+
       - name: Lint
         run: npm run lint
 
