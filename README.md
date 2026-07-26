@@ -5,6 +5,10 @@
 </p>
 
 <p align="center">
+  <img src="geronticare-logo.png" alt="GerontiCare logo" width="400">
+</p>
+
+<p align="center">
   <strong>Open-source electronic health record specialized in geriatric care.</strong><br>
   A multi-tenant system for long-term care facilities (ILPIs) and geriatric clinics.
 </p>
@@ -18,6 +22,8 @@
   <img src="https://img.shields.io/badge/PostgreSQL-Drizzle-4169E1?logo=postgresql" alt="PostgreSQL + Drizzle">
   <img src="https://img.shields.io/badge/Tailwind-4-38B2AC?logo=tailwind-css" alt="Tailwind 4">
 </p>
+
+> **⚠️ NOT PRODUCTION READY** — GerontiCare is in early pre-alpha development. **Do not use with real patients or in production environments.** The system may produce incorrect assessments, false positives, or data loss. Use only for development, testing, and evaluation.
 
 ---
 
