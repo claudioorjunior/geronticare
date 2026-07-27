@@ -18,12 +18,19 @@ export const pacientesRouter = createTRPCRouter({
   buscar: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
-      return ctx.db.query.pacientes.findFirst({
+      const patient = await ctx.db.query.pacientes.findFirst({
         where: and(
           eq(pacientes.id, input.id),
-          eq(pacientes.instituicaoId, ctx.instituicaoId)
+          eq(pacientes.instituicaoId, ctx.instituicaoId),
         ),
       });
+      if (!patient) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Paciente não encontrado',
+        });
+      }
+      return patient;
     }),
 
   criar: protectedProcedure

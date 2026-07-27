@@ -333,47 +333,45 @@ export default function PacientesPage() {
           </div>
         )}
 
-        {/* Empty state */}
-        {!isPending && !isError && paged.length === 0 && (
+        {/* Not found state */}
+        {pacientesQuery.data?.length === 0 ? (
           <div className="py-16 text-center">
-            <Search className="mx-auto h-8 w-8 text-slate-300 mb-3" />
+            <Users className="mx-auto h-8 w-8 text-slate-300 mb-3" />
             <p className="text-sm text-slate-500">
-              {linhas.length === 0
-                ? 'Nenhum paciente cadastrado ainda'
-                : 'Nenhum paciente encontrado'}
+              Nenhum paciente cadastrado nesta instituição
             </p>
             <p className="text-xs text-slate-400 mt-1">
-              {linhas.length === 0
-                ? 'Clique em "Novo Paciente" para cadastrar o primeiro'
-                : 'Tente ajustar os filtros ou a busca'}
+              Clique em &quot;Novo Paciente&quot; para cadastrar o primeiro
             </p>
           </div>
-        )}
-
-        {/* Pagination */}
-        {!isPending && filtered.length > PAGE_SIZE && (
-          <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
-            <div className="text-xs text-slate-500">
-              Exibindo {Math.min((paginaAtual - 1) * PAGE_SIZE + 1, filtered.length)}–{Math.min(paginaAtual * PAGE_SIZE, filtered.length)} de {filtered.length}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPage(Math.max(1, paginaAtual - 1))}
-                disabled={paginaAtual === 1}
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft className="h-3.5 w-3.5" /> Anterior
-              </button>
-              <span className="text-xs text-slate-500 px-2 tabular-nums">{paginaAtual}/{totalPages}</span>
-              <button
-                onClick={() => setPage(Math.min(totalPages, paginaAtual + 1))}
-                disabled={paginaAtual === totalPages || totalPages === 0}
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Próximo <ChevronRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
+        ) : (
+          <>
+            {/* Pagination */}
+            {!isPending && filtered.length > PAGE_SIZE && (
+              <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div className="text-xs text-slate-500">
+                  Exibindo {Math.min((paginaAtual - 1) * PAGE_SIZE + 1, filtered.length)}–{Math.min(paginaAtual * PAGE_SIZE, filtered.length)} de {filtered.length}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setPage(Math.max(1, paginaAtual - 1))}
+                    disabled={paginaAtual === 1}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" /> Anterior
+                  </button>
+                  <span className="text-xs text-slate-500 px-2 tabular-nums">{paginaAtual}/{totalPages}</span>
+                  <button
+                    onClick={() => setPage(Math.min(totalPages, paginaAtual + 1))}
+                    disabled={paginaAtual === totalPages || totalPages === 0}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Próximo <ChevronRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
