@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
-import { gerarUrlUpload, gerarUrlPublica, gerarChaveAnexo } from '@/lib/storage/s3';
-import { db } from '@/lib/db';
+import { getAuth } from '@/lib/auth';
+import { getDb } from '@/lib/db';
 import { pacientes, usuarios } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
+import { gerarUrlUpload, gerarUrlPublica, gerarChaveAnexo } from '@/lib/storage/s3';
 import { z } from 'zod';
 
 const bodySchema = z.object({
@@ -14,6 +14,9 @@ const bodySchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = await getAuth();
+    const db = await getDb();
+
     const session = await auth.api.getSession({ headers: request.headers });
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
@@ -24,7 +27,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json(
         { error: 'Dados inválidos', details: parsed.error.flatten() },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -42,7 +45,7 @@ export async function POST(request: NextRequest) {
     const paciente = await db.query.pacientes.findFirst({
       where: and(
         eq(pacientes.id, pacienteId),
-        eq(pacientes.instituicaoId, usuario.instituicaoId)
+        eq(pacientes.instituicaoId, usuario.instituicaoId),
       ),
     });
 
