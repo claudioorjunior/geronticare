@@ -1,8 +1,12 @@
 import * as schema from './schema';
+import type { PgDatabase } from 'drizzle-orm/pg-core';
+import type { PgQueryResultHKT } from 'drizzle-orm/pg-core';
+import type { ExtractTablesWithRelations } from 'drizzle-orm';
 
 const isDev = process.env.NODE_ENV === 'development';
 
-type AnyDb = any;
+type AnyDb = PgDatabase<PgQueryResultHKT, typeof schema, ExtractTablesWithRelations<typeof schema>>;
+export type Db = AnyDb;
 let _db: AnyDb | null = null;
 let _dbPromise: Promise<void> | null = null;
 
@@ -25,13 +29,13 @@ async function init() {
       'utf-8',
     );
     await client.exec(seedSql);
-    _db = drizzle(client, { schema }) as AnyDb;
+    _db = drizzle(client, { schema });
   } else {
     const { drizzle } = await import('drizzle-orm/postgres-js');
     const postgres = await import('postgres');
     const { env } = await import('@/lib/env');
     const client = postgres.default(env.DATABASE_URL, { prepare: false });
-    _db = drizzle(client, { schema }) as AnyDb;
+    _db = drizzle(client, { schema });
   }
 }
 

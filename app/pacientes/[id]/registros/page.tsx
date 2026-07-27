@@ -42,6 +42,7 @@ export default function RegistrosPage() {
   const params = useParams<{ id: string }>();
   const { role } = useDevRole();
   const utils = trpc.useUtils();
+  const [filtroTipo, setFiltroTipo] = useState<TipoRegistro | null>(null);
   const registrosQuery = trpc.registros.listar.useQuery(
     { pacienteId: params.id, tipo: filtroTipo ?? undefined },
     { enabled: Boolean(params.id) },
@@ -54,7 +55,6 @@ export default function RegistrosPage() {
   const [novoTipo, setNovoTipo] = useState<TipoRegistro>('evolucao');
   const [novoTitulo, setNovoTitulo] = useState('');
   const [novoConteudo, setNovoConteudo] = useState('');
-  const [filtroTipo, setFiltroTipo] = useState<TipoRegistro | null>(null);
   const [message, setMessage] = useState('');
   const canEdit = role === 'admin' || role === 'profissional';
 

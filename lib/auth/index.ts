@@ -81,7 +81,7 @@ export async function getAuth(): Promise<ReturnType<typeof betterAuth>> {
         secret: env.AUTH_SECRET,
         baseURL: env.AUTH_URL,
       } as const;
-      return betterAuth(options as any);
+      return betterAuth(options as unknown as Parameters<typeof betterAuth>[0]);
     })();
   }
   _auth = await _authPromise;
