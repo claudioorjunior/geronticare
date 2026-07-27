@@ -66,6 +66,14 @@ export default function PatientDadosPage() {
   }
 
   const paciente = pacienteQ.data;
+  if (!paciente) {
+    return (
+      <div className="py-12 text-center">
+        <AlertCircle className="mx-auto h-8 w-8 text-amber-500 mb-3" />
+        <p className="text-sm font-medium text-slate-700">Paciente não encontrado</p>
+      </div>
+    );
+  }
   const adm = new Date(paciente.dataAdmissao);
   const diasInternado = Number.isNaN(adm.getTime()) ? null : Math.max(0, Math.floor((agora - adm.getTime()) / 86400000));
 

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
-import { ArrowLeft, Calendar, Phone, ShieldCheck, MapPin, Loader2 } from 'lucide-react';
+import { ArrowLeft, Calendar, Phone, ShieldCheck, MapPin, Loader2, AlertCircle } from 'lucide-react';
 import { useDevRole } from '@/lib/dev/use-dev-role';
 import { trpc } from '@/lib/trpc/client';
 
@@ -63,6 +63,14 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
   );
 
   const paciente = pacienteQ.data;
+  if (!paciente) {
+    return (
+      <div className="py-4 text-center">
+        <AlertCircle className="mx-auto h-6 w-6 text-amber-500 mb-2" />
+        <p className="text-xs text-slate-500">Paciente não encontrado</p>
+      </div>
+    );
+  }
   const idade = paciente ? calcularIdade(paciente.dataNascimento) : null;
 
   const sexoLabel = paciente?.sexo === 'masculino' ? 'M' : paciente?.sexo === 'feminino' ? 'F' : '—';
