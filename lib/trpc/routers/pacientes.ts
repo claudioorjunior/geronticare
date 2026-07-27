@@ -3,7 +3,7 @@ import { createTRPCRouter, protectedProcedure, adminProcedure } from '../server'
 import { pacientes } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { verificarOwnershipPaciente } from '../ownership';
+import { verificarOwnershipPaciente } from '@/lib/trpc/ownership';
 
 export const pacientesRouter = createTRPCRouter({
   listar: protectedProcedure.query(async ({ ctx }) => {

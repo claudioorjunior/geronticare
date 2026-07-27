@@ -22,50 +22,41 @@ async function init() {
     const client = await PGlite.create({ dataDir });
 
     // Só roda migration + seed se o banco estiver vazio (primeira vez ou após wipe)
+    let jaInicializado = false;
     try {
       const { rows } = await client.query(`SELECT EXISTS (
         SELECT FROM information_schema.tables
         WHERE table_name = 'instituicoes'
       )`);
-      const jaInicializado = rows?.[0]?.exists === true;
-      if (!jaInicializado) {
-        const migrationSql = readFileSync(
-          join(cwd, 'lib', 'db', 'migrations', '0000_smooth_doomsday.sql'),
-          'utf-8',
-        );
-        await client.exec(migrationSql);
-        // Migration incremental: add updated_at coluna faltando
-        await client.exec(
-          readFileSync(
-            join(cwd, 'lib', 'db', 'migrations', '0001_add_updated_at_sinais.sql'),
-            'utf-8',
-          ),
-        );
-        const seedSql = readFileSync(
-          join(cwd, 'lib', 'db', 'seed-data.sql'),
-          'utf-8',
-        );
-        await client.exec(seedSql);
-      } else {
-        // Migration patch retroativo: add updated_at em sinais_vitais
-        // (para bancos criados antes da migration 0001)
-        await client.exec(
-          `ALTER TABLE sinais_vitais ADD COLUMN IF NOT EXISTS updated_at timestamp DEFAULT now() NOT NULL`
-        );
-      }
+      jaInicializado = rows?.[0]?.exists === true;
     } catch {
-      // Tabela information_schema.tables pode não estar disponível em alguns contextos;
-      // fallback: roda migration (safe se tabelas já existirem via CREATE IF NOT EXISTS)
+      // information_schema.tables pode não estar disponível em alguns contextos;
+      // considera não inicializado para forçar migration
+    }
+    if (!jaInicializado) {
       const migrationSql = readFileSync(
         join(cwd, 'lib', 'db', 'migrations', '0000_smooth_doomsday.sql'),
         'utf-8',
       );
       await client.exec(migrationSql);
+      // Migration incremental: add updated_at coluna faltando
+      await client.exec(
+        readFileSync(
+          join(cwd, 'lib', 'db', 'migrations', '0001_add_updated_at_sinais.sql'),
+          'utf-8',
+        ),
+      );
       const seedSql = readFileSync(
         join(cwd, 'lib', 'db', 'seed-data.sql'),
         'utf-8',
       );
       await client.exec(seedSql);
+    } else {
+      // Migration patch retroativo: add updated_at em sinais_vitais
+      // (para bancos criados antes da migration 0001)
+      await client.exec(
+        `ALTER TABLE sinais_vitais ADD COLUMN IF NOT EXISTS updated_at timestamp DEFAULT now() NOT NULL`
+      );
     }
 
     _db = drizzle(client, { schema });

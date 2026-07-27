@@ -133,11 +133,7 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
               {paciente.ativo ? 'Ativo' : 'Inativo'}
             </span>
           </div>
-        ) : (
-          <div className="text-center py-4">
-            <p className="text-sm text-slate-500">Paciente não encontrado</p>
-          </div>
-        )}
+        ) : null}
       </div>
 
       {/* Container único: abas + conteúdo */}
