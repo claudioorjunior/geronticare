@@ -38,7 +38,7 @@ function optionalVar(key: string, fallback: string): () => string {
 }
 
 export const env = defineEnv({
-  // Database
+  // Database (obrigatório em produção, opcional em dev com PGLite)
   DATABASE_URL: requireVar('DATABASE_URL'),
 
   // Better-Auth

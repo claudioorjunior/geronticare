@@ -9,8 +9,9 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDevRole } from '@/lib/dev/use-dev-role';
+import { trpc } from '@/lib/trpc/client';
 
-// === Mock Data ===
+// === Mock Data (ocupação e atividades não têm query no DB — permanecem mock) ===
 
 const occupancyData = [
   { day: 'Seg', value: 45 },
@@ -56,72 +57,6 @@ const upcomingActivities = [
 ];
 
 type Status = 'concluido' | 'andamento' | 'agendado';
-
-const atendimentosRecentes: {
-  paciente: string;
-  tipo: string;
-  profissional: string;
-  data: string;
-  status: Status;
-}[] = [
-  { paciente: 'Maria das Graças Silva', tipo: 'Avaliação Geriátrica', profissional: 'Dra. Helena Costa', data: '24/07/2025', status: 'concluido' },
-  { paciente: 'João Pedro Costa', tipo: 'Registro Clínico', profissional: 'En. Paulo Ribeiro', data: '24/07/2025', status: 'andamento' },
-  { paciente: 'Ana Lúcia Ferreira', tipo: 'Sinais Vitais', profissional: 'Tec. Mara Lopes', data: '23/07/2025', status: 'concluido' },
-  { paciente: 'José Carlos Mendes', tipo: 'Avaliação Geriátrica', profissional: 'Dr. Ruben Araújo', data: '23/07/2025', status: 'concluido' },
-  { paciente: 'Tereza de Jesus Pinto', tipo: 'Registro Clínico', profissional: 'Dra. Helena Costa', data: '22/07/2025', status: 'agendado' },
-];
-
-const alertasVitais: {
-  paciente: string;
-  sinal: string;
-  severidade: 'critico' | 'atencao';
-}[] = [
-  { paciente: 'João Pedro Costa', sinal: 'PA 170/105 mmHg', severidade: 'critico' },
-  { paciente: 'Francisco Lima Oliveira', sinal: 'SpO2 88%', severidade: 'critico' },
-  { paciente: 'Arnaldo Souza Ramos', sinal: 'Temp 38.5 C', severidade: 'atencao' },
-];
-
-const agasProximas: { paciente: string; data: string }[] = [
-  { paciente: 'Ana Lucia Ferreira', data: '26/07/2025' },
-  { paciente: 'Beatriz Alves Santos', data: '28/07/2025' },
-  { paciente: 'Tereza de Jesus Pinto', data: '30/07/2025' },
-];
-
-const registrosHoje: {
-  hora: string;
-  paciente: string;
-  tipo: string;
-  conteudo: string;
-}[] = [
-  { hora: '08:30', paciente: 'Maria das Graças Silva', tipo: 'medicina', conteudo: 'Avaliacao de rotina. Paciente estavel, sem queixas. Ajuste de dose de losartana.' },
-  { hora: '10:15', paciente: 'João Pedro Costa', tipo: 'enfermagem', conteudo: 'Curativo de ulcera de pressao em regiao sacra. Troca de cobertura.' },
-  { hora: '11:45', paciente: 'Ana Lucia Ferreira', tipo: 'fisioterapia', conteudo: 'Sessao de mobilizacao. Pacente deambulou 15m com apoio.' },
-  { hora: '14:00', paciente: 'Jose Carlos Mendes', tipo: 'medicina', conteudo: 'Revisao de exames laboratoriais. Glicemia 142 mg/dL. Mantem conduta.' },
-];
-
-const sinaisMonitorar: {
-  paciente: string;
-  sinal: string;
-  tendencia: 'alta' | 'baixa' | 'estavel';
-}[] = [
-  { paciente: 'Maria das Graças Silva', sinal: 'PA 138/82 mmHg', tendencia: 'estavel' },
-  { paciente: 'Jose Carlos Mendes', sinal: 'Glicemia 142 mg/dL', tendencia: 'alta' },
-  { paciente: 'Tereza de Jesus Pinto', sinal: 'SpO2 95%', tendencia: 'baixa' },
-];
-
-const pacientesRecentes: {
-  nome: string;
-  cpf: string;
-  idade: number;
-  dataAdmissao: string;
-  status: 'ativo' | 'inativo';
-}[] = [
-  { nome: 'Maria das Graças Silva', cpf: '***.456.789-**', idade: 78, dataAdmissao: '15/03/2024', status: 'ativo' },
-  { nome: 'João Pedro Costa', cpf: '***.654.321-**', idade: 84, dataAdmissao: '22/01/2024', status: 'ativo' },
-  { nome: 'Ana Lucia Ferreira', cpf: '***.789.123-**', idade: 71, dataAdmissao: '08/09/2024', status: 'ativo' },
-  { nome: 'Jose Carlos Mendes', cpf: '***.654.987-**', idade: 86, dataAdmissao: '30/11/2023', status: 'ativo' },
-  { nome: 'Beatriz Alves Santos', cpf: '***.123.456-**', idade: 69, dataAdmissao: '12/02/2025', status: 'ativo' },
-];
 
 // === Shared Components ===
 
@@ -287,6 +222,18 @@ function ActivityList() {
 // === Admin Dashboard (Stitch v2 — M3 tokens) ===
 
 function DashboardAdmin() {
+  const { data: resumo, isLoading } = trpc.dashboard.resumo.useQuery();
+
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <span className="text-m3-secondary text-body-md">Carregando...</span>
+      </div>
+    );
+  }
+
+  if (!resumo) return null;
+
   return (
     <div className="h-full flex flex-col px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto pt-gutter pb-section-gap gap-gutter">
       {/* Header — compact strip */}
@@ -311,7 +258,7 @@ function DashboardAdmin() {
       <section className="grid grid-cols-1 md:grid-cols-3 gap-gutter shrink-0">
         <KpiCardV2
           label="Total de Pacientes"
-          value="142"
+          value={String(resumo.totalPacientes)}
           delta="+3%"
           deltaType="positive"
           icon={<Users className="h-5 w-5" />}
@@ -319,7 +266,7 @@ function DashboardAdmin() {
         />
         <KpiCardV2
           label="Admissões Semanais"
-          value="12"
+          value={String(resumo.admissoesSemanais)}
           delta="Estável"
           deltaType="neutral"
           icon={<UserPlus className="h-5 w-5" />}
@@ -327,7 +274,7 @@ function DashboardAdmin() {
         />
         <KpiCardV2
           label="Avaliações Pendentes"
-          value="8"
+          value={String(resumo.agasPendentes)}
           delta="Atenção"
           deltaType="negative"
           icon={<ClipboardList className="h-5 w-5" />}
@@ -346,7 +293,120 @@ function DashboardAdmin() {
 
 // === Professional Dashboard (M3 tokens) ===
 
+// Converte um sinal vital num rótulo legível + severidade (para Alertas Vitais)
+// ponytail: pontos de corte fixos; trocar por thresholds configuráveis se houver variação por perfil clínico
+function classificarSinal(s: {
+  pressaoArterialSistolica: number | null;
+  pressaoArterialDiastolica: number | null;
+  saturacaoO2: number | null;
+  temperatura: number | null;
+  glicemia: number | null;
+}): { sinal: string; severidade: 'critico' | 'atencao' | 'normal' } | null {
+  // Críticos primeiro
+  if (s.saturacaoO2 != null && s.saturacaoO2 < 90) {
+    return { sinal: `SpO2 ${s.saturacaoO2}%`, severidade: 'critico' };
+  }
+  if (s.pressaoArterialSistolica != null && s.pressaoArterialSistolica >= 170) {
+    const db = s.pressaoArterialDiastolica ?? 0;
+    return { sinal: `PA ${s.pressaoArterialSistolica}/${db} mmHg`, severidade: 'critico' };
+  }
+  if (s.temperatura != null && s.temperatura >= 38.5) {
+    return { sinal: `Temp ${s.temperatura.toFixed(1)} C`, severidade: 'atencao' };
+  }
+  if (s.glicemia != null && s.glicemia >= 200) {
+    return { sinal: `Glicemia ${s.glicemia} mg/dL`, severidade: 'atencao' };
+  }
+  return null;
+}
+
+// Converte um sinal vital num rótulo resumido para "Sinais para Monitorar"
+function sinalVitalLabel(s: {
+  pressaoArterialSistolica: number | null;
+  pressaoArterialDiastolica: number | null;
+  saturacaoO2: number | null;
+  glicemia: number | null;
+}): string {
+  if (s.pressaoArterialSistolica != null) {
+    const db = s.pressaoArterialDiastolica ?? 0;
+    return `PA ${s.pressaoArterialSistolica}/${db} mmHg`;
+  }
+  if (s.saturacaoO2 != null) return `SpO2 ${s.saturacaoO2}%`;
+  if (s.glicemia != null) return `Glicemia ${s.glicemia} mg/dL`;
+  return '—';
+}
+
 function DashboardProfissional() {
+  const registrosQ = trpc.dashboard.registrosHoje.useQuery();
+  const sinaisQ = trpc.dashboard.ultimosSinaisVitais.useQuery();
+  const agasQ = trpc.dashboard.agasProximas.useQuery();
+  const resumoQ = trpc.dashboard.resumo.useQuery();
+
+  const registrosHoje = (registrosQ.data ?? []) as {
+    id: string;
+    pacienteNome: string;
+    especialidade: string;
+    tipo: string;
+    titulo: string;
+    conteudo: string;
+    dataRegistro: Date;
+  }[];
+  const sinaisVitais = (sinaisQ.data ?? []) as {
+    pacienteNome: string;
+    pressaoArterialSistolica: number | null;
+    pressaoArterialDiastolica: number | null;
+    saturacaoO2: number | null;
+    glicemia: number | null;
+    temperatura: number | null;
+  }[];
+  const agasProximas = (agasQ.data ?? []) as {
+    id: string;
+    pacienteNome: string;
+    dataAvaliacao: Date;
+  }[];
+
+  // Alertas: classifica cada sinal vital e mantém só os anormais
+  const alertasVitais: { paciente: string; sinal: string; severidade: 'critico' | 'atencao' }[] = sinaisVitais
+    .map((s) => {
+      const cls = classificarSinal(s);
+      return cls ? { paciente: s.pacienteNome, sinal: cls.sinal, severidade: cls.severidade } : null;
+    })
+    .filter((a): a is { paciente: string; sinal: string; severidade: 'critico' | 'atencao' } => a !== null);
+
+  // Sinais para monitorar: últimos sinais vitais com rótulos e tendência placeholder "estavel"
+  // ponytail: tendência fixa em 'estavel'; trocar por cálculo de delta vs. aferição anterior quando houver histórico
+  const sinaisMonitorar: { paciente: string; sinal: string; tendencia: 'alta' | 'baixa' | 'estavel' }[] =
+    sinaisVitais.slice(0, 3).map((s) => ({
+      paciente: s.pacienteNome,
+      sinal: sinalVitalLabel(s),
+      tendencia: 'estavel' as const,
+    }));
+
+  // Atendimentos recentes: mesmos registros de hoje, exibidos como atendimentos
+  // ponytail: status fixo 'concluido'; trocar por campo real quando registros ganharem status
+  const atendimentosRecentes: {
+    paciente: string;
+    tipo: string;
+    profissional: string;
+    data: string;
+    status: Status;
+  }[] = registrosHoje.slice(0, 5).map((r) => ({
+    paciente: r.pacienteNome,
+    tipo: r.titulo,
+    profissional: '', // não há join com tabela de usuários na query atual
+    data: r.dataRegistro instanceof Date ? r.dataRegistro.toLocaleDateString('pt-BR') : '',
+    status: 'concluido' as Status,
+  }));
+
+  const alertasCriticos = alertasVitais.filter((a) => a.severidade === 'critico').length;
+
+  if (registrosQ.isLoading || sinaisQ.isLoading || agasQ.isLoading || resumoQ.isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <span className="text-m3-secondary text-body-md">Carregando...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full flex flex-col px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto pt-gutter pb-section-gap gap-gutter">
       {/* Header — compact strip */}
@@ -359,10 +419,10 @@ function DashboardProfissional() {
 
       {/* KPIs — one row */}
       <section className="grid grid-cols-1 md:grid-cols-4 gap-gutter shrink-0">
-        <KpiCardV2 label="Atendimentos Hoje" value="7" delta="+2" deltaType="positive" icon={<Activity className="h-5 w-5" />} />
-        <KpiCardV2 label="Pacientes Sob Cuidado" value="23" icon={<Users className="h-5 w-5" />} />
-        <KpiCardV2 label="AGAs Pendentes" value="4" delta="Atenção" deltaType="negative" icon={<ClipboardList className="h-5 w-5" />} />
-        <KpiCardV2 label="Alertas Críticos" value="2" delta="Crítico" deltaType="negative" icon={<Bell className="h-5 w-5" />} />
+        <KpiCardV2 label="Atendimentos Hoje" value={String(registrosHoje.length)} delta="+2" deltaType="positive" icon={<Activity className="h-5 w-5" />} />
+        <KpiCardV2 label="Pacientes Sob Cuidado" value={String(resumoQ.data?.totalPacientes ?? 0)} icon={<Users className="h-5 w-5" />} />
+        <KpiCardV2 label="AGAs Pendentes" value={String(resumoQ.data?.agasPendentes ?? 0)} delta="Atenção" deltaType="negative" icon={<ClipboardList className="h-5 w-5" />} />
+        <KpiCardV2 label="Alertas Críticos" value={String(alertasCriticos)} delta="Crítico" deltaType="negative" icon={<Bell className="h-5 w-5" />} />
       </section>
 
       {/* Linha 2: Registros + Sinais */}
@@ -374,20 +434,26 @@ function DashboardProfissional() {
             <ChevronRight className="h-4 w-4 text-m3-secondary" />
           </div>
           <div className="divide-y divide-m3-outline-variant/50 overflow-y-auto flex-1">
-            {registrosHoje.map((r, i) => (
-              <div key={i} className="flex gap-4 px-gutter py-3">
-                <time className="text-label-md text-m3-secondary tabular-nums w-12 shrink-0 pt-0.5">{r.hora}</time>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-label-md text-m3-on-surface truncate">{r.paciente}</span>
-                    <span className="inline-flex items-center rounded-full bg-m3-surface-container px-2 py-0.5 text-label-sm text-m3-on-surface-variant shrink-0">
-                      {tipoLabels[r.tipo] || r.tipo}
-                    </span>
+            {registrosHoje.length === 0 ? (
+              <div className="px-gutter py-6 text-body-md text-m3-secondary">Nenhum registro hoje.</div>
+            ) : (
+              registrosHoje.map((r, i) => (
+                <div key={r.id ?? i} className="flex gap-4 px-gutter py-3">
+                  <time className="text-label-md text-m3-secondary tabular-nums w-12 shrink-0 pt-0.5">
+                    {r.dataRegistro instanceof Date ? r.dataRegistro.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}
+                  </time>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-label-md text-m3-on-surface truncate">{r.pacienteNome}</span>
+                      <span className="inline-flex items-center rounded-full bg-m3-surface-container px-2 py-0.5 text-label-sm text-m3-on-surface-variant shrink-0">
+                        {tipoLabels[r.especialidade] ?? r.tipo}
+                      </span>
+                    </div>
+                    <p className="text-body-md text-m3-on-surface-variant mt-1 line-clamp-2">{r.conteudo}</p>
                   </div>
-                  <p className="text-body-md text-m3-on-surface-variant mt-1 line-clamp-2">{r.conteudo}</p>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -397,20 +463,24 @@ function DashboardProfissional() {
             <h2 className="text-title-lg text-m3-on-surface">Sinais Vitais para Monitorar</h2>
           </div>
           <div className="divide-y divide-m3-outline-variant/50 overflow-y-auto flex-1">
-            {sinaisMonitorar.map((s, i) => (
-              <div key={i} className="flex items-center justify-between px-gutter py-3">
-                <div className="min-w-0">
-                  <div className="text-label-md text-m3-on-surface truncate">{s.paciente}</div>
-                  <div className="text-label-sm text-m3-secondary tabular-nums mt-0.5">{s.sinal}</div>
+            {sinaisMonitorar.length === 0 ? (
+              <div className="px-gutter py-6 text-body-md text-m3-secondary">Nenhum sinal vital registrado.</div>
+            ) : (
+              sinaisMonitorar.map((s, i) => (
+                <div key={i} className="flex items-center justify-between px-gutter py-3">
+                  <div className="min-w-0">
+                    <div className="text-label-md text-m3-on-surface truncate">{s.paciente}</div>
+                    <div className="text-label-sm text-m3-secondary tabular-nums mt-0.5">{s.sinal}</div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0 ml-4">
+                    <TendenciaIcon tendencia={s.tendencia} />
+                    <span className="text-label-md text-m3-on-surface-variant">
+                      {s.tendencia === 'alta' ? 'Em alta' : s.tendencia === 'baixa' ? 'Em baixa' : 'Estável'}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0 ml-4">
-                  <TendenciaIcon tendencia={s.tendencia} />
-                  <span className="text-label-md text-m3-on-surface-variant">
-                    {s.tendencia === 'alta' ? 'Em alta' : s.tendencia === 'baixa' ? 'Em baixa' : 'Estável'}
-                  </span>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </section>
@@ -424,26 +494,30 @@ function DashboardProfissional() {
             <h2 className="text-title-lg text-m3-on-surface">Alertas Vitais</h2>
           </div>
           <div className="space-y-3">
-            {alertasVitais.map((a, i) => (
-              <div key={i} className={`flex items-start gap-3 rounded-m3-lg p-3 ${
-                a.severidade === 'critico' ? 'bg-m3-error-container/20' : 'bg-amber-50'
-              }`}>
-                <AlertTriangle className={`h-4 w-4 mt-0.5 shrink-0 ${
-                  a.severidade === 'critico' ? 'text-m3-error' : 'text-amber-600'
-                }`} />
-                <div className="min-w-0 flex-1">
-                  <div className="text-label-md text-m3-on-surface">{a.paciente}</div>
-                  <div className="text-label-sm text-m3-secondary mt-0.5">{a.sinal}</div>
-                </div>
-                <span className={`text-label-sm px-2 py-0.5 rounded-full shrink-0 ${
-                  a.severidade === 'critico'
-                    ? 'bg-m3-error-container/40 text-m3-error'
-                    : 'bg-amber-100 text-amber-700'
+            {alertasVitais.length === 0 ? (
+              <div className="text-body-md text-m3-secondary">Nenhum alerta ativo.</div>
+            ) : (
+              alertasVitais.map((a, i) => (
+                <div key={i} className={`flex items-start gap-3 rounded-m3-lg p-3 ${
+                  a.severidade === 'critico' ? 'bg-m3-error-container/20' : 'bg-amber-50'
                 }`}>
-                  {a.severidade === 'critico' ? 'Crítico' : 'Atenção'}
-                </span>
-              </div>
-            ))}
+                  <AlertTriangle className={`h-4 w-4 mt-0.5 shrink-0 ${
+                    a.severidade === 'critico' ? 'text-m3-error' : 'text-amber-600'
+                  }`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-label-md text-m3-on-surface">{a.paciente}</div>
+                    <div className="text-label-sm text-m3-secondary mt-0.5">{a.sinal}</div>
+                  </div>
+                  <span className={`text-label-sm px-2 py-0.5 rounded-full shrink-0 ${
+                    a.severidade === 'critico'
+                      ? 'bg-m3-error-container/40 text-m3-error'
+                      : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {a.severidade === 'critico' ? 'Crítico' : 'Atenção'}
+                  </span>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -454,18 +528,24 @@ function DashboardProfissional() {
             <h2 className="text-title-lg text-m3-on-surface">AGAs Próximas</h2>
           </div>
           <div className="space-y-3">
-            {agasProximas.map((a, i) => (
-              <div key={i} className="flex items-center justify-between rounded-m3-lg border border-m3-outline-variant/40 p-3">
-                <div className="min-w-0">
-                  <div className="text-label-md text-m3-on-surface truncate">{a.paciente}</div>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <Calendar className="h-3.5 w-3.5 text-m3-secondary" />
-                    <span className="text-label-sm text-m3-secondary tabular-nums">{a.data}</span>
+            {agasProximas.length === 0 ? (
+              <div className="text-body-md text-m3-secondary">Nenhuma AGA agendada.</div>
+            ) : (
+              agasProximas.map((a, i) => (
+                <div key={a.id ?? i} className="flex items-center justify-between rounded-m3-lg border border-m3-outline-variant/40 p-3">
+                  <div className="min-w-0">
+                    <div className="text-label-md text-m3-on-surface truncate">{a.pacienteNome}</div>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <Calendar className="h-3.5 w-3.5 text-m3-secondary" />
+                      <span className="text-label-sm text-m3-secondary tabular-nums">
+                        {a.dataAvaliacao instanceof Date ? a.dataAvaliacao.toLocaleDateString('pt-BR') : ''}
+                      </span>
+                    </div>
                   </div>
+                  <ChevronRight className="h-4 w-4 text-m3-secondary shrink-0 ml-2" />
                 </div>
-                <ChevronRight className="h-4 w-4 text-m3-secondary shrink-0 ml-2" />
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -476,20 +556,24 @@ function DashboardProfissional() {
             <h2 className="text-title-lg text-m3-on-surface">Atendimentos Recentes</h2>
           </div>
           <div className="space-y-3">
-            {atendimentosRecentes.map((a, i) => (
-              <div key={i} className="flex items-start justify-between gap-3 rounded-m3-lg border border-m3-outline-variant/40 p-3">
-                <div className="min-w-0 flex-1">
-                  <div className="text-label-md text-m3-on-surface truncate">{a.paciente}</div>
-                  <div className="text-label-sm text-m3-secondary mt-0.5">{a.tipo}</div>
-                  <div className="flex items-center gap-2 mt-1 text-label-sm text-m3-on-surface-variant">
-                    <span>{a.profissional}</span>
-                    <span>&middot;</span>
-                    <span>{a.data}</span>
+            {atendimentosRecentes.length === 0 ? (
+              <div className="text-body-md text-m3-secondary">Nenhum atendimento hoje.</div>
+            ) : (
+              atendimentosRecentes.map((a, i) => (
+                <div key={i} className="flex items-start justify-between gap-3 rounded-m3-lg border border-m3-outline-variant/40 p-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-label-md text-m3-on-surface truncate">{a.paciente}</div>
+                    <div className="text-label-sm text-m3-secondary mt-0.5">{a.tipo}</div>
+                    <div className="flex items-center gap-2 mt-1 text-label-sm text-m3-on-surface-variant">
+                      {a.profissional && <span>{a.profissional}</span>}
+                      {a.profissional && <span>&middot;</span>}
+                      <span>{a.data}</span>
+                    </div>
                   </div>
+                  <StatusBadge status={a.status} />
                 </div>
-                <StatusBadge status={a.status} />
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </section>
@@ -500,6 +584,24 @@ function DashboardProfissional() {
 // === User Dashboard (M3 tokens) ===
 
 function DashboardUsuario() {
+  const { data: resumo, isLoading } = trpc.dashboard.resumo.useQuery();
+  const pacientesRecentes = (resumo?.pacientesRecentes ?? []) as {
+    id: string;
+    nome: string;
+    cpf: string | null;
+    dataNascimento: Date;
+    dataAdmissao: Date;
+    ativo: boolean;
+  }[];
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto pt-gutter min-h-[400px]">
+        <span className="text-m3-secondary text-body-md">Carregando...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto pt-gutter pb-section-gap">
       <div className="mb-gutter">
@@ -530,25 +632,37 @@ function DashboardUsuario() {
             <tr className="border-b border-m3-outline-variant bg-m3-surface-container-low">
               <th className="py-4 px-6 text-label-md text-m3-secondary text-left">Nome</th>
               <th className="py-4 px-6 text-label-md text-m3-secondary text-left">CPF</th>
-              <th className="py-4 px-6 text-label-md text-m3-secondary text-left">Idade</th>
+              <th className="py-4 px-6 text-label-md text-m3-secondary text-left">Data Nascimento</th>
               <th className="py-4 px-6 text-label-md text-m3-secondary text-left">Data Admissão</th>
               <th className="py-4 px-6 text-label-md text-m3-secondary text-left">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-m3-outline-variant/50 bg-m3-surface-container-lowest">
-            {pacientesRecentes.map((p, i) => (
-              <tr key={i} className="hover:bg-m3-surface-container-lowest transition-colors">
-                <td className="py-4 px-6 text-body-md text-m3-on-surface font-medium">{p.nome}</td>
-                <td className="py-4 px-6 text-body-md text-m3-secondary tabular-nums">{p.cpf}</td>
-                <td className="py-4 px-6 text-body-md text-m3-on-surface tabular-nums">{p.idade} anos</td>
-                <td className="py-4 px-6 text-body-md text-m3-on-surface">{p.dataAdmissao}</td>
-                <td className="py-4 px-6">
-                  <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-label-sm text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                    Ativo
-                  </span>
-                </td>
+            {pacientesRecentes.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="py-8 px-6 text-body-md text-m3-secondary text-center">Nenhum paciente cadastrado.</td>
               </tr>
-            ))}
+            ) : (
+              pacientesRecentes.map((p, i) => (
+                <tr key={p.id ?? i} className="hover:bg-m3-surface-container-lowest transition-colors">
+                  <td className="py-4 px-6 text-body-md text-m3-on-surface font-medium">{p.nome}</td>
+                  <td className="py-4 px-6 text-body-md text-m3-secondary tabular-nums">{p.cpf ?? '—'}</td>
+                  <td className="py-4 px-6 text-body-md text-m3-on-surface tabular-nums">
+                    {p.dataNascimento instanceof Date ? p.dataNascimento.toLocaleDateString('pt-BR') : '—'}
+                  </td>
+                  <td className="py-4 px-6 text-body-md text-m3-on-surface">
+                    {p.dataAdmissao instanceof Date ? p.dataAdmissao.toLocaleDateString('pt-BR') : '—'}
+                  </td>
+                  <td className="py-4 px-6">
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-label-sm ring-1 ring-inset ${
+                      p.ativo ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-gray-50 text-gray-500 ring-gray-200'
+                    }`}>
+                      {p.ativo ? 'Ativo' : 'Inativo'}
+                    </span>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
