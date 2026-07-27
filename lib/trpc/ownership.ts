@@ -1,4 +1,5 @@
 import { pacientes } from '@/lib/db/schema';
+import type { Db } from '@/lib/db';
 import { eq, and } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 
@@ -9,7 +10,7 @@ import { TRPCError } from '@trpc/server';
  * @throws TRPCError NOT_FOUND se paciente não existe ou não pertence à instituição
  */
 export async function verificarOwnershipPaciente(
-  db: typeof import('@/lib/db').db,
+  db: Db,
   pacienteId: string,
   instituicaoId: string,
 ) {
