@@ -3,6 +3,7 @@ import { createTRPCRouter, protectedProcedure, adminProcedure } from '../server'
 import { pacientes } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
+import { verificarOwnershipPaciente } from '../ownership';
 
 export const pacientesRouter = createTRPCRouter({
   listar: protectedProcedure.query(async ({ ctx }) => {
@@ -118,6 +119,9 @@ export const pacientesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
 
+      // Verifica que o paciente existe e pertence à instituição
+      await verificarOwnershipPaciente(ctx.db, id, ctx.instituicaoId);
+
       // Valida unicidade de CPF (mesmo padrão de pacientes.criar)
       if (data.cpf) {
         const cpfExistente = await ctx.db.query.pacientes.findFirst({
@@ -151,6 +155,7 @@ export const pacientesRouter = createTRPCRouter({
   desativar: adminProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
+      await verificarOwnershipPaciente(ctx.db, input.id, ctx.instituicaoId);
       await ctx.db
         .update(pacientes)
         .set({ ativo: false })

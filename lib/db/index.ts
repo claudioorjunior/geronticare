@@ -18,17 +18,56 @@ async function init() {
   if (isDev) {
     const { PGlite } = await import('@electric-sql/pglite');
     const { drizzle } = await import('drizzle-orm/pglite');
-    const client = await PGlite.create();
-    const migrationSql = readFileSync(
-      join(cwd, 'lib', 'db', 'migrations', '0000_smooth_doomsday.sql'),
-      'utf-8',
-    );
-    await client.exec(migrationSql);
-    const seedSql = readFileSync(
-      join(cwd, 'lib', 'db', 'seed-data.sql'),
-      'utf-8',
-    );
-    await client.exec(seedSql);
+    const dataDir = join(cwd, '.pglite');
+    const client = await PGlite.create({ dataDir });
+
+    // Só roda migration + seed se o banco estiver vazio (primeira vez ou após wipe)
+    try {
+      const { rows } = await client.query(`SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_name = 'instituicoes'
+      )`);
+      const jaInicializado = rows?.[0]?.exists === true;
+      if (!jaInicializado) {
+        const migrationSql = readFileSync(
+          join(cwd, 'lib', 'db', 'migrations', '0000_smooth_doomsday.sql'),
+          'utf-8',
+        );
+        await client.exec(migrationSql);
+        // Migration incremental: add updated_at coluna faltando
+        await client.exec(
+          readFileSync(
+            join(cwd, 'lib', 'db', 'migrations', '0001_add_updated_at_sinais.sql'),
+            'utf-8',
+          ),
+        );
+        const seedSql = readFileSync(
+          join(cwd, 'lib', 'db', 'seed-data.sql'),
+          'utf-8',
+        );
+        await client.exec(seedSql);
+      } else {
+        // Migration patch retroativo: add updated_at em sinais_vitais
+        // (para bancos criados antes da migration 0001)
+        await client.exec(
+          `ALTER TABLE sinais_vitais ADD COLUMN IF NOT EXISTS updated_at timestamp DEFAULT now() NOT NULL`
+        );
+      }
+    } catch {
+      // Tabela information_schema.tables pode não estar disponível em alguns contextos;
+      // fallback: roda migration (safe se tabelas já existirem via CREATE IF NOT EXISTS)
+      const migrationSql = readFileSync(
+        join(cwd, 'lib', 'db', 'migrations', '0000_smooth_doomsday.sql'),
+        'utf-8',
+      );
+      await client.exec(migrationSql);
+      const seedSql = readFileSync(
+        join(cwd, 'lib', 'db', 'seed-data.sql'),
+        'utf-8',
+      );
+      await client.exec(seedSql);
+    }
+
     _db = drizzle(client, { schema });
   } else {
     const { drizzle } = await import('drizzle-orm/postgres-js');

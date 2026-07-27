@@ -63,7 +63,7 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
   );
 
   const paciente = pacienteQ.data;
-  if (!paciente) {
+  if (pacienteQ.isError && !paciente) {
     return (
       <div className="py-4 text-center">
         <AlertCircle className="mx-auto h-6 w-6 text-amber-500 mb-2" />
