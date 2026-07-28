@@ -17,7 +17,7 @@ export const pacientesRouter = createTRPCRouter({
   }),
 
   buscar: protectedProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(z.object({ id: z.string().uuid({ message: 'ID de paciente inválido' }) }))
     .query(async ({ ctx, input }) => {
       const patient = await ctx.db.query.pacientes.findFirst({
         where: and(

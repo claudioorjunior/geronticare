@@ -64,10 +64,13 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
 
   const paciente = pacienteQ.data;
   if (pacienteQ.isError && !paciente) {
+    const mensagem = pacienteQ.error?.data?.code === 'NOT_FOUND'
+      ? 'Paciente não encontrado'
+      : pacienteQ.error?.message ?? 'Erro ao carregar paciente';
     return (
       <div className="py-4 text-center">
         <AlertCircle className="mx-auto h-6 w-6 text-amber-500 mb-2" />
-        <p className="text-xs text-slate-500">Paciente não encontrado</p>
+        <p className="text-xs text-slate-500">{mensagem}</p>
       </div>
     );
   }
