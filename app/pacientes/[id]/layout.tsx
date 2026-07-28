@@ -48,7 +48,7 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
   const patientId = params.id;
   const { role: userRole } = useDevRole();
 
-  const tabs = allTabs.filter((tab) => tab.roles.includes(userRole));
+  const tabs = allTabs.filter((tab) => userRole && tab.roles.includes(userRole));
 
   const currentTab = () => {
     const segments = pathname.split('/').filter(Boolean);
@@ -63,7 +63,7 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
   );
 
   const paciente = pacienteQ.data;
-  if (!paciente) {
+  if (pacienteQ.isError && !paciente) {
     return (
       <div className="py-4 text-center">
         <AlertCircle className="mx-auto h-6 w-6 text-amber-500 mb-2" />

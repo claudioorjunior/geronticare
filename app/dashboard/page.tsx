@@ -673,8 +673,9 @@ function DashboardUsuario() {
 // === Page Component ===
 
 export default function DashboardPage() {
-  const { role } = useDevRole();
+  const { role, isLoading } = useDevRole();
 
+  if (!role && isLoading) return null; // sessão carregando — evita flash do dashboard errado
   if (role === 'admin') return <DashboardAdmin />;
   if (role === 'profissional') return <DashboardProfissional />;
   return <DashboardUsuario />;
