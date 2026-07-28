@@ -74,6 +74,10 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
       </div>
     );
   }
+  // ponytail: show subtle banner when error occurs but stale data is available
+  const bannerErro = pacienteQ.isError && paciente
+    ? pacienteQ.error?.message ?? 'Erro ao recarregar dados do paciente'
+    : null;
   const idade = paciente ? calcularIdade(paciente.dataNascimento) : null;
 
   const sexoLabel = paciente?.sexo === 'masculino' ? 'M' : paciente?.sexo === 'feminino' ? 'F' : '—';
@@ -82,6 +86,11 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
     <div className="max-w-container-max mx-auto w-full">
       {/* Profile Header Card */}
       <div className="mb-6 rounded-xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
+        {bannerErro && (
+          <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            {bannerErro}
+          </div>
+        )}
         {!paciente && pacienteQ.isPending ? (
           <div className="flex items-center justify-center py-4">
             <Loader2 className="h-5 w-5 animate-spin text-teal-600" />
