@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { useDevRole } from '@/lib/dev/use-dev-role';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
-import { Activity, Heart, Calendar, User, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Activity, Heart, Calendar, User, Loader2, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import { trpc } from '@/lib/trpc/client';
 import {
   atualizarPacienteSchema,
@@ -45,12 +45,15 @@ export default function PatientDadosPage() {
   const [agora] = useState(() => Date.now());
 
   if (pacienteQ.isError) {
+    const mensagem = pacienteQ.error?.data?.code === 'NOT_FOUND'
+      ? 'Paciente não encontrado'
+      : pacienteQ.error?.message ?? 'Verifique autenticação e conexão.';
     return (
       <div className="py-12 text-center">
         <AlertCircle className="mx-auto h-8 w-8 text-amber-500 mb-3" />
         <p className="text-sm font-medium text-slate-700">Não foi possível carregar o paciente</p>
         <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-          {pacienteQ.error?.message ?? 'Verifique autenticação e conexão.'}
+          {mensagem}
         </p>
       </div>
     );
@@ -106,6 +109,17 @@ export default function PatientDadosPage() {
       label: 'Internado',
       value: diasInternado?.toString() ?? '—',
       unit: 'dias',
+    },
+    {
+      icon: Clock,
+      label: 'Atualizado',
+      value: paciente.updatedAt
+        ? new Date(paciente.updatedAt).toLocaleTimeString('pt-BR', {
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : '—',
+      unit: '',
     },
   ];
 

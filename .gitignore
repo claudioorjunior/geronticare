@@ -46,6 +46,7 @@ next-env.d.ts
 
 # hermes internal
 .hermes/
+.pglite/
 docs/
 AGENTS.md
 INVENTARIO_TELAS_M4.md
