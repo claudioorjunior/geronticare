@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { createTRPCRouter, protectedProcedure, adminProcedure } from '../server';
+import { createTRPCRouter, protectedProcedure, adminProcedure, clinicalProcedure } from '../server';
 import { pacientes } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
@@ -33,7 +33,8 @@ export const pacientesRouter = createTRPCRouter({
       return patient;
     }),
 
-  criar: protectedProcedure
+  // Escrita restrita: papel 'usuario' só lê (listar/buscar)
+  criar: clinicalProcedure
     .input(
       z.object({
         nome: z.string().min(3),
@@ -89,7 +90,7 @@ export const pacientesRouter = createTRPCRouter({
       return novoPaciente;
     }),
 
-  atualizar: protectedProcedure
+  atualizar: clinicalProcedure
     .input(
       z.object({
         id: z.string().uuid(),

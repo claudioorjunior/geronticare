@@ -79,4 +79,14 @@ export const adminProcedure = t.procedure.use(isAuthed).use(({ ctx, next }) => {
   return next();
 });
 
-export const clinicalProcedure = t.procedure.use(isAuthed);
+// Escrita e dados clínicos: só admin e profissional.
+// Papel 'usuario' é somente leitura (listar/buscar pacientes, dashboard).
+export const clinicalProcedure = t.procedure.use(isAuthed).use(({ ctx, next }) => {
+  if (ctx.userRole !== 'admin' && ctx.userRole !== 'profissional') {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Seu perfil não tem permissão para esta ação',
+    });
+  }
+  return next();
+});

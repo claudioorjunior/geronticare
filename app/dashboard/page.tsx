@@ -613,17 +613,15 @@ function DashboardUsuario() {
       <div className="mb-section-gap rounded-m3-xl border border-m3-outline-variant bg-m3-surface-container-lowest p-gutter">
         <h2 className="text-title-lg text-m3-on-surface">Bem-vindo(a)</h2>
         <p className="text-body-md text-m3-on-surface-variant mt-2 max-w-prose">
-          Seu perfil tem acesso aos dados cadastrais de pacientes. Registros clínicos,
-          avaliações geriátricas, sinais vitais e anexos são restritos a profissionais de saúde.
+          Seu perfil tem acesso de leitura aos dados cadastrais de pacientes. Cadastro,
+          edição, registros clínicos, avaliações geriátricas, sinais vitais e anexos são
+          restritos a profissionais de saúde.
         </p>
       </div>
 
       {/* Pacientes Recentes */}
       <div className="mb-gutter flex items-center justify-between">
         <h2 className="text-title-lg text-m3-on-surface">Pacientes Recentes</h2>
-        <Button className="gap-2 text-label-md bg-m3-primary text-m3-on-primary hover:bg-m3-primary-container hover:text-m3-on-primary-container">
-          <Plus className="h-4 w-4" /> Novo Paciente
-        </Button>
       </div>
 
       <div className="overflow-hidden rounded-m3-xl border border-m3-outline-variant">
