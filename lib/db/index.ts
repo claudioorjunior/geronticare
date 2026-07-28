@@ -28,7 +28,7 @@ async function init() {
         SELECT FROM information_schema.tables
         WHERE table_name = 'instituicoes'
       )`);
-      jaInicializado = rows?.[0]?.exists === true;
+      jaInicializado = (rows?.[0] as { exists?: boolean } | undefined)?.exists === true;
     } catch {
       // information_schema.tables pode não estar disponível em alguns contextos;
       // considera não inicializado para forçar migration
