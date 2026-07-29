@@ -1,22 +1,24 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
+import { trpc } from '@/lib/trpc/client';
 
 export type DevRole = 'admin' | 'profissional' | 'usuario';
 
 const STORAGE_KEY = 'geronticare-dev-role';
-const IS_DEV = typeof window !== 'undefined' && process.env.NODE_ENV === 'development';
+const IS_DEV = process.env.NODE_ENV === 'development';
 
-// Module-level shared state (works across components without context)
-let currentRole: DevRole = 'profissional';
+// ── Dev override (client-side, dev only) ──
+// null = sem override → usa o papel real da sessão via meuPerfil.
+let overrideRole: DevRole | null = null;
 const listeners = new Set<() => void>();
 
-function getSnapshot(): DevRole {
-  return currentRole;
+function getSnapshot(): DevRole | null {
+  return overrideRole;
 }
 
-function getServerSnapshot(): DevRole {
-  return 'profissional';
+function getServerSnapshot(): DevRole | null {
+  return null;
 }
 
 function subscribe(callback: () => void): () => void {
@@ -28,12 +30,11 @@ function notify() {
   listeners.forEach((l) => l());
 }
 
-// Initialize from localStorage on client
 if (typeof window !== 'undefined' && IS_DEV) {
   try {
     const saved = localStorage.getItem(STORAGE_KEY) as DevRole | null;
     if (saved && ['admin', 'profissional', 'usuario'].includes(saved)) {
-      currentRole = saved;
+      overrideRole = saved;
     }
   } catch {
     // localStorage unavailable
@@ -41,16 +42,24 @@ if (typeof window !== 'undefined' && IS_DEV) {
 }
 
 /**
- * Hook de papel para DESENVOLVIMENTO.
- * Em produção, retorna sempre 'profissional'.
- * Usa useSyncExternalStore para compartilhar estado entre componentes.
+ * Papel do usuário logado, lido da sessão real via usuarios.meuPerfil.
+ * Em desenvolvimento, o switcher da TopNav pode sobrescrever client-side
+ * (localStorage) para testar cada perfil sem trocar de conta.
+ * role === null enquanto carrega ou sem sessão → UI trata como sem permissão.
  */
 export function useDevRole() {
-  const role = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const override = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const perfil = trpc.usuarios.meuPerfil.useQuery(undefined, {
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+
+  const role: DevRole | null =
+    IS_DEV && override ? override : (perfil.data?.role ?? null);
 
   const setRole = (newRole: DevRole) => {
     if (!IS_DEV) return;
-    currentRole = newRole;
+    overrideRole = newRole;
     notify();
     try {
       localStorage.setItem(STORAGE_KEY, newRole);
@@ -59,5 +68,5 @@ export function useDevRole() {
     }
   };
 
-  return { role, setRole };
+  return { role, setRole, isLoading: perfil.isLoading, perfil: perfil.data ?? null };
 }

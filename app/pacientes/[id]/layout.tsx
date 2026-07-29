@@ -48,7 +48,7 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
   const patientId = params.id;
   const { role: userRole } = useDevRole();
 
-  const tabs = allTabs.filter((tab) => tab.roles.includes(userRole));
+  const tabs = allTabs.filter((tab) => userRole && tab.roles.includes(userRole));
 
   const currentTab = () => {
     const segments = pathname.split('/').filter(Boolean);

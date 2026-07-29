@@ -32,10 +32,18 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
     });
     instituicaoId = user?.instituicaoId ?? null;
     userRole = user?.role ?? null;
-  } else if (isDev) {
-    userId = '320471aa-5994-4886-9ee6-1cee8e7aa810';
-    instituicaoId = 'ae6c72cc-c72e-4b20-9686-7d015efe9b24';
-    userRole = 'admin';
+  } else if (
+    // Dev-only bypass: requires BOTH NODE_ENV=development (which Next.js
+    // replaces with "production" in prod builds, dead-coding this branch)
+    // AND explicit override ids from .env.local (gitignored, never committed).
+    // In production, without a valid session, the request fails isAuthed below.
+    isDev &&
+    process.env.DEV_OVERRIDE_USER_ID &&
+    process.env.DEV_OVERRIDE_INSTITUICAO_ID
+  ) {
+    userId = process.env.DEV_OVERRIDE_USER_ID;
+    instituicaoId = process.env.DEV_OVERRIDE_INSTITUICAO_ID;
+    userRole = process.env.DEV_OVERRIDE_ROLE ?? 'admin';
   }
 
   return {
@@ -79,4 +87,14 @@ export const adminProcedure = t.procedure.use(isAuthed).use(({ ctx, next }) => {
   return next();
 });
 
-export const clinicalProcedure = t.procedure.use(isAuthed);
+// Escrita e dados clínicos: só admin e profissional.
+// Papel 'usuario' é somente leitura (listar/buscar pacientes, dashboard).
+export const clinicalProcedure = t.procedure.use(isAuthed).use(({ ctx, next }) => {
+  if (ctx.userRole !== 'admin' && ctx.userRole !== 'profissional') {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Seu perfil não tem permissão para esta ação',
+    });
+  }
+  return next();
+});

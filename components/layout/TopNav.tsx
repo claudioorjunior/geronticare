@@ -18,7 +18,7 @@ const mockPatients = [
 export function TopNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const { role: userRole, setRole } = useDevRole();
+  const { role: userRole, setRole, perfil } = useDevRole();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -163,8 +163,8 @@ export function TopNav() {
 
           <div className="flex items-center gap-2 text-sm">
             <div className="text-right">
-              <div className="text-label-md font-medium text-m3-on-surface">Usuário Dev</div>
-              <div className="text-label-sm text-m3-secondary capitalize">{userRole}</div>
+              <div className="text-label-md font-medium text-m3-on-surface">{perfil?.nome ?? '—'}</div>
+              <div className="text-label-sm text-m3-secondary capitalize">{userRole ?? ''}</div>
             </div>
             <div className="h-8 w-8 rounded-full bg-m3-surface-variant flex items-center justify-center">
               <User className="h-4 w-4 text-m3-on-surface-variant" />
