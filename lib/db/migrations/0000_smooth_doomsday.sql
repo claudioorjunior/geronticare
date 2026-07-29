@@ -124,6 +124,7 @@ CREATE TABLE "usuarios" (
 	"especialidade" "especialidade",
 	"role" "role" DEFAULT 'profissional' NOT NULL,
 	"registro_profissional" text,
+	"image" text,
 	"ativo" boolean DEFAULT true NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
