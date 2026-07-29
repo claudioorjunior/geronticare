@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { Search, User, LogOut, X, Bell } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Search, User, LogOut, X, Bell, ChevronDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { useDevRole, type DevRole } from '@/lib/dev/use-dev-role';
+import { authClient } from '@/lib/auth/client';
+import { trpc } from '@/lib/trpc/client';
 
 // Mock patients for dev (replace with tRPC search later)
 const mockPatients = [
@@ -41,6 +42,33 @@ export function TopNav() {
   const clearSearch = () => {
     setSearchTerm('');
     setIsSearchOpen(false);
+  };
+
+  const perfilQuery = trpc.usuarios.meuPerfil.useQuery();
+  const perfil = perfilQuery.data;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Fecha o dropdown ao clicar fora ou apertar Escape (acessibilidade basica)
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    const onClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onClick);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onClick);
+    };
+  }, [menuOpen]);
+
+  const handleLogout = async () => {
+    await authClient.signOut();
+    router.push('/');
   };
 
   const navLinkClass = (path: string) =>
@@ -165,24 +193,59 @@ export function TopNav() {
             </div>
           )}
 
-          <div className="flex items-center gap-2 text-sm">
-            <div className="text-right">
-              <div className="text-label-md font-medium text-m3-on-surface">Usuário Dev</div>
-              <div className="text-label-sm text-m3-secondary capitalize">{userRole}</div>
-            </div>
-            <div className="h-8 w-8 rounded-full bg-m3-surface-variant flex items-center justify-center">
-              <User className="h-4 w-4 text-m3-on-surface-variant" />
-            </div>
-          </div>
+          {/* Indicador de usuario + dropdown (nome, cargo, foto) */}
+          <div className="relative" ref={menuRef}>
+            <button
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              className="flex items-center gap-2 text-sm rounded-full pl-1 pr-2 py-1 hover:bg-m3-surface-variant transition-colors"
+            >
+              <div className="text-right">
+                <div className="text-label-md font-medium text-m3-on-surface">{perfil?.nome ?? 'Usuário Dev'}</div>
+                <div className="text-label-sm text-m3-secondary capitalize">{perfil?.role ?? userRole}</div>
+              </div>
+              {perfil?.image ? (
+                <img
+                  src={perfil.image}
+                  alt=""
+                  className="h-8 w-8 rounded-full object-cover bg-m3-surface-variant"
+                />
+              ) : (
+                <div className="h-8 w-8 rounded-full bg-m3-surface-variant flex items-center justify-center">
+                  <User className="h-4 w-4 text-m3-on-surface-variant" />
+                </div>
+              )}
+              <ChevronDown className={`h-4 w-4 text-m3-secondary transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
+            </button>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {/* TODO: logout via better-auth */}}
-            title="Sair"
-          >
-            <LogOut className="h-4 w-4" />
-          </Button>
+            {menuOpen && (
+              <div
+                role="menu"
+                className="absolute right-0 top-full mt-2 w-48 bg-m3-surface-container-lowest border border-m3-outline-variant rounded-m3-xl shadow-lg z-50 py-1 text-sm"
+              >
+                <Link
+                  href="/perfil"
+                  role="menuitem"
+                  onClick={() => setMenuOpen(false)}
+                  className="w-full text-left px-4 py-2 hover:bg-m3-surface-variant flex items-center gap-2 text-m3-on-surface"
+                >
+                  <User className="h-4 w-4 text-m3-secondary" />
+                  Meu Perfil
+                </Link>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={handleLogout}
+                  className="w-full text-left px-4 py-2 hover:bg-m3-surface-variant flex items-center gap-2 text-m3-on-surface"
+                >
+                  <LogOut className="h-4 w-4 text-m3-secondary" />
+                  Deslogar
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </nav>
