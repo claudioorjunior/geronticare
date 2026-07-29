@@ -5,16 +5,17 @@ import { useParams } from 'next/navigation';
 import { useDevRole } from '@/lib/dev/use-dev-role';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Brain, Heart, Scale, Timer, Apple, ClipboardCheck } from 'lucide-react';
+import { Brain, Heart, Scale, Timer, Apple, ClipboardCheck, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import { trpc } from '@/lib/trpc/client';
+import { interpretarEscala } from '@/lib/validations/escalas';
 
 type AGAScore = {
-  katz: number;
-  lawton: number;
-  meem: number;
-  gds15: number;
-  mna: number;
-  tug: number;
+  katz: string;
+  lawton: string;
+  meem: string;
+  gds15: string;
+  man: string;
+  tug: string;
 };
 
 type AvaliacaoGeriatrica = {
@@ -30,44 +31,70 @@ type AvaliacaoGeriatrica = {
 };
 
 const emptyScores: AGAScore = {
-  katz: 6,
-  lawton: 8,
-  meem: 28,
-  gds15: 3,
-  mna: 12,
-  tug: 12,
+  katz: '6',
+  lawton: '8',
+  meem: '28',
+  gds15: '3',
+  man: '12',
+  tug: '12',
 };
 
-const scoreFields: { key: keyof AGAScore; label: string; max: number; help: string }[] = [
-  { key: 'katz', label: 'Katz (AVD)', max: 6, help: '0 = dependente total' },
-  { key: 'lawton', label: 'Lawton (AIVD)', max: 8, help: '0 = dependente' },
-  { key: 'meem', label: 'MEEM', max: 30, help: 'Mini-Exame do Estado Mental' },
-  { key: 'gds15', label: 'GDS-15', max: 15, help: 'Depressao geriatrica' },
-  { key: 'mna', label: 'MNA', max: 14, help: 'Mini Avaliacao Nutricional' },
-  { key: 'tug', label: 'TUG (segundos)', max: 60, help: 'Timed Up and Go' },
+// Cada escala: range, descrição e ícone. Reuso de interpretarEscala para live feedback.
+const escalas: {
+  key: keyof AGAScore;
+  label: string;
+  max: number;
+  icon: typeof Brain;
+  desc: string;
+}[] = [
+  { key: 'katz', label: 'Katz (AVD)', max: 6, icon: Scale, desc: '0 = dependente total · 6 = independente' },
+  { key: 'lawton', label: 'Lawton (AIVD)', max: 8, icon: ClipboardCheck, desc: '0 = dependente · 8 = independente' },
+  { key: 'meem', label: 'MEEM', max: 30, icon: Brain, desc: 'Mini-Exame do Estado Mental' },
+  { key: 'gds15', label: 'GDS-15', max: 15, icon: Heart, desc: 'Triagem de depressão geriátrica' },
+  { key: 'man', label: 'MAN', max: 14, icon: Apple, desc: 'Mini Avaliação Nutricional' },
+  { key: 'tug', label: 'TUG (s)', max: 300, icon: Timer, desc: 'Timed Up and Go em segundos' },
 ];
 
-const scaleGuide: { label: string; icon: typeof Brain; desc: string }[] = [
-  { label: 'Katz', icon: Scale, desc: 'AVD basicas: banho, vestir, higiene, transferencia, continencia, alimentacao. 0-6.' },
-  { label: 'Lawton', icon: ClipboardCheck, desc: 'AIVD: telefone, compras, comida, casa, roupa, transporte, medicacao, financas. 0-8.' },
-  { label: 'MEEM', icon: Brain, desc: 'Rastreio cognitivo. <24 sugere declinio; <20 comprometimento significativo.' },
-  { label: 'GDS-15', icon: Heart, desc: 'Triagem de depressao. >=6 sugere sintomas depressivos relevantes.' },
-  { label: 'MNA', icon: Apple, desc: 'Triagem nutricional. <8 risco alto; 8-11 risco moderado; >=12 normal.' },
-  { label: 'TUG', icon: Timer, desc: 'Mobilidade funcional. >20s = risco de queda aumentado.' },
-];
+// Mapeia chave interna -> nome esperado por interpretarEscala
+const escalaNome: Record<keyof AGAScore, string> = {
+  katz: 'katz',
+  lawton: 'lawton',
+  meem: 'meem',
+  gds15: 'gds15',
+  man: 'man',
+  tug: 'tug',
+};
+
+function toneFor(key: keyof AGAScore, score: number | null | undefined): 'ok' | 'warn' | 'risk' {
+  if (score == null) return 'ok';
+  switch (key) {
+    case 'katz':
+      return score <= 3 ? 'risk' : score <= 5 ? 'warn' : 'ok';
+    case 'lawton':
+      return score <= 3 ? 'risk' : score <= 6 ? 'warn' : 'ok';
+    case 'meem':
+      return score < 20 ? 'risk' : score < 25 ? 'warn' : 'ok';
+    case 'gds15':
+      return score >= 10 ? 'risk' : score >= 6 ? 'warn' : 'ok';
+    case 'man':
+      return score < 8 ? 'risk' : score < 12 ? 'warn' : 'ok';
+    case 'tug':
+      return score >= 20 ? 'risk' : score >= 10 ? 'warn' : 'ok';
+  }
+}
+
+const toneStyle = {
+  ok: 'text-emerald-700 bg-emerald-50 ring-emerald-200',
+  warn: 'text-amber-700 bg-amber-50 ring-amber-200',
+  risk: 'text-red-700 bg-red-50 ring-red-200',
+};
 
 function KpiCard({ label, value, max, tone }: { label: string; value: number; max: number; tone: 'ok' | 'warn' | 'risk' }) {
-  const toneMap = {
-    ok: 'text-emerald-600',
-    warn: 'text-amber-600',
-    risk: 'text-red-600',
-  };
-
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="text-[11px] uppercase tracking-wider text-slate-400">{label}</div>
-      <div className="mt-2 flex items-baseline gap-1">
-        <span className={`text-2xl font-semibold tabular-nums ${toneMap[tone]}`}>{value}</span>
+      <div className={`mt-2 flex items-baseline gap-1 text-2xl font-semibold tabular-nums ${tone === 'ok' ? 'text-emerald-600' : tone === 'warn' ? 'text-amber-600' : 'text-red-600'}`}>
+        {value}
         <span className="text-sm text-slate-400">/{max}</span>
       </div>
     </div>
@@ -82,15 +109,13 @@ export default function AGAPage() {
     { pacienteId: params.id },
     { enabled: Boolean(params.id) },
   );
-  const ultimaAgaQuery = trpc.avaliacoesGeriatricas.buscar.useQuery(
-    { id: agasQuery.data?.[0]?.id ?? '' },
-    { enabled: Boolean(agasQuery.data?.[0]?.id) },
-  );
   const relatorioQuery = trpc.avaliacoesGeriatricas.relatorio.useQuery(
     { pacienteId: params.id },
     { enabled: Boolean(params.id) },
   );
   const [scores, setScores] = useState<AGAScore>(emptyScores);
+  const [dataAvaliacao, setDataAvaliacao] = useState('');
+  const [observacoes, setObservacoes] = useState('');
   const [message, setMessage] = useState('');
   const canEdit = role === 'admin' || role === 'profissional';
 
@@ -99,16 +124,24 @@ export default function AGAPage() {
       utils.avaliacoesGeriatricas.listar.invalidate({ pacienteId: params.id });
       utils.avaliacoesGeriatricas.relatorio.invalidate({ pacienteId: params.id });
       setScores(emptyScores);
+      setDataAvaliacao('');
+      setObservacoes('');
       setMessage('Avaliacao salva com sucesso.');
       window.setTimeout(() => setMessage(''), 2200);
     },
     onError: (error) => setMessage(error.message),
   });
 
-  const handleScoreChange = (field: keyof AGAScore, value: string) => {
-    const fieldDef = scoreFields.find((item) => item.key === field);
-    const num = parseInt(value, 10) || 0;
-    setScores((prev) => ({ ...prev, [field]: fieldDef ? Math.max(0, Math.min(fieldDef.max, num)) : num }));
+  // Live parse: string vazia -> undefined; senão clamp na faixa. Evita parseInt solto (BUG-003/004).
+  const parseScore = (key: keyof AGAScore, raw: string): number | undefined => {
+    if (raw.trim() === '') return undefined;
+    const n = Number(raw);
+    if (Number.isNaN(n)) return undefined;
+    return Math.max(0, Math.min(escalas.find((e) => e.key === key)!.max, Math.round(n)));
+  };
+
+  const handleScoreChange = (key: keyof AGAScore, value: string) => {
+    setScores((prev) => ({ ...prev, [key]: value }));
   };
 
   const salvarAGA = () => {
@@ -116,49 +149,113 @@ export default function AGAPage() {
     setMessage('');
     criarAga.mutate({
       pacienteId: params.id,
-      katzScore: scores.katz,
-      lawtonScore: scores.lawton,
-      meemScore: scores.meem,
-      gds15Score: scores.gds15,
-      manScore: scores.mna,
-      tugSegundos: scores.tug,
+      dataAvaliacao: dataAvaliacao ? new Date(dataAvaliacao) : undefined,
+      katzScore: parseScore('katz', scores.katz),
+      lawtonScore: parseScore('lawton', scores.lawton),
+      meemScore: parseScore('meem', scores.meem),
+      gds15Score: parseScore('gds15', scores.gds15),
+      manScore: parseScore('man', scores.man),
+      tugSegundos: parseScore('tug', scores.tug),
+      observacoes: observacoes.trim() || undefined,
     });
   };
 
   const agas = (agasQuery.data ?? []) as AvaliacaoGeriatrica[];
   const ultima = agas[0];
-  const interpretacoes = relatorioQuery.data?.interpretacao
-    ? Object.values(relatorioQuery.data.interpretacao).filter(Boolean).join(' • ')
-    : ultimaAgaQuery.data?.observacoes ?? '';
 
   return (
     <>
       {ultima && (
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <KpiCard label="Katz" value={ultima.katzScore ?? 0} max={6} tone={(ultima.katzScore ?? 0) <= 3 ? 'risk' : (ultima.katzScore ?? 0) <= 5 ? 'warn' : 'ok'} />
-          <KpiCard label="Lawton" value={ultima.lawtonScore ?? 0} max={8} tone={(ultima.lawtonScore ?? 0) <= 3 ? 'risk' : (ultima.lawtonScore ?? 0) <= 6 ? 'warn' : 'ok'} />
-          <KpiCard label="MEEM" value={ultima.meemScore ?? 0} max={30} tone={(ultima.meemScore ?? 0) < 20 ? 'risk' : (ultima.meemScore ?? 0) < 25 ? 'warn' : 'ok'} />
-          <KpiCard label="GDS-15" value={ultima.gds15Score ?? 0} max={15} tone={(ultima.gds15Score ?? 0) >= 10 ? 'risk' : (ultima.gds15Score ?? 0) >= 6 ? 'warn' : 'ok'} />
+          <KpiCard label="Katz" value={ultima.katzScore ?? 0} max={6} tone={toneFor('katz', ultima.katzScore)} />
+          <KpiCard label="Lawton" value={ultima.lawtonScore ?? 0} max={8} tone={toneFor('lawton', ultima.lawtonScore)} />
+          <KpiCard label="MEEM" value={ultima.meemScore ?? 0} max={30} tone={toneFor('meem', ultima.meemScore)} />
+          <KpiCard label="GDS-15" value={ultima.gds15Score ?? 0} max={15} tone={toneFor('gds15', ultima.gds15Score)} />
         </div>
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <section className="space-y-6 lg:col-span-2">
           {canEdit && (
-            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-m3-2">
-              <h3 className="mb-4 text-sm font-semibold text-slate-900">Nova avaliacao</h3>
-              <div className="mb-6 grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-3">
-                {scoreFields.map(({ key, label, max, help }) => (
-                  <div key={key}>
-                    <label htmlFor={`aga-${key}`} className="mb-1.5 block text-xs font-medium text-slate-500">
-                      {label} <span className="text-slate-400">(max {max})</span>
-                    </label>
-                    <Input id={`aga-${key}`} type="number" min={0} max={max} value={scores[key]} onChange={(event) => handleScoreChange(key, event.target.value)} />
-                    <p className="mt-1 text-[11px] text-slate-400">{help}</p>
-                  </div>
-                ))}
+            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h3 className="mb-1 text-sm font-semibold text-slate-900">Nova avaliacao</h3>
+              <p className="mb-5 text-xs text-slate-500">
+                A interpretação aparece em tempo real conforme você preenche cada escala.
+              </p>
+
+              {/* Blocos por escala: input + feedback live */}
+              <div className="space-y-4">
+                {escalas.map(({ key, label, max, icon: Icon, desc }) => {
+                  const num = parseScore(key, scores[key]);
+                  const interpretacao = interpretarEscala(escalaNome[key], num);
+                  const tone = toneFor(key, num);
+                  return (
+                    <div key={key} className="rounded-lg border border-slate-200 p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <Icon className="h-4 w-4 text-slate-400" />
+                            <label htmlFor={`aga-${key}`} className="text-sm font-medium text-slate-900">
+                              {label}
+                            </label>
+                            <span className="text-[11px] text-slate-400">max {max}</span>
+                          </div>
+                          <p className="mt-0.5 text-[11px] text-slate-400">{desc}</p>
+                          <div className="mt-2 flex items-center gap-2">
+                            <Input
+                              id={`aga-${key}`}
+                              type="number"
+                              min={0}
+                              max={max}
+                              value={scores[key]}
+                              onChange={(e) => handleScoreChange(key, e.target.value)}
+                              className="w-24"
+                            />
+                            {interpretacao && (
+                              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${toneStyle[tone]}`}>
+                                {tone === 'ok' && <CheckCircle2 className="h-3 w-3" />}
+                                {tone === 'warn' && <AlertTriangle className="h-3 w-3" />}
+                                {tone === 'risk' && <XCircle className="h-3 w-3" />}
+                                {interpretacao}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <div className="flex items-center gap-3">
+
+              {/* Campos ricos */}
+              <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label htmlFor="aga-data" className="mb-1.5 block text-xs font-medium text-slate-500">
+                    Data da avaliacao
+                  </label>
+                  <Input
+                    id="aga-data"
+                    type="date"
+                    value={dataAvaliacao}
+                    onChange={(e) => setDataAvaliacao(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="mt-4">
+                <label htmlFor="aga-obs" className="mb-1.5 block text-xs font-medium text-slate-500">
+                  Observacoes
+                </label>
+                <textarea
+                  id="aga-obs"
+                  value={observacoes}
+                  onChange={(e) => setObservacoes(e.target.value)}
+                  rows={3}
+                  placeholder="Contexto clinico, evolucao, condicoes observadas..."
+                  className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                />
+              </div>
+
+              <div className="mt-5 flex items-center gap-3">
                 <Button onClick={salvarAGA} disabled={criarAga.isPending || !params.id}>
                   {criarAga.isPending ? 'Salvando...' : 'Salvar nova AGA'}
                 </Button>
@@ -174,7 +271,7 @@ export default function AGAPage() {
               <h3 className="mb-4 text-sm font-semibold text-slate-900">Historico de avaliacoes</h3>
               <div className="space-y-3">
                 {agas.slice(1).map((aga) => (
-                  <div key={aga.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-m3-2">
+                  <div key={aga.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                     <time className="text-sm font-medium text-slate-900">{aga.dataAvaliacao.toLocaleDateString('pt-BR')}</time>
                     <div className="mb-3 mt-3 grid grid-cols-3 gap-x-4 gap-y-2 md:grid-cols-6">
                       <div className="text-xs"><span className="font-medium text-slate-700">{aga.katzScore ?? '—'}</span><span className="text-slate-400">/6</span> <span className="text-slate-500">Katz</span></div>
@@ -196,7 +293,7 @@ export default function AGAPage() {
           <div className="rounded-xl border border-slate-100 bg-slate-50 p-5">
             <h3 className="mb-3 text-sm font-semibold text-slate-900">Guia rapido das escalas</h3>
             <div className="space-y-3">
-              {scaleGuide.map(({ label, icon: Icon, desc }) => (
+              {escalas.map(({ label, icon: Icon, desc }) => (
                 <div key={label} className="flex gap-3 rounded-lg border border-slate-200 bg-white p-3">
                   <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
                   <div>
@@ -208,10 +305,19 @@ export default function AGAPage() {
             </div>
           </div>
 
-          {ultima && (
+          {ultima && relatorioQuery.data?.interpretacao && (
             <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-5">
-              <h3 className="mb-3 text-sm font-semibold text-slate-900">Ultima avaliacao</h3>
-              <p className="text-sm leading-relaxed text-slate-600">{interpretacoes}</p>
+              <h3 className="mb-3 text-sm font-semibold text-slate-900">Ultima interpretacao</h3>
+              <ul className="space-y-1.5 text-xs text-slate-600">
+                {Object.entries(relatorioQuery.data.interpretacao).map(([k, v]) =>
+                  v ? (
+                    <li key={k} className="flex justify-between gap-2">
+                      <span className="capitalize text-slate-500">{k}</span>
+                      <span className="font-medium text-slate-800">{v as string}</span>
+                    </li>
+                  ) : null,
+                )}
+              </ul>
               <p className="mt-3 text-[11px] text-slate-400">{ultima.dataAvaliacao.toLocaleDateString('pt-BR')}</p>
             </div>
           )}
