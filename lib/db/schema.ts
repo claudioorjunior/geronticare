@@ -38,6 +38,7 @@ export const usuarios = pgTable('usuarios', {
   especialidade: especialidadeEnum('especialidade'),
   role: roleEnum('role').default('profissional').notNull(),
   registroProfissional: text('registro_profissional'), // CRM, COREN, CREFITO, etc
+  image: text('image'), // avatar URL (Better-Auth updateUser)
   ativo: boolean('ativo').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),

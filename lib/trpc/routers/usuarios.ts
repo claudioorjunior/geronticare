@@ -114,6 +114,7 @@ export const usuariosRouter = createTRPCRouter({
         especialidade: true,
         registroProfissional: true,
         role: true,
+        image: true,
       },
     });
   }),
@@ -123,6 +124,7 @@ export const usuariosRouter = createTRPCRouter({
       z.object({
         nome: z.string().min(3).optional(),
         registroProfissional: z.string().optional(),
+        image: z.string().url().optional().nullable(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -134,6 +136,7 @@ export const usuariosRouter = createTRPCRouter({
           id: usuarios.id,
           nome: usuarios.nome,
           email: usuarios.email,
+          image: usuarios.image,
         });
       return usuario;
     }),

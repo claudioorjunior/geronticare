@@ -21,7 +21,7 @@ export async function getAuth(): Promise<ReturnType<typeof betterAuth>> {
                 id: 'id',
                 email: 'email',
                 name: 'nome',
-                image: undefined,
+                image: 'image',
                 createdAt: 'createdAt',
                 updatedAt: 'updatedAt',
               },
