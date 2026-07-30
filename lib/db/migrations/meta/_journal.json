@@ -15,6 +15,13 @@
       "when": 1784910000000,
       "tag": "0001_aga_rdc502",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785455253529,
+      "tag": "0002_perpetual_skin",
+      "breakpoints": true
     }
   ]
 }

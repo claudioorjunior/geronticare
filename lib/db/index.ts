@@ -1,4 +1,5 @@
 import * as schema from './schema';
+import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import type { PgDatabase } from 'drizzle-orm/pg-core';
 import type { PgQueryResultHKT } from 'drizzle-orm/pg-core';
 import type { ExtractTablesWithRelations } from 'drizzle-orm';
@@ -19,16 +20,21 @@ async function init() {
     const { PGlite } = await import('@electric-sql/pglite');
     const { drizzle } = await import('drizzle-orm/pglite');
     const client = await PGlite.create();
-    const migrationSql = readFileSync(
-      join(cwd, 'lib', 'db', 'migrations', '0000_smooth_doomsday.sql'),
-      'utf-8',
-    );
-    await client.exec(migrationSql);
-    const rdcMigrationSql = readFileSync(
-      join(cwd, 'lib', 'db', 'migrations', '0001_aga_rdc502.sql'),
-      'utf-8',
-    );
-    await client.exec(rdcMigrationSql);
+    const journal = JSON.parse(
+      readFileSync(
+        join(cwd, 'lib', 'db', 'migrations', 'meta', '_journal.json'),
+        'utf-8',
+      ),
+    ) as { entries: Array<{ tag: string }> };
+
+    for (const entry of journal.entries) {
+      const migrationSql = readFileSync(
+        join(cwd, 'lib', 'db', 'migrations', `${entry.tag}.sql`),
+        'utf-8',
+      );
+      await client.exec(migrationSql);
+    }
+
     const seedSql = readFileSync(
       join(cwd, 'lib', 'db', 'seed-data.sql'),
       'utf-8',
@@ -40,7 +46,11 @@ async function init() {
     const postgres = await import('postgres');
     const { env } = await import('@/lib/env');
     const client = postgres.default(env.DATABASE_URL, { prepare: false });
-    _db = drizzle(client, { schema });
+    const db = drizzle(client, { schema });
+    _db = db;
+    await migrate(db, {
+      migrationsFolder: join(cwd, 'lib', 'db', 'migrations'),
+    });
   }
 }
 
