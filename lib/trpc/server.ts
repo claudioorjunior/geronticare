@@ -79,4 +79,9 @@ export const adminProcedure = t.procedure.use(isAuthed).use(({ ctx, next }) => {
   return next();
 });
 
-export const clinicalProcedure = t.procedure.use(isAuthed);
+export const clinicalProcedure = t.procedure.use(isAuthed).use(({ ctx, next }) => {
+  if (ctx.userRole !== 'admin' && ctx.userRole !== 'profissional') {
+    throw new TRPCError({ code: 'FORBIDDEN' });
+  }
+  return next();
+});

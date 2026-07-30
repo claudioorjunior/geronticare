@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import { useDevRole } from '@/lib/dev/use-dev-role';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
-import { Activity, Heart, Calendar, User, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Activity, Heart, Calendar, User, Loader2, AlertCircle, CheckCircle2, ClipboardList, ChevronRight } from 'lucide-react';
 import { trpc } from '@/lib/trpc/client';
 import {
   atualizarPacienteSchema,
@@ -13,7 +14,7 @@ import {
   toDateInput,
   mascaraCPF,
 } from '@/lib/validations/pacientes';
-import type { Paciente } from '@/lib/db/schema';
+import type { Paciente, AvaliacaoGeriatrica } from '@/lib/db/schema';
 
 function Kpi({ icon: Icon, label, value, unit }: { icon: typeof Activity; label: string; value: string; unit: string }) {
   return (
@@ -31,6 +32,8 @@ function Kpi({ icon: Icon, label, value, unit }: { icon: typeof Activity; label:
 
 export default function PatientDadosPage() {
   const params = useParams<{ id: string }>();
+  const { role } = useDevRole();
+  const canViewClinical = role === 'admin' || role === 'profissional';
   const pacienteQ = trpc.pacientes.buscar.useQuery(
     { id: params.id },
     { enabled: Boolean(params.id) },
@@ -43,6 +46,12 @@ export default function PatientDadosPage() {
   );
 
   const [agora] = useState(() => Date.now());
+
+  // Último relatório AGA
+  const relatorioAGA = trpc.avaliacoesGeriatricas.relatorio.useQuery(
+    { pacienteId: params.id },
+    { enabled: Boolean(params.id) && canViewClinical },
+  );
 
   if (pacienteQ.isError) {
     return (
@@ -66,14 +75,7 @@ export default function PatientDadosPage() {
   }
 
   const paciente = pacienteQ.data;
-  if (!paciente) {
-    return (
-      <div className="py-12 text-center">
-        <AlertCircle className="mx-auto h-8 w-8 text-amber-500 mb-3" />
-        <p className="text-sm font-medium text-slate-700">Paciente não encontrado</p>
-      </div>
-    );
-  }
+
   const adm = new Date(paciente.dataAdmissao);
   const diasInternado = Number.isNaN(adm.getTime()) ? null : Math.max(0, Math.floor((agora - adm.getTime()) / 86400000));
 
@@ -116,6 +118,15 @@ export default function PatientDadosPage() {
           <Kpi key={kpi.label} icon={kpi.icon} label={kpi.label} value={kpi.value} unit={kpi.unit} />
         ))}
       </div>
+
+      {/* ── Resumo Clínico AGA ── */}
+      <AGASummaryCard
+        pacienteId={params.id}
+        relatorio={relatorioAGA.data}
+        isLoading={relatorioAGA.isLoading}
+        isError={relatorioAGA.isError}
+        canViewClinical={canViewClinical}
+      />
 
       {/* Keyed pelo id para recriar estado do form na navegação entre pacientes */}
       <EditForm key={paciente.id} paciente={paciente} />
@@ -301,6 +312,188 @@ function EditForm({ paciente }: { paciente: Paciente }) {
           <p className="text-xs text-slate-400">Nenhuma alergia registrada.</p>
         </div>
       </aside>
+    </div>
+  );
+}
+
+// ── AGA scale helpers ──
+
+const toneForScale = (key: string, score: number | null | undefined): 'ok' | 'warn' | 'risk' => {
+  if (score == null) return 'ok';
+  switch (key) {
+    case 'katz': return score === 0 ? 'ok' : score === 6 ? 'risk' : 'warn';
+    case 'lawton': return 'ok';
+    case 'meem': return score < 20 ? 'risk' : score < 25 ? 'warn' : 'ok';
+    case 'gds15': return score >= 10 ? 'risk' : score >= 6 ? 'warn' : 'ok';
+    case 'man': return score < 8 ? 'risk' : score < 12 ? 'warn' : 'ok';
+    case 'tug': return score >= 20 ? 'risk' : score >= 10 ? 'warn' : 'ok';
+    default: return 'ok';
+  }
+};
+
+const toneBgClass: Record<string, string> = {
+  ok: 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200',
+  warn: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200',
+  risk: 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200',
+};
+
+// ── AGASummaryCard ──
+// Resumo clínico da última AGA, exibido no primeiro acesso ao paciente.
+// Estados: loading, erro, ausência (com CTA) e dados preenchidos.
+
+function AGASummaryCard({
+  pacienteId,
+  relatorio,
+  isLoading,
+  isError,
+  canViewClinical,
+}: {
+  pacienteId: string;
+  relatorio: {
+    avaliacao: AvaliacaoGeriatrica;
+    profissional?: string;
+    especialidade?: string | null;
+    interpretacao?: {
+      katz: string | null;
+      lawton: string | null;
+      meem: string | null;
+      gds15: string | null;
+      man: string | null;
+      tug: string | null;
+    };
+  } | null | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  canViewClinical: boolean;
+}) {
+  if (!canViewClinical) {
+    return (
+      <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center gap-2">
+          <ClipboardList className="h-5 w-5 text-slate-400" />
+          <h3 className="text-sm font-semibold text-slate-900">Resumo Clínico da AGA</h3>
+        </div>
+        <p className="mt-3 text-sm text-slate-500">
+          Informações clínicas disponíveis apenas para profissionais.
+        </p>
+      </div>
+    );
+  }
+
+  const canEdit = canViewClinical;
+
+  if (isLoading) {
+    return (
+      <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center gap-2 text-slate-400">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="text-sm">Carregando AGA...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-6">
+        <div className="flex items-center gap-2 text-red-600">
+          <AlertCircle className="h-4 w-4" />
+          <span className="text-sm font-medium">Erro ao carregar AGA</span>
+        </div>
+        <p className="mt-1 text-xs text-red-500">Não foi possível carregar o resumo clínico.</p>
+      </div>
+    );
+  }
+
+  if (!relatorio) {
+    return (
+      <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ClipboardList className="h-5 w-5 text-slate-400" />
+            <h3 className="text-sm font-semibold text-slate-900">Resumo Clínico — AGA</h3>
+          </div>
+          {canEdit && (
+            <Link
+              href={`/pacientes/${pacienteId}/aga`}
+              className="inline-flex items-center gap-1 text-sm font-medium text-teal-600 hover:text-teal-700 transition-colors"
+            >
+              Iniciar AGA
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          )}
+        </div>
+        <p className="mt-3 text-sm text-slate-500">
+          Nenhuma Avaliação Geriátrica Ampla registrada para este paciente.
+        </p>
+        {!canEdit && (
+          <p className="mt-1 text-xs text-slate-400">
+            Apenas profissionais podem realizar AGAs.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  const { avaliacao, profissional, especialidade, interpretacao } = relatorio;
+
+  return (
+    <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <ClipboardList className="h-5 w-5 text-teal-600" />
+          <h3 className="text-sm font-semibold text-slate-900">Resumo Clínico — AGA</h3>
+        </div>
+        <time className="text-xs text-slate-400">
+          {new Date(avaliacao.dataAvaliacao).toLocaleDateString('pt-BR')}
+        </time>
+      </div>
+
+      {profissional && (
+        <div className="mb-4 flex items-center gap-2 text-xs text-slate-500">
+          <User className="h-3.5 w-3.5" />
+          <span>{profissional}</span>
+          {especialidade && <span className="text-slate-400">· {especialidade}</span>}
+          {canEdit && (
+            <Link
+              href={`/pacientes/${pacienteId}/aga`}
+              className="ml-auto inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 font-medium transition-colors"
+            >
+              Ver avaliação completa
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Link>
+          )}
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+        {[
+          { key: 'katz' as const, label: 'Katz', max: 6, score: avaliacao.katzScore, interp: interpretacao?.katz },
+          { key: 'lawton' as const, label: 'Lawton', max: 8, score: avaliacao.lawtonScore, interp: interpretacao?.lawton },
+          { key: 'meem' as const, label: 'MEEM', max: 30, score: avaliacao.meemScore, interp: interpretacao?.meem },
+          { key: 'gds15' as const, label: 'GDS-15', max: 15, score: avaliacao.gds15Score, interp: interpretacao?.gds15 },
+          { key: 'man' as const, label: 'MAN', max: 14, score: avaliacao.manScore, interp: interpretacao?.man },
+          { key: 'tug' as const, label: 'TUG', max: 300, score: avaliacao.tugSegundos, interp: interpretacao?.tug, unit: 's' },
+        ].map(({ key, label, max, score, interp, unit }) => {
+          const tone = toneForScale(key, score);
+          return (
+            <div key={key} className={`rounded-lg border p-3 text-center ${toneBgClass[tone]}`}>
+              <div className="text-[11px] font-medium tracking-wider uppercase">{label}</div>
+              <div className="mt-1 text-lg font-semibold tabular-nums">
+                {score ?? '—'}
+                {unit ? (
+                  <span className="text-xs font-normal opacity-60">{unit}</span>
+                ) : (
+                  <span className="text-xs font-normal opacity-60">/{max}</span>
+                )}
+              </div>
+              {interp && (
+                <div className="mt-1 text-[10px] leading-tight opacity-80">{interp}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

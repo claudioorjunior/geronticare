@@ -221,6 +221,18 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "rdc502_autocuidado": {
+          "name": "rdc502_autocuidado",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rdc502_cognicao": {
+          "name": "rdc502_cognicao",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},

@@ -126,9 +126,11 @@ export const avaliacoesGeriatricas = pgTable('avaliacoes_geriatricas', {
   profissionalId: uuid('profissional_id').references(() => usuarios.id).notNull(),
   dataAvaliacao: timestamp('data_avaliacao').defaultNow().notNull(),
   
-  // Escalas funcionais
-  katzScore: integer('katz_score'), // 0-6 (independência em AVD)
-  lawtonScore: integer('lawton_score'), // 0-8 (AIVD)
+  // Escalas funcionais. Katz segue a direção validada no Brasil: 0 = independente.
+  katzScore: integer('katz_score'), // 0-6 (número de ABVD com dependência)
+  lawtonScore: integer('lawton_score'), // 0-8 (AIVD: 0 = dependente, 8 = independente)
+  rdc502Autocuidado: text('rdc502_autocuidado'), // nenhuma, ate_tres ou todas
+  rdc502Cognicao: text('rdc502_cognicao'), // sem_comprometimento, alteracao_controlada ou comprometimento
   meemScore: integer('meem_score'), // 0-30 (Mini-Exame do Estado Mental)
   gds15Score: integer('gds15_score'), // 0-15 (Escala de Depressão Geriátrica)
   manScore: integer('man_score'), // Mini Avaliação Nutricional

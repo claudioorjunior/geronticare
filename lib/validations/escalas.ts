@@ -4,6 +4,8 @@ import { z } from 'zod';
 export const escalasGeriatricasSchema = z.object({
   katzScore: z.number().int().min(0).max(6).optional(),
   lawtonScore: z.number().int().min(0).max(8).optional(),
+  rdc502Autocuidado: z.enum(['nenhuma', 'ate_tres', 'todas']).optional(),
+  rdc502Cognicao: z.enum(['sem_comprometimento', 'alteracao_controlada', 'comprometimento']).optional(),
   meemScore: z.number().int().min(0).max(30).optional(),
   gds15Score: z.number().int().min(0).max(15).optional(),
   manScore: z.number().int().min(0).max(14).optional(),
@@ -16,6 +18,8 @@ export const criarAvaliacaoSchema = z.object({
   dataAvaliacao: z.coerce.date().optional(),
   katzScore: z.number().int().min(0).max(6).optional(),
   lawtonScore: z.number().int().min(0).max(8).optional(),
+  rdc502Autocuidado: z.enum(['nenhuma', 'ate_tres', 'todas']).optional(),
+  rdc502Cognicao: z.enum(['sem_comprometimento', 'alteracao_controlada', 'comprometimento']).optional(),
   meemScore: z.number().int().min(0).max(30).optional(),
   gds15Score: z.number().int().min(0).max(15).optional(),
   manScore: z.number().int().min(0).max(14).optional(),
@@ -55,13 +59,13 @@ export function interpretarEscala(nome: string, score: number | null | undefined
 
   switch (nome) {
     case 'katz':
-      if (score === 6) return 'Independência total';
-      if (score >= 3) return 'Dependência parcial';
-      return 'Dependência total';
+      if (score === 0) return 'Independente em ABVD';
+      if (score === 6) return 'Dependência em todas as ABVD';
+      return `Dependência em ${score} de 6 ABVD`;
     case 'lawton':
-      if (score === 8) return 'Independência total (AIVD)';
-      if (score >= 4) return 'Dependência parcial (AIVD)';
-      return 'Dependência total (AIVD)';
+      if (score === 0) return 'Dependência em AIVD';
+      if (score === 8) return 'Independência em AIVD';
+      return `Necessita de assistência em ${8 - score} de 8 AIVD`;
     case 'meem':
       if (score >= 24) return 'Normal';
       if (score >= 18) return 'Déficit cognitivo leve';
@@ -81,4 +85,48 @@ export function interpretarEscala(nome: string, score: number | null | undefined
     default:
       return null;
   }
+}
+
+export type Rdc502Autocuidado = 'nenhuma' | 'ate_tres' | 'todas';
+export type Rdc502Cognicao = 'sem_comprometimento' | 'alteracao_controlada' | 'comprometimento';
+
+export type GrauDependenciaAnvisa = {
+  grau: 'I' | 'II' | 'III';
+  label: 'Grau I' | 'Grau II' | 'Grau III';
+  tone: 'ok' | 'warn' | 'risk';
+  fundamento: string;
+};
+
+// A RDC 502/2021 não transforma Katz ou Lawton em um grau. Para ILPI, o grau
+// depende do autocuidado e do comprometimento cognitivo informados na avaliação.
+export function classificarGrauDependenciaRdc502(
+  autocuidado: Rdc502Autocuidado | null | undefined,
+  cognicao: Rdc502Cognicao | null | undefined,
+): GrauDependenciaAnvisa | null {
+  if (!autocuidado || !cognicao) return null;
+
+  if (autocuidado === 'todas' || cognicao === 'comprometimento') {
+    return {
+      grau: 'III',
+      label: 'Grau III',
+      tone: 'risk',
+      fundamento: 'Assistência em todas as atividades de autocuidado e/ou comprometimento cognitivo.',
+    };
+  }
+
+  if (autocuidado === 'ate_tres') {
+    return {
+      grau: 'II',
+      label: 'Grau II',
+      tone: 'warn',
+      fundamento: 'Dependência em até três atividades de autocuidado, sem comprometimento cognitivo não controlado.',
+    };
+  }
+
+  return {
+    grau: 'I',
+    label: 'Grau I',
+    tone: 'ok',
+    fundamento: 'Pessoa idosa independente, ainda que utilize equipamentos de autoajuda.',
+  };
 }

@@ -43,6 +43,7 @@ next-env.d.ts
 # drizzle
 /lib/db/migrations/*.sql
 !lib/db/migrations/.gitkeep
+!lib/db/migrations/0001_aga_rdc502.sql
 
 # hermes internal
 .hermes/

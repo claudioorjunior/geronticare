@@ -24,6 +24,11 @@ async function init() {
       'utf-8',
     );
     await client.exec(migrationSql);
+    const rdcMigrationSql = readFileSync(
+      join(cwd, 'lib', 'db', 'migrations', '0001_aga_rdc502.sql'),
+      'utf-8',
+    );
+    await client.exec(rdcMigrationSql);
     const seedSql = readFileSync(
       join(cwd, 'lib', 'db', 'seed-data.sql'),
       'utf-8',

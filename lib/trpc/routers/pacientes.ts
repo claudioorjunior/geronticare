@@ -145,6 +145,12 @@ export const pacientesRouter = createTRPCRouter({
           )
         )
         .returning();
+      if (!pacienteAtualizado) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Paciente não encontrado',
+        });
+      }
       return pacienteAtualizado;
     }),
 
