@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1784909856069,
-      "tag": "0000_smooth_doomsday",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1784910000000,
-      "tag": "0001_aga_rdc502",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1785455253529,
-      "tag": "0002_perpetual_skin",
+      "when": 1785455849389,
+      "tag": "0000_curious_naoko",
       "breakpoints": true
     }
   ]

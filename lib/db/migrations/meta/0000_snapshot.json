@@ -1,5 +1,5 @@
 {
-  "id": "5f29b189-a0c4-464d-b160-e00e8f0226bf",
+  "id": "c98da34b-3763-4493-b925-42b2f3c0c076",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -154,6 +154,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "rdc502_autocuidado": {
+          "name": "rdc502_autocuidado",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "rdc502_cognicao": {
+          "name": "rdc502_cognicao",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "meem_score": {
           "name": "meem_score",
           "type": "integer",
@@ -221,21 +233,40 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "rdc502_autocuidado": {
-          "name": "rdc502_autocuidado",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "rdc502_cognicao": {
-          "name": "rdc502_cognicao",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "avaliacoes_paciente_idx": {
+          "name": "avaliacoes_paciente_idx",
+          "columns": [
+            {
+              "expression": "paciente_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "avaliacoes_profissional_idx": {
+          "name": "avaliacoes_profissional_idx",
+          "columns": [
+            {
+              "expression": "profissional_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "avaliacoes_geriatricas_paciente_id_pacientes_id_fk": {
           "name": "avaliacoes_geriatricas_paciente_id_pacientes_id_fk",
@@ -455,7 +486,38 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "pacientes_instituicao_idx": {
+          "name": "pacientes_instituicao_idx",
+          "columns": [
+            {
+              "expression": "instituicao_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pacientes_ativo_idx": {
+          "name": "pacientes_ativo_idx",
+          "columns": [
+            {
+              "expression": "ativo",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "pacientes_instituicao_id_instituicoes_id_fk": {
           "name": "pacientes_instituicao_id_instituicoes_id_fk",
@@ -472,15 +534,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "pacientes_cpf_unique": {
-          "name": "pacientes_cpf_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "cpf"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -561,7 +615,38 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "registros_paciente_idx": {
+          "name": "registros_paciente_idx",
+          "columns": [
+            {
+              "expression": "paciente_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "registros_profissional_idx": {
+          "name": "registros_profissional_idx",
+          "columns": [
+            {
+              "expression": "profissional_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "registros_paciente_id_pacientes_id_fk": {
           "name": "registros_paciente_id_pacientes_id_fk",
@@ -778,9 +863,47 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "sinaisvitais_paciente_idx": {
+          "name": "sinaisvitais_paciente_idx",
+          "columns": [
+            {
+              "expression": "paciente_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "sinaisvitais_profissional_idx": {
+          "name": "sinaisvitais_profissional_idx",
+          "columns": [
+            {
+              "expression": "profissional_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "sinais_vitais_paciente_id_pacientes_id_fk": {
           "name": "sinais_vitais_paciente_id_pacientes_id_fk",
@@ -871,6 +994,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "image": {
+          "name": "image",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "ativo": {
           "name": "ativo",
           "type": "boolean",
@@ -893,7 +1022,23 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "usuarios_instituicao_idx": {
+          "name": "usuarios_instituicao_idx",
+          "columns": [
+            {
+              "expression": "instituicao_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "usuarios_instituicao_id_instituicoes_id_fk": {
           "name": "usuarios_instituicao_id_instituicoes_id_fk",

@@ -25,6 +25,8 @@ CREATE TABLE "avaliacoes_geriatricas" (
 	"data_avaliacao" timestamp DEFAULT now() NOT NULL,
 	"katz_score" integer,
 	"lawton_score" integer,
+	"rdc502_autocuidado" text,
+	"rdc502_cognicao" text,
 	"meem_score" integer,
 	"gds15_score" integer,
 	"man_score" integer,
@@ -67,8 +69,7 @@ CREATE TABLE "pacientes" (
 	"foto_url" text,
 	"ativo" boolean DEFAULT true NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp DEFAULT now() NOT NULL,
-	CONSTRAINT "pacientes_cpf_unique" UNIQUE("cpf")
+	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "registros" (
@@ -112,7 +113,8 @@ CREATE TABLE "sinais_vitais" (
 	"peso" integer,
 	"altura" integer,
 	"observacoes" text,
-	"created_at" timestamp DEFAULT now() NOT NULL
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "usuarios" (
@@ -149,4 +151,13 @@ ALTER TABLE "registros" ADD CONSTRAINT "registros_profissional_id_usuarios_id_fk
 ALTER TABLE "sessions" ADD CONSTRAINT "sessions_user_id_usuarios_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."usuarios"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "sinais_vitais" ADD CONSTRAINT "sinais_vitais_paciente_id_pacientes_id_fk" FOREIGN KEY ("paciente_id") REFERENCES "public"."pacientes"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "sinais_vitais" ADD CONSTRAINT "sinais_vitais_profissional_id_usuarios_id_fk" FOREIGN KEY ("profissional_id") REFERENCES "public"."usuarios"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "usuarios" ADD CONSTRAINT "usuarios_instituicao_id_instituicoes_id_fk" FOREIGN KEY ("instituicao_id") REFERENCES "public"."instituicoes"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "usuarios" ADD CONSTRAINT "usuarios_instituicao_id_instituicoes_id_fk" FOREIGN KEY ("instituicao_id") REFERENCES "public"."instituicoes"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "avaliacoes_paciente_idx" ON "avaliacoes_geriatricas" USING btree ("paciente_id");--> statement-breakpoint
+CREATE INDEX "avaliacoes_profissional_idx" ON "avaliacoes_geriatricas" USING btree ("profissional_id");--> statement-breakpoint
+CREATE INDEX "pacientes_instituicao_idx" ON "pacientes" USING btree ("instituicao_id");--> statement-breakpoint
+CREATE INDEX "pacientes_ativo_idx" ON "pacientes" USING btree ("ativo");--> statement-breakpoint
+CREATE INDEX "registros_paciente_idx" ON "registros" USING btree ("paciente_id");--> statement-breakpoint
+CREATE INDEX "registros_profissional_idx" ON "registros" USING btree ("profissional_id");--> statement-breakpoint
+CREATE INDEX "sinaisvitais_paciente_idx" ON "sinais_vitais" USING btree ("paciente_id");--> statement-breakpoint
+CREATE INDEX "sinaisvitais_profissional_idx" ON "sinais_vitais" USING btree ("profissional_id");--> statement-breakpoint
+CREATE INDEX "usuarios_instituicao_idx" ON "usuarios" USING btree ("instituicao_id");
