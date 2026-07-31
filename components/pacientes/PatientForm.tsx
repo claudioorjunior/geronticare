@@ -6,7 +6,7 @@ import { Loader2, X, UserPlus, MapPin, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Field, SelectField } from '@/components/ui/field';
 import { trpc } from '@/lib/trpc/client';
-import { useDevRole } from '@/lib/dev/use-dev-role';
+import { useUserRole } from '@/lib/auth/use-user-role';
 import {
   criarPacienteSchema,
   sexoOptions,
@@ -81,7 +81,7 @@ export function PatientForm({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const { role } = useDevRole();
+  const { role } = useUserRole();
   const utils = trpc.useUtils();
 
   const [form, setForm] = React.useState<CriarPacienteInput>({

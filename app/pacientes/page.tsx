@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Search, ChevronRight, ChevronLeft, Users, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useDevRole } from '@/lib/dev/use-dev-role';
+import { useUserRole } from '@/lib/auth/use-user-role';
 import { trpc } from '@/lib/trpc/client';
 import { PatientForm } from '@/components/pacientes/PatientForm';
 import type { Paciente } from '@/lib/db/schema';
@@ -96,7 +96,7 @@ const quickFilters = [
 // ── Page ──
 
 export default function PacientesPage() {
-  const { role } = useDevRole();
+  const { role } = useUserRole();
   const router = useRouter();
   const utils = trpc.useUtils();
   const canCreate = role === 'admin' || role === 'profissional';

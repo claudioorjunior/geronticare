@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { useDevRole } from '@/lib/dev/use-dev-role';
+import { useUserRole } from '@/lib/auth/use-user-role';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
 import { Activity, Heart, Calendar, User, Loader2, AlertCircle, CheckCircle2, ClipboardList, ChevronRight } from 'lucide-react';
@@ -32,7 +32,7 @@ function Kpi({ icon: Icon, label, value, unit }: { icon: typeof Activity; label:
 
 export default function PatientDadosPage() {
   const params = useParams<{ id: string }>();
-  const { role } = useDevRole();
+  const { role } = useUserRole();
   const canViewClinical = role === 'admin' || role === 'profissional';
   const pacienteQ = trpc.pacientes.buscar.useQuery(
     { id: params.id },
@@ -42,7 +42,7 @@ export default function PatientDadosPage() {
   // Último sinal vital registrado para o paciente
   const { data: ultimoSV } = trpc.sinaisVitais.ultimo.useQuery(
     { pacienteId: params.id },
-    { enabled: !!params.id },
+    { enabled: !!params.id && canViewClinical },
   );
 
   const [agora] = useState(() => Date.now());
@@ -139,7 +139,7 @@ export default function PatientDadosPage() {
 // então recria estado do zero quando navega para outro paciente — sem useEffect.
 
 function EditForm({ paciente }: { paciente: Paciente }) {
-  const { role } = useDevRole();
+  const { role } = useUserRole();
   const utils = trpc.useUtils();
   const params = useParams<{ id: string }>();
   const canEditClinical = role === 'admin' || role === 'profissional';

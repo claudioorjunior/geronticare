@@ -8,7 +8,7 @@ import {
   Activity, Heart, Thermometer, Stethoscope, Bell
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useDevRole } from '@/lib/dev/use-dev-role';
+import { useUserRole } from '@/lib/auth/use-user-role';
 import { trpc } from '@/lib/trpc/client';
 
 // === Mock Data (ocupação e atividades não têm query no DB — permanecem mock) ===
@@ -673,7 +673,9 @@ function DashboardUsuario() {
 // === Page Component ===
 
 export default function DashboardPage() {
-  const { role } = useDevRole();
+  const { role } = useUserRole();
+
+  if (!role) return null;
 
   if (role === 'admin') return <DashboardAdmin />;
   if (role === 'profissional') return <DashboardProfissional />;

@@ -5,9 +5,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import { Search, User, LogOut, X, Bell, ChevronDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { useDevRole, type DevRole } from '@/lib/dev/use-dev-role';
+import { useUserRole } from '@/lib/auth/use-user-role';
 import { authClient } from '@/lib/auth/client';
-import { trpc } from '@/lib/trpc/client';
 
 // Mock patients for dev (replace with tRPC search later)
 const mockPatients = [
@@ -19,7 +18,7 @@ const mockPatients = [
 export function TopNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const { role: userRole, setRole } = useDevRole();
+  const { data: perfil, role: userRole } = useUserRole();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -44,8 +43,6 @@ export function TopNav() {
     setIsSearchOpen(false);
   };
 
-  const perfilQuery = trpc.usuarios.meuPerfil.useQuery();
-  const perfil = perfilQuery.data;
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -167,31 +164,12 @@ export function TopNav() {
           )}
         </div>
 
-        {/* User Menu + Dev Role Switcher */}
+        {/* User Menu */}
         <div className="flex items-center gap-3 ml-auto shrink-0">
           {/* Notification bell — dot only shows when unread > 0 (stub, always 0 for now) */}
           <button className="relative p-2 text-m3-secondary hover:text-m3-primary transition-colors rounded-full hover:bg-m3-surface-variant">
             <Bell className="h-5 w-5" />
           </button>
-
-          {/* Dev role switcher — só renderiza em desenvolvimento */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="flex items-center gap-1 text-label-sm border border-m3-outline-variant rounded-m3-lg p-0.5 bg-m3-surface-container-low">
-              {(['admin', 'profissional', 'usuario'] as DevRole[]).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setRole(r)}
-                  className={`px-2 py-0.5 rounded-m3-lg ${
-                    userRole === r
-                      ? 'bg-m3-primary text-m3-on-primary'
-                      : 'hover:bg-m3-surface-container-lowest'
-                  }`}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-          )}
 
           {/* Indicador de usuario + dropdown (nome, cargo, foto) */}
           <div className="relative" ref={menuRef}>
@@ -203,8 +181,8 @@ export function TopNav() {
               className="flex items-center gap-2 text-sm rounded-full pl-1 pr-2 py-1 hover:bg-m3-surface-variant transition-colors"
             >
               <div className="text-right">
-                <div className="text-label-md font-medium text-m3-on-surface">{perfil?.nome ?? 'Usuário Dev'}</div>
-                <div className="text-label-sm text-m3-secondary capitalize">{perfil?.role ?? userRole}</div>
+                <div className="text-label-md font-medium text-m3-on-surface">{perfil?.nome ?? 'Usuário'}</div>
+                <div className="text-label-sm text-m3-secondary capitalize">{perfil?.role ?? userRole ?? 'carregando'}</div>
               </div>
               {perfil?.image ? (
                 <img

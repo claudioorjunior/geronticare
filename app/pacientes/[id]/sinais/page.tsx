@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useDevRole } from '@/lib/dev/use-dev-role';
+import { useUserRole } from '@/lib/auth/use-user-role';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Heart, Activity, Thermometer, Droplets } from 'lucide-react';
@@ -76,7 +76,7 @@ function Kpi({ icon: Icon, label, value, unit, tone }: { icon: typeof Activity; 
 
 export default function SinaisVitaisPage() {
   const params = useParams<{ id: string }>();
-  const { role } = useDevRole();
+  const { role } = useUserRole();
   const utils = trpc.useUtils();
   const historicoQuery = trpc.sinaisVitais.listar.useQuery({ pacienteId: params.id }, { enabled: Boolean(params.id) });
   const ultimoQuery = trpc.sinaisVitais.ultimo.useQuery({ pacienteId: params.id }, { enabled: Boolean(params.id) });

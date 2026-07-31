@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
 import { ArrowLeft, Calendar, Phone, ShieldCheck, MapPin, Loader2, AlertCircle } from 'lucide-react';
-import { useDevRole } from '@/lib/dev/use-dev-role';
+import { useUserRole } from '@/lib/auth/use-user-role';
 import { trpc } from '@/lib/trpc/client';
 
 function getInitials(nome: string): string {
@@ -14,13 +14,6 @@ function getInitials(nome: string): string {
     .slice(0, 2)
     .join('')
     .toUpperCase();
-}
-
-function formatarData(d?: string | Date | null): string {
-  if (!d) return '—';
-  const date = typeof d === 'string' ? new Date(d) : d;
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleDateString('pt-BR');
 }
 
 function calcularIdade(dataNascimento?: string | Date | null): number | null {
@@ -46,9 +39,9 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
   const pathname = usePathname();
   const params = useParams<{ id: string }>();
   const patientId = params.id;
-  const { role: userRole } = useDevRole();
+  const { role: userRole } = useUserRole();
 
-  const tabs = allTabs.filter((tab) => tab.roles.includes(userRole));
+  const tabs = allTabs.filter((tab) => userRole !== null && tab.roles.includes(userRole));
 
   const currentTab = () => {
     const segments = pathname.split('/').filter(Boolean);

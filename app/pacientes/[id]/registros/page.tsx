@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useDevRole } from '@/lib/dev/use-dev-role';
+import { useUserRole } from '@/lib/auth/use-user-role';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Stethoscope, Pill, AlertTriangle, ClipboardList } from 'lucide-react';
@@ -40,13 +40,9 @@ function Kpi({ label, value }: { label: string; value: number }) {
 
 export default function RegistrosPage() {
   const params = useParams<{ id: string }>();
-  const { role } = useDevRole();
+  const { role } = useUserRole();
   const utils = trpc.useUtils();
   const [filtroTipo, setFiltroTipo] = useState<TipoRegistro | null>(null);
-  const registrosQuery = trpc.registros.listar.useQuery(
-    { pacienteId: params.id, tipo: filtroTipo ?? undefined },
-    { enabled: Boolean(params.id) },
-  );
   const timelineQuery = trpc.registros.timeline.useQuery(
     { pacienteId: params.id },
     { enabled: Boolean(params.id) },

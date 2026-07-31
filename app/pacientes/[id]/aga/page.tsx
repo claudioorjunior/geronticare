@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useDevRole } from '@/lib/dev/use-dev-role';
+import { useUserRole } from '@/lib/auth/use-user-role';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Brain, Heart, Scale, Timer, Apple, ClipboardCheck, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
@@ -94,7 +94,7 @@ function KpiCard({ label, value, max, tone }: { label: string; value: number | s
 
 export default function AGAPage() {
   const params = useParams<{ id: string }>();
-  const { role } = useDevRole();
+  const { role } = useUserRole();
   const utils = trpc.useUtils();
   const agasQuery = trpc.avaliacoesGeriatricas.listar.useQuery(
     { pacienteId: params.id },
