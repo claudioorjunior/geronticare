@@ -15,6 +15,7 @@ import {
   mascaraCPF,
 } from '@/lib/validations/pacientes';
 import type { Paciente, AvaliacaoGeriatrica } from '@/lib/db/schema';
+import { formatarData } from '@/lib/utils';
 
 function Kpi({ icon: Icon, label, value, unit }: { icon: typeof Activity; label: string; value: string; unit: string }) {
   return (
@@ -322,8 +323,8 @@ const toneForScale = (key: string, score: number | null | undefined): 'ok' | 'wa
   if (score == null) return 'ok';
   switch (key) {
     case 'katz': return score === 0 ? 'ok' : score === 6 ? 'risk' : 'warn';
-    case 'lawton': return 'ok';
-    case 'meem': return score < 20 ? 'risk' : score < 25 ? 'warn' : 'ok';
+    case 'lawton': return score === 8 ? 'ok' : score === 0 ? 'risk' : 'warn';
+    case 'meem': return score >= 24 ? 'ok' : score >= 18 ? 'warn' : 'risk';
     case 'gds15': return score >= 10 ? 'risk' : score >= 6 ? 'warn' : 'ok';
     case 'man': return score < 8 ? 'risk' : score < 12 ? 'warn' : 'ok';
     case 'tug': return score >= 20 ? 'risk' : score >= 10 ? 'warn' : 'ok';
@@ -445,7 +446,7 @@ function AGASummaryCard({
           <h3 className="text-sm font-semibold text-slate-900">Resumo Clínico — AGA</h3>
         </div>
         <time className="text-xs text-slate-400">
-          {new Date(avaliacao.dataAvaliacao).toLocaleDateString('pt-BR')}
+          {formatarData(avaliacao.dataAvaliacao)}
         </time>
       </div>
 

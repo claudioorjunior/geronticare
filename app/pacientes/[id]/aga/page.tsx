@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { trpc } from '@/lib/trpc/client';
 import { useUserRole } from '@/lib/auth/use-user-role';
 import { AgaForm } from '@/components/pacientes/AgaForm';
+import { formatarData } from '@/lib/utils';
 import {
   classificarGrauDependenciaRdc502,
   interpretarEscala,
@@ -123,7 +124,7 @@ function AGARecord({ aga, current }: { aga: AvaliacaoGeriatrica; current: boolea
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-teal-600" />
-          <time className="text-sm font-semibold text-slate-900">{new Date(aga.dataAvaliacao).toLocaleDateString('pt-BR')}</time>
+          <time className="text-sm font-semibold text-slate-900">{formatarData(aga.dataAvaliacao)}</time>
           {current && <span className="rounded-full bg-teal-50 px-2 py-1 text-[11px] font-semibold text-teal-700">Atual</span>}
         </div>
         {aga.respostas && <span className="text-xs text-slate-400">Formulário completo</span>}
@@ -220,7 +221,7 @@ function AGAPageContent({ patientId, role }: { patientId: string; role: string |
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-teal-600" /><h3 className="text-sm font-semibold text-slate-900">Última avaliação</h3></div>
-                  <div className="mt-2 flex items-center gap-2 text-xs text-slate-500"><Calendar className="h-3.5 w-3.5" />{new Date(current.dataAvaliacao).toLocaleDateString('pt-BR')}<User className="ml-2 h-3.5 w-3.5" />Profissional responsável</div>
+                  <div className="mt-2 flex items-center gap-2 text-xs text-slate-500"><Calendar className="h-3.5 w-3.5" />{formatarData(current.dataAvaliacao)}<User className="ml-2 h-3.5 w-3.5" />Profissional responsável</div>
                 </div>
               </div>
               <ScaleCards aga={current} />

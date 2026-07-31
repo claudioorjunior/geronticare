@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useUserRole } from '@/lib/auth/use-user-role';
 import { trpc } from '@/lib/trpc/client';
 import { PatientForm } from '@/components/pacientes/PatientForm';
+import { formatarData } from '@/lib/utils';
 import type { Paciente } from '@/lib/db/schema';
 
 // ── Types ──
@@ -38,12 +39,7 @@ function getInitials(nome: string): string {
     .toUpperCase();
 }
 
-function formatarData(d?: string | Date | null): string {
-  if (!d) return '—';
-  const date = typeof d === 'string' ? new Date(d) : d;
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleDateString('pt-BR');
-}
+// ── AGA score helpers ──
 
 function calcularIdade(dataNascimento?: string | Date | null): number {
   if (!dataNascimento) return 0;
