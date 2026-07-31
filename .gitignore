@@ -45,6 +45,10 @@ next-env.d.ts
 # hermes internal
 .hermes/
 .pglite/
+
+# local tooling artifacts
+.tokensave/
+.worktrees/
 docs/
 AGENTS.md
 INVENTARIO_TELAS_M4.md

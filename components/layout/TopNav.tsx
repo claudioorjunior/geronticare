@@ -92,11 +92,6 @@ export function TopNav() {
             Pacientes
           </Link>
 
-          {/* Perfil — visível para todos os papéis */}
-          <Link href="/perfil" className={navLinkClass('/perfil')}>
-            Meu Perfil
-          </Link>
-
           {userRole === 'admin' && (
             <>
               <Link href="/profissionais" className={navLinkClass('/profissionais')}>

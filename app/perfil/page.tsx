@@ -1,18 +1,23 @@
 'use client';
 
-import { useState } from 'react';
-import { User, Mail, Lock, Camera, Save, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { User, Camera, Save, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
 import { authClient } from '@/lib/auth/client';
 import { trpc } from '@/lib/trpc/client';
 
+const TIPOS_MIME_IMAGEM = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const TAMANHO_MAXIMO_BYTES = 10 * 1024 * 1024;
+
 export default function PerfilPage() {
   const utils = trpc.useUtils();
-  const { data: perfil, isLoading, refetch } = trpc.usuarios.meuPerfil.useQuery();
+  const { data: perfil, isLoading } = trpc.usuarios.meuPerfil.useQuery();
 
-  const [nome, setNome] = useState('');
-  const [image, setImage] = useState('');
+  const [nome, setNome] = useState<string>();
+  const [image, setImage] = useState<string>();
+  const [imagePreview, setImagePreview] = useState('');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [senhaAtual, setSenhaAtual] = useState('');
   const [novaSenha, setNovaSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
@@ -21,14 +26,66 @@ export default function PerfilPage() {
   const [salvando, setSalvando] = useState(false);
   const [trocandoSenha, setTrocandoSenha] = useState(false);
 
-  // Sync state quando perfil carrega
-  if (perfil) {
-    if (nome !== (perfil.nome ?? '')) setNome(perfil.nome ?? '');
-    if (image !== (perfil.image ?? '')) setImage(perfil.image ?? '');
-  }
+  useEffect(() => {
+    return () => {
+      if (imagePreview.startsWith('blob:')) URL.revokeObjectURL(imagePreview);
+    };
+  }, [imagePreview]);
+
+  const selecionarFoto = (file: File | undefined) => {
+    if (!file) return;
+    if (!TIPOS_MIME_IMAGEM.includes(file.type)) {
+      setMsg({ tipo: 'erro', texto: 'Use uma imagem JPEG, PNG, WebP ou GIF.' });
+      return;
+    }
+    if (file.size > TAMANHO_MAXIMO_BYTES) {
+      setMsg({ tipo: 'erro', texto: 'A imagem deve ter no máximo 10 MB.' });
+      return;
+    }
+
+    setAvatarFile(file);
+    setImagePreview(URL.createObjectURL(file));
+    setMsg(null);
+  };
+
+  const enviarFoto = async (file: File) => {
+    const response = await fetch('/api/usuarios/avatar-upload-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nomeArquivo: file.name,
+        tipoMime: file.type,
+        tamanhoBytes: file.size,
+      }),
+    });
+    const data = (await response.json()) as {
+      uploadUrl?: string;
+      urlPublica?: string;
+      error?: string;
+    };
+
+    if (!response.ok || !data.uploadUrl || !data.urlPublica) {
+      throw new Error(data.error ?? 'Falha ao preparar o upload da foto');
+    }
+
+    const uploadResponse = await fetch(data.uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': file.type },
+      body: file,
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error('Falha ao enviar a foto');
+    }
+
+    return data.urlPublica;
+  };
 
   const salvarPerfil = async () => {
-    if (!nome.trim()) {
+    const nomeAtual = nome ?? perfil?.nome ?? '';
+    const imageAtual = image ?? perfil?.image ?? '';
+
+    if (!nomeAtual.trim()) {
       setMsg({ tipo: 'erro', texto: 'Nome é obrigatório' });
       return;
     }
@@ -36,10 +93,14 @@ export default function PerfilPage() {
     setMsg(null);
 
     try {
-      // Better-Auth updateUser: nome + image (não permite email via API)
+      let imageUrl = imageAtual.trim() || undefined;
+      if (avatarFile) {
+        imageUrl = await enviarFoto(avatarFile);
+      }
+
       const { error: updateError } = await authClient.updateUser({
-        name: nome.trim(),
-        image: image.trim() || undefined,
+        name: nomeAtual.trim(),
+        image: imageUrl,
       });
 
       if (updateError) {
@@ -47,11 +108,17 @@ export default function PerfilPage() {
         return;
       }
 
-      // Atualiza cache local
+      setNome(nomeAtual);
+      setImage(imageUrl ?? '');
+      setImagePreview(imageUrl ?? '');
+      setAvatarFile(null);
       utils.usuarios.meuPerfil.invalidate();
       setMsg({ tipo: 'ok', texto: 'Perfil atualizado com sucesso.' });
-    } catch {
-      setMsg({ tipo: 'erro', texto: 'Erro inesperado ao salvar perfil' });
+    } catch (error) {
+      setMsg({
+        tipo: 'erro',
+        texto: error instanceof Error ? error.message : 'Erro inesperado ao salvar perfil',
+      });
     } finally {
       setSalvando(false);
     }
@@ -90,8 +157,11 @@ export default function PerfilPage() {
       setNovaSenha('');
       setConfirmarSenha('');
       setMsg({ tipo: 'ok', texto: 'Senha atualizada com sucesso.' });
-    } catch {
-      setMsg({ tipo: 'erro', texto: 'Erro inesperado ao trocar senha' });
+    } catch (error) {
+      setMsg({
+        tipo: 'erro',
+        texto: error instanceof Error ? error.message : 'Erro inesperado ao trocar senha',
+      });
     } finally {
       setTrocandoSenha(false);
     }
@@ -104,6 +174,10 @@ export default function PerfilPage() {
       </div>
     );
   }
+
+  const nomeAtual = nome ?? perfil?.nome ?? '';
+  const imageAtual = image ?? perfil?.image ?? '';
+  const avatarSrc = imagePreview || imageAtual;
 
   return (
     <div className="max-w-container-max mx-auto w-full px-margin-mobile md:px-margin-desktop py-8">
@@ -139,15 +213,14 @@ export default function PerfilPage() {
       )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Avatar + identidade */}
         <section className="space-y-6 lg:col-span-2">
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="mb-4 text-sm font-semibold text-slate-900">Identidade</h2>
             <div className="mb-5 flex items-center gap-5">
               <div className="relative">
-                {image ? (
+                {avatarSrc ? (
                   <img
-                    src={image}
+                    src={avatarSrc}
                     alt="Avatar"
                     className="h-16 w-16 rounded-full object-cover ring-2 ring-slate-200"
                   />
@@ -163,21 +236,23 @@ export default function PerfilPage() {
                       : '—'}
                   </div>
                 )}
-                <label className="absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-600 ring-2 ring-white hover:bg-slate-200 cursor-pointer">
+                <label className="absolute bottom-0 right-0 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full bg-slate-100 text-slate-600 ring-2 ring-white hover:bg-slate-200">
                   <Camera className="h-3 w-3" />
                   <input
-                    type="text"
-                    placeholder="URL da imagem"
-                    value={image}
-                    onChange={(e) => setImage(e.target.value)}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={(e) => {
+                      selecionarFoto(e.currentTarget.files?.[0]);
+                      e.currentTarget.value = '';
+                    }}
                     className="sr-only"
-                    aria-label="URL da imagem do avatar"
+                    aria-label="Trocar foto do perfil"
                   />
                 </label>
               </div>
               <div className="flex-1">
                 <p className="text-xs text-slate-500">
-                  Cole a URL da sua imagem de perfil. Recomendado: 200x200px.
+                  Clique no ícone da câmera para escolher uma imagem. Máximo: 10 MB.
                 </p>
               </div>
             </div>
@@ -187,7 +262,7 @@ export default function PerfilPage() {
                 id="perfil-nome"
                 htmlFor="perfil-nome"
                 label="Nome completo"
-                value={nome}
+                value={nomeAtual}
                 onChange={(e) => setNome(e.target.value)}
               />
               <Field
@@ -204,7 +279,7 @@ export default function PerfilPage() {
             <div className="mt-6 flex items-center gap-3">
               <Button
                 onClick={salvarPerfil}
-                disabled={salvando || !nome.trim()}
+                disabled={salvando || !nomeAtual.trim()}
                 className="gap-2 bg-teal-600 text-white hover:bg-teal-700"
               >
                 {salvando ? (
@@ -220,7 +295,6 @@ export default function PerfilPage() {
             </div>
           </div>
 
-          {/* Troca de senha */}
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="mb-4 text-sm font-semibold text-slate-900">Trocar senha</h2>
             <div className="grid grid-cols-1 gap-x-6 gap-y-5 md:grid-cols-2">
@@ -269,7 +343,6 @@ export default function PerfilPage() {
           </div>
         </section>
 
-        {/* Informações secundárias */}
         <aside className="space-y-6">
           <div className="rounded-xl border border-slate-100 bg-slate-50 p-5">
             <h3 className="mb-3 text-sm font-semibold text-slate-900">Informações da conta</h3>

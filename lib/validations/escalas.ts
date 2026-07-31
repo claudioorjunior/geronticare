@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { agaAnswersSchema, calcularAgaScores, type AgaAnswers } from './aga-form';
 
 // Schema para validação de escalas geriátricas
 export const escalasGeriatricasSchema = z.object({
@@ -16,6 +17,7 @@ export const escalasGeriatricasSchema = z.object({
 export const criarAvaliacaoSchema = z.object({
   pacienteId: z.string().uuid(),
   dataAvaliacao: z.coerce.date().optional(),
+  respostas: agaAnswersSchema.optional(),
   katzScore: z.number().int().min(0).max(6).optional(),
   lawtonScore: z.number().int().min(0).max(8).optional(),
   rdc502Autocuidado: z.enum(['nenhuma', 'ate_tres', 'todas']).optional(),
@@ -36,6 +38,9 @@ export const criarAvaliacaoSchema = z.object({
   moradia: z.string().max(500).optional(),
   observacoes: z.string().max(5000).optional(),
 });
+
+export { agaAnswersSchema, calcularAgaScores };
+export type { AgaAnswers };
 
 // Schema para sinais vitais
 export const sinalVitalSchema = z.object({
@@ -72,8 +77,8 @@ export function interpretarEscala(nome: string, score: number | null | undefined
       return 'Déficit cognitivo moderado a grave';
     case 'gds15':
       if (score <= 5) return 'Sem depressão';
-      if (score <= 9) return 'Depressão leve';
-      return 'Depressão moderada a grave';
+      if (score <= 10) return 'Depressão leve';
+      return 'Depressão severa';
     case 'man':
       if (score >= 12) return 'Nutrição adequada';
       if (score >= 8) return 'Risco de desnutrição';

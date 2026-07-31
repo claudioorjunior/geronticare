@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useUserRole } from '@/lib/auth/use-user-role';
+import { useState } from 'react';
+import { AlertCircle, Calendar, CheckCircle2, ClipboardCheck, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Brain, Heart, Scale, Timer, Apple, ClipboardCheck, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import { trpc } from '@/lib/trpc/client';
+import { useUserRole } from '@/lib/auth/use-user-role';
+import { AgaForm } from '@/components/pacientes/AgaForm';
 import {
   classificarGrauDependenciaRdc502,
   interpretarEscala,
@@ -15,403 +15,225 @@ import {
 } from '@/lib/validations/escalas';
 import type { AvaliacaoGeriatrica } from '@/lib/db/schema';
 
-type AGAScore = {
-  katz: string;
-  lawton: string;
-  meem: string;
-  gds15: string;
-  man: string;
-  tug: string;
-};
+type ScaleKey = 'katz' | 'lawton' | 'meem' | 'gds15' | 'man' | 'tug';
 
-const emptyScores: AGAScore = {
-  katz: '',
-  lawton: '',
-  meem: '',
-  gds15: '',
-  man: '',
-  tug: '',
-};
-
-// Cada escala: range, descrição e ícone. Reuso de interpretarEscala para live feedback.
-const escalas: {
-  key: keyof AGAScore;
+type ScaleSummary = {
+  key: ScaleKey;
   label: string;
-  max: number;
-  icon: typeof Brain;
-  desc: string;
-}[] = [
-  { key: 'katz', label: 'Katz (ABVD)', max: 6, icon: Scale, desc: '0 = independente · 6 = dependente em todas as ABVD' },
-  { key: 'lawton', label: 'Lawton (AIVD)', max: 8, icon: ClipboardCheck, desc: '0 = dependente · 8 = independente' },
-  { key: 'meem', label: 'MEEM', max: 30, icon: Brain, desc: 'Mini-Exame do Estado Mental' },
-  { key: 'gds15', label: 'GDS-15', max: 15, icon: Heart, desc: 'Triagem de depressão geriátrica' },
-  { key: 'man', label: 'MAN', max: 14, icon: Apple, desc: 'Mini Avaliação Nutricional' },
-  { key: 'tug', label: 'TUG (s)', max: 300, icon: Timer, desc: 'Timed Up and Go em segundos' },
-];
+  max?: number;
+  unit?: string;
+  score: number | null;
+  interpretation: string | null;
+};
 
-function toneFor(key: keyof AGAScore, score: number | null | undefined): 'ok' | 'warn' | 'risk' | 'muted' {
+const scaleLabels: Record<ScaleKey, string> = {
+  katz: 'Katz',
+  lawton: 'Lawton',
+  meem: 'MEEM',
+  gds15: 'GDS-15',
+  man: 'MAN',
+  tug: 'TUG',
+};
+
+const scaleDescriptions: Record<ScaleKey, string> = {
+  katz: 'Dependências em atividades básicas',
+  lawton: 'Independência em atividades instrumentais',
+  meem: 'Rastreamento cognitivo',
+  gds15: 'Rastreamento de humor',
+  man: 'Triagem nutricional',
+  tug: 'Mobilidade e risco de queda',
+};
+
+function toneFor(key: ScaleKey, score: number | null): 'ok' | 'warn' | 'risk' | 'muted' {
   if (score == null) return 'muted';
   switch (key) {
     case 'katz':
-      return score === 0 ? 'ok' : score === 6 ? 'risk' : 'warn';
+      return score === 0 ? 'ok' : score >= 4 ? 'risk' : 'warn';
     case 'lawton':
-      return 'muted';
+      return score >= 7 ? 'ok' : score >= 4 ? 'warn' : 'risk';
     case 'meem':
-      return score < 20 ? 'risk' : score < 25 ? 'warn' : 'ok';
+      return score >= 24 ? 'ok' : score >= 18 ? 'warn' : 'risk';
     case 'gds15':
-      return score >= 10 ? 'risk' : score >= 6 ? 'warn' : 'ok';
+      return score <= 5 ? 'ok' : score <= 10 ? 'warn' : 'risk';
     case 'man':
-      return score < 8 ? 'risk' : score < 12 ? 'warn' : 'ok';
+      return score >= 12 ? 'ok' : score >= 8 ? 'warn' : 'risk';
     case 'tug':
-      return score >= 20 ? 'risk' : score >= 10 ? 'warn' : 'ok';
+      return score < 10 ? 'ok' : score < 20 ? 'warn' : 'risk';
   }
 }
 
-const toneStyle: Record<'ok' | 'warn' | 'risk' | 'muted', string> = {
-  ok: 'text-emerald-700 bg-emerald-50 ring-emerald-200',
-  warn: 'text-amber-700 bg-amber-50 ring-amber-200',
-  risk: 'text-red-700 bg-red-50 ring-red-200',
-  muted: 'text-slate-500 bg-slate-50 ring-slate-200',
-};
-
-const dependencyToneStyle: Record<'ok' | 'warn' | 'risk', string> = {
+const toneClasses = {
   ok: 'border-emerald-200 bg-emerald-50 text-emerald-800',
   warn: 'border-amber-200 bg-amber-50 text-amber-800',
   risk: 'border-red-200 bg-red-50 text-red-800',
+  muted: 'border-slate-200 bg-slate-50 text-slate-500',
 };
 
-function KpiCard({ label, value, max, tone }: { label: string; value: number | string; max: number; tone: 'ok' | 'warn' | 'risk' | 'muted' }) {
+function getScaleSummaries(aga: AvaliacaoGeriatrica): ScaleSummary[] {
+  return [
+    { key: 'katz', label: scaleLabels.katz, max: 6, score: aga.katzScore, interpretation: interpretarEscala('katz', aga.katzScore) },
+    { key: 'lawton', label: scaleLabels.lawton, max: 8, score: aga.lawtonScore, interpretation: interpretarEscala('lawton', aga.lawtonScore) },
+    { key: 'meem', label: scaleLabels.meem, max: 30, score: aga.meemScore, interpretation: interpretarEscala('meem', aga.meemScore) },
+    { key: 'gds15', label: scaleLabels.gds15, max: 15, score: aga.gds15Score, interpretation: interpretarEscala('gds15', aga.gds15Score) },
+    { key: 'man', label: scaleLabels.man, max: 14, score: aga.manScore, interpretation: interpretarEscala('man', aga.manScore) },
+    { key: 'tug', label: scaleLabels.tug, unit: 's', score: aga.tugSegundos, interpretation: interpretarEscala('tug', aga.tugSegundos) },
+  ];
+}
+
+function CurrentClassification({ aga }: { aga: AvaliacaoGeriatrica }) {
+  const autocuidado = aga.rdc502Autocuidado as Rdc502Autocuidado | null;
+  const cognicao = aga.rdc502Cognicao as Rdc502Cognicao | null;
+  const classification = classificarGrauDependenciaRdc502(autocuidado, cognicao);
+
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="text-[11px] uppercase tracking-wider text-slate-400">{label}</div>
-      <div className={`mt-2 flex items-baseline gap-1 text-2xl font-semibold tabular-nums ${tone === 'ok' ? 'text-emerald-600' : tone === 'warn' ? 'text-amber-600' : tone === 'risk' ? 'text-red-600' : 'text-slate-500'}`}>
-        {value}
-        <span className="text-sm text-slate-400">/{max}</span>
-      </div>
+    <div className={`rounded-xl border p-5 ${classification ? toneClasses[classification.tone] : toneClasses.muted}`}>
+      <p className="text-xs font-semibold uppercase tracking-wide">Classificação atual</p>
+      <p className="mt-1 text-xl font-semibold">{classification?.label ?? 'Não informada'}</p>
+      <p className="mt-1 text-xs leading-relaxed">
+        {classification?.fundamento ?? 'A avaliação registrada não contém autocuidado e cognição suficientes para calcular o grau RDC 502/2021.'}
+      </p>
     </div>
+  );
+}
+
+function ScaleCards({ aga }: { aga: AvaliacaoGeriatrica }) {
+  return (
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+      {getScaleSummaries(aga).map((scale) => {
+        const tone = toneFor(scale.key, scale.score);
+        return (
+          <div key={scale.key} className={`rounded-xl border p-4 ${toneClasses[tone]}`}>
+            <div className="text-xs font-semibold tracking-wide">{scale.label}</div>
+            <div className="mt-2 text-2xl font-semibold tabular-nums">
+              {scale.score ?? 'n/d'}
+              {scale.max !== undefined && <span className="text-sm font-normal opacity-60">/{scale.max}</span>}
+              {scale.unit && <span className="text-sm font-normal opacity-60"> {scale.unit}</span>}
+            </div>
+            <p className="mt-1 text-[11px] leading-relaxed opacity-80">{scale.interpretation ?? scaleDescriptions[scale.key]}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function AGARecord({ aga, current }: { aga: AvaliacaoGeriatrica; current: boolean }) {
+  return (
+    <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-teal-600" />
+          <time className="text-sm font-semibold text-slate-900">{new Date(aga.dataAvaliacao).toLocaleDateString('pt-BR')}</time>
+          {current && <span className="rounded-full bg-teal-50 px-2 py-1 text-[11px] font-semibold text-teal-700">Atual</span>}
+        </div>
+        {aga.respostas && <span className="text-xs text-slate-400">Formulário completo</span>}
+      </div>
+      <div className="mt-4">
+        <ScaleCards aga={aga} />
+      </div>
+      {aga.observacoes && <p className="mt-4 border-t border-slate-100 pt-4 text-sm leading-relaxed text-slate-600">{aga.observacoes}</p>}
+    </article>
   );
 }
 
 export default function AGAPage() {
   const params = useParams<{ id: string }>();
   const { role } = useUserRole();
-  const utils = trpc.useUtils();
-  const agasQuery = trpc.avaliacoesGeriatricas.listar.useQuery(
-    { pacienteId: params.id },
-    { enabled: Boolean(params.id) },
-  );
+  return <AGAPageContent patientId={params.id} role={role} />;
+}
 
-  const [scores, setScores] = useState<AGAScore>(emptyScores);
-  const [dataAvaliacao, setDataAvaliacao] = useState('');
-  const [observacoes, setObservacoes] = useState('');
-  const [rdc502Autocuidado, setRdc502Autocuidado] = useState<Rdc502Autocuidado | ''>('');
-  const [rdc502Cognicao, setRdc502Cognicao] = useState<Rdc502Cognicao | ''>('');
+function AGAPageContent({ patientId, role }: { patientId: string; role: string | null }) {
+  const utils = trpc.useUtils();
+  const [showForm, setShowForm] = useState(false);
   const [message, setMessage] = useState('');
   const canEdit = role === 'admin' || role === 'profissional';
-
+  const agasQuery = trpc.avaliacoesGeriatricas.listar.useQuery({ pacienteId: patientId }, { enabled: Boolean(patientId) });
   const criarAga = trpc.avaliacoesGeriatricas.criar.useMutation({
     onSuccess: () => {
-      utils.avaliacoesGeriatricas.listar.invalidate({ pacienteId: params.id });
-      setScores(emptyScores);
-      setDataAvaliacao('');
-      setObservacoes('');
-      setRdc502Autocuidado('');
-      setRdc502Cognicao('');
-      setMessage('Avaliacao salva com sucesso.');
-      window.setTimeout(() => setMessage(''), 2200);
+      utils.avaliacoesGeriatricas.listar.invalidate({ pacienteId: patientId });
+      utils.avaliacoesGeriatricas.relatorio.invalidate({ pacienteId: patientId });
+      setShowForm(false);
+      setMessage('Avaliação salva com sucesso.');
+      window.setTimeout(() => setMessage(''), 2500);
     },
     onError: (error) => setMessage(error.message),
   });
 
-  // Live parse: string vazia -> undefined; senão clamp na faixa. Evita parseInt solto (BUG-003/004).
-  const parseScore = (key: keyof AGAScore, raw: string): number | undefined => {
-    if (raw.trim() === '') return undefined;
-    const n = Number(raw);
-    if (Number.isNaN(n)) return undefined;
-    return Math.max(0, Math.min(escalas.find((e) => e.key === key)!.max, Math.round(n)));
-  };
-
-  const handleScoreChange = (key: keyof AGAScore, value: string) => {
-    setScores((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const salvarAGA = () => {
-    if (!canEdit || !params.id) return;
-    setMessage('');
-    criarAga.mutate({
-      pacienteId: params.id,
-      dataAvaliacao: dataAvaliacao ? new Date(dataAvaliacao) : undefined,
-      katzScore: parseScore('katz', scores.katz),
-      lawtonScore: parseScore('lawton', scores.lawton),
-      rdc502Autocuidado: rdc502Autocuidado || undefined,
-      rdc502Cognicao: rdc502Cognicao || undefined,
-      meemScore: parseScore('meem', scores.meem),
-      gds15Score: parseScore('gds15', scores.gds15),
-      manScore: parseScore('man', scores.man),
-      tugSegundos: parseScore('tug', scores.tug),
-      observacoes: observacoes.trim() || undefined,
-    });
-  };
-
-  const agas = (agasQuery.data ?? []) as AvaliacaoGeriatrica[];
-  const ultima = agas[0];
-  const grauDependencia = classificarGrauDependenciaRdc502(
-    rdc502Autocuidado || undefined,
-    rdc502Cognicao || undefined,
-  );
-  const interpretacoes = ultima
-    ? [
-        ['Katz', interpretarEscala('katz', ultima.katzScore)],
-        ['Lawton', interpretarEscala('lawton', ultima.lawtonScore)],
-        ['MEEM', interpretarEscala('meem', ultima.meemScore)],
-        ['GDS-15', interpretarEscala('gds15', ultima.gds15Score)],
-        ['MAN', interpretarEscala('man', ultima.manScore)],
-        ['TUG', interpretarEscala('tug', ultima.tugSegundos)],
-      ]
-    : [];
-
-  const emptyState = !ultima && (
-    <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-6 text-center">
-      <ClipboardCheck className="mx-auto mb-2 h-8 w-8 text-slate-300" />
-      <p className="text-sm font-medium text-slate-600">Nenhuma avaliação geriátrica registrada.</p>
-      {canEdit && <p className="mt-1 text-xs text-slate-400">Preencha o formulário abaixo para iniciar a AGA.</p>}
-    </div>
-  );
-
   if (agasQuery.isPending) {
-    return (
-      <div className="py-12 text-center" aria-live="polite">
-        <span className="text-sm text-slate-500">Carregando avaliações...</span>
-      </div>
-    );
+    return <div className="py-12 text-center text-sm text-slate-500" aria-live="polite">Carregando avaliações...</div>;
   }
 
   if (agasQuery.isError) {
+    return <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-700" role="alert"><div className="flex items-center gap-2 font-medium"><AlertCircle className="h-4 w-4" /> Não foi possível carregar as avaliações.</div><p className="mt-1 text-xs">{agasQuery.error.message}</p></div>;
+  }
+
+  const agas = (agasQuery.data ?? []) as AvaliacaoGeriatrica[];
+  const current = agas[0];
+
+  if (showForm) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-6" role="alert">
-        <p className="text-sm font-medium text-red-700">Não foi possível carregar as avaliações.</p>
-        <p className="mt-1 text-xs text-red-600">{agasQuery.error.message}</p>
+      <div>
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Nova avaliação geriátrica ampla</h2>
+            <p className="mt-1 text-sm text-slate-500">Preencha cada escala selecionando as opções do instrumento.</p>
+          </div>
+          <Button variant="outline" onClick={() => setShowForm(false)}>Voltar para avaliações</Button>
+        </div>
+        {canEdit ? (
+          <AgaForm
+            pacienteId={patientId}
+            onCancel={() => setShowForm(false)}
+            create={(input) => criarAga.mutate(input)}
+            isPending={criarAga.isPending}
+            errorMessage={criarAga.error?.message}
+          />
+        ) : (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600">Usuários sem perfil clínico não podem preencher uma AGA.</div>
+        )}
       </div>
     );
   }
 
   return (
-    <>
-      {emptyState}
-      {ultima && (
-        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <KpiCard label="Katz" value={ultima.katzScore ?? '—'} max={6} tone={toneFor('katz', ultima.katzScore)} />
-          <KpiCard label="Lawton" value={ultima.lawtonScore ?? '—'} max={8} tone={toneFor('lawton', ultima.lawtonScore)} />
-          <KpiCard label="MEEM" value={ultima.meemScore ?? '—'} max={30} tone={toneFor('meem', ultima.meemScore)} />
-          <KpiCard label="GDS-15" value={ultima.gds15Score ?? '—'} max={15} tone={toneFor('gds15', ultima.gds15Score)} />
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">Avaliações geriátricas amplas</h2>
+          <p className="mt-1 text-sm text-slate-500">Histórico de avaliações preenchidas e classificação funcional atual.</p>
         </div>
-      )}
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <section className="space-y-6 lg:col-span-2">
-          {canEdit && (
-            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h3 className="mb-1 text-sm font-semibold text-slate-900">Nova avaliacao</h3>
-              <p className="mb-5 text-xs text-slate-500">
-                A interpretação aparece em tempo real conforme você preenche cada escala.
-              </p>
-
-              {/* Blocos por escala: input + feedback live */}
-              <div className="space-y-4">
-                {escalas.map(({ key, label, max, icon: Icon, desc }) => {
-                  const num = parseScore(key, scores[key]);
-                  const interpretacao = interpretarEscala(key, num);
-                  const tone = toneFor(key, num);
-                  return (
-                    <div key={key} className="rounded-lg border border-slate-200 p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <Icon className="h-4 w-4 text-slate-400" />
-                            <label htmlFor={`aga-${key}`} className="text-sm font-medium text-slate-900">
-                              {label}
-                            </label>
-                            <span className="text-[11px] text-slate-400">max {max}</span>
-                          </div>
-                          <p className="mt-0.5 text-[11px] text-slate-400">{desc}</p>
-                          <div className="mt-2 flex items-center gap-2">
-                            <Input
-                              id={`aga-${key}`}
-                              type="number"
-                              min={0}
-                              max={max}
-                              value={scores[key]}
-                              onChange={(e) => handleScoreChange(key, e.target.value)}
-                              className="w-24"
-                            />
-                            {interpretacao && (
-                              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${toneStyle[tone]}`}>
-                                {tone === 'ok' && <CheckCircle2 className="h-3 w-3" />}
-                                {tone === 'warn' && <AlertTriangle className="h-3 w-3" />}
-                                {tone === 'risk' && <XCircle className="h-3 w-3" />}
-                                {interpretacao}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div
-                className={`mt-5 rounded-lg border p-4 ${
-                  grauDependencia
-                    ? dependencyToneStyle[grauDependencia.tone]
-                    : 'border-slate-200 bg-slate-50 text-slate-600'
-                }`}
-                aria-live="polite"
-              >
-                <div className="flex items-baseline justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide">Classificação RDC Anvisa 502/2021</p>
-                    <p className="mt-1 text-lg font-semibold">
-                      {grauDependencia?.label ?? 'Informe autocuidado e cognição'}
-                    </p>
-                  </div>
-                  {grauDependencia && <span className="text-xs">ILPI</span>}
-                </div>
-                <p className="mt-1 text-xs opacity-80">
-                  {grauDependencia
-                    ? grauDependencia.fundamento
-                    : 'Katz e Lawton são exibidos separadamente e não determinam sozinhos o grau da RDC.'}
-                </p>
-              </div>
-
-              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                <label className="text-xs font-medium text-slate-600">
-                  RDC 502: autocuidado
-                  <select
-                    value={rdc502Autocuidado}
-                    onChange={(event) => setRdc502Autocuidado(event.target.value as Rdc502Autocuidado | '')}
-                    className="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-700"
-                  >
-                    <option value="">Não informado</option>
-                    <option value="nenhuma">Independente nas atividades de autocuidado</option>
-                    <option value="ate_tres">Dependente em até três atividades</option>
-                    <option value="todas">Dependente em todas as atividades</option>
-                  </select>
-                </label>
-                <label className="text-xs font-medium text-slate-600">
-                  RDC 502: cognição
-                  <select
-                    value={rdc502Cognicao}
-                    onChange={(event) => setRdc502Cognicao(event.target.value as Rdc502Cognicao | '')}
-                    className="mt-1 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-700"
-                  >
-                    <option value="">Não informado</option>
-                    <option value="sem_comprometimento">Sem comprometimento cognitivo</option>
-                    <option value="alteracao_controlada">Alteração cognitiva controlada</option>
-                    <option value="comprometimento">Comprometimento cognitivo</option>
-                  </select>
-                </label>
-              </div>
-              <p className="mt-2 text-[11px] text-slate-400">
-                A classificação da RDC é própria para ILPIs. Katz (ABVD) e Lawton (AIVD) permanecem como medidas funcionais separadas.
-              </p>
-
-              {/* Campos ricos */}
-              <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <label htmlFor="aga-data" className="mb-1.5 block text-xs font-medium text-slate-500">
-                    Data da avaliacao
-                  </label>
-                  <Input
-                    id="aga-data"
-                    type="date"
-                    value={dataAvaliacao}
-                    onChange={(e) => setDataAvaliacao(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="mt-4">
-                <label htmlFor="aga-obs" className="mb-1.5 block text-xs font-medium text-slate-500">
-                  Observacoes
-                </label>
-                <textarea
-                  id="aga-obs"
-                  value={observacoes}
-                  onChange={(e) => setObservacoes(e.target.value)}
-                  rows={3}
-                  placeholder="Contexto clinico, evolucao, condicoes observadas..."
-                  className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-                />
-              </div>
-
-              <div className="mt-5 flex items-center gap-3">
-                <Button onClick={salvarAGA} disabled={criarAga.isPending || !params.id}>
-                  {criarAga.isPending ? 'Salvando...' : 'Salvar nova AGA'}
-                </Button>
-                {message && <span className="text-sm text-emerald-600">{message}</span>}
-              </div>
-            </div>
-          )}
-
-          {!canEdit && <p className="text-sm text-slate-400">Usuarios nao tem permissao para registrar AGAs.</p>}
-
-          {agas.length > 1 && (
-            <div>
-              <h3 className="mb-4 text-sm font-semibold text-slate-900">Historico de avaliacoes</h3>
-              <div className="space-y-3">
-                {agas.slice(1).map((aga) => (
-                  <div key={aga.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <time className="text-sm font-medium text-slate-900">{aga.dataAvaliacao.toLocaleDateString('pt-BR')}</time>
-                    <div className="mb-3 mt-3 grid grid-cols-3 gap-x-4 gap-y-2 md:grid-cols-6">
-                      <div className="text-xs"><span className="font-medium text-slate-700">{aga.katzScore ?? '—'}</span><span className="text-slate-400">/6</span> <span className="text-slate-500">Katz</span></div>
-                      <div className="text-xs"><span className="font-medium text-slate-700">{aga.lawtonScore ?? '—'}</span><span className="text-slate-400">/8</span> <span className="text-slate-500">Lawton</span></div>
-                      <div className="text-xs"><span className="font-medium text-slate-700">{aga.meemScore ?? '—'}</span><span className="text-slate-400">/30</span> <span className="text-slate-500">MEEM</span></div>
-                      <div className="text-xs"><span className="font-medium text-slate-700">{aga.gds15Score ?? '—'}</span><span className="text-slate-400">/15</span> <span className="text-slate-500">GDS-15</span></div>
-                      <div className="text-xs"><span className="font-medium text-slate-700">{aga.manScore ?? '—'}</span><span className="text-slate-400">/14</span> <span className="text-slate-500">MAN</span></div>
-                      <div className="text-xs"><span className="font-medium text-slate-700">{aga.tugSegundos ?? '—'}s</span> <span className="text-slate-500">TUG</span></div>
-                    </div>
-                    {aga.observacoes && <p className="text-sm leading-relaxed text-slate-600">{aga.observacoes}</p>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </section>
-
-        <aside className="space-y-4">
-          <div className="rounded-xl border border-slate-100 bg-slate-50 p-5">
-            <h3 className="mb-3 text-sm font-semibold text-slate-900">Guia rapido das escalas</h3>
-            <div className="space-y-3">
-              {escalas.map(({ label, icon: Icon, desc }) => (
-                <div key={label} className="flex gap-3 rounded-lg border border-slate-200 bg-white p-3">
-                  <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-                  <div>
-                    <span className="text-xs font-medium text-slate-700">{label}</span>
-                    <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">{desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {ultima && (
-            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-5">
-              <h3 className="mb-3 text-sm font-semibold text-slate-900">Ultima interpretacao</h3>
-              <ul className="space-y-1.5 text-xs text-slate-600">
-                {interpretacoes.map(([k, v]) =>
-                  v ? (
-                    <li key={k} className="flex justify-between gap-2">
-                      <span className="text-slate-500">{k}</span>
-                      <span className="font-medium text-slate-800">{v}</span>
-                    </li>
-                  ) : null,
-                )}
-              </ul>
-              <p className="mt-3 text-[11px] text-slate-400">{ultima.dataAvaliacao.toLocaleDateString('pt-BR')}</p>
-            </div>
-          )}
-        </aside>
+        {canEdit && <Button onClick={() => setShowForm(true)} className="bg-teal-600 text-white hover:bg-teal-700">Incluir nova AGA</Button>}
       </div>
-    </>
+
+      {message && <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700" role="status"><CheckCircle2 className="h-4 w-4" />{message}</div>}
+
+      {!current ? (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center">
+          <ClipboardCheck className="mx-auto mb-3 h-9 w-9 text-slate-300" />
+          <p className="text-sm font-medium text-slate-700">Nenhuma AGA preenchida.</p>
+          <p className="mt-1 text-xs text-slate-500">{canEdit ? 'Inicie uma avaliação para registrar as escalas do paciente.' : 'Apenas profissionais podem registrar avaliações.'}</p>
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-teal-600" /><h3 className="text-sm font-semibold text-slate-900">Última avaliação</h3></div>
+                  <div className="mt-2 flex items-center gap-2 text-xs text-slate-500"><Calendar className="h-3.5 w-3.5" />{new Date(current.dataAvaliacao).toLocaleDateString('pt-BR')}<User className="ml-2 h-3.5 w-3.5" />Profissional responsável</div>
+                </div>
+              </div>
+              <ScaleCards aga={current} />
+            </div>
+            <CurrentClassification aga={current} />
+          </div>
+          {current.observacoes && <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><h3 className="text-sm font-semibold text-slate-900">Observações da avaliação atual</h3><p className="mt-2 text-sm leading-relaxed text-slate-600">{current.observacoes}</p></div>}
+          <div>
+            <h3 className="mb-3 text-sm font-semibold text-slate-900">Histórico de avaliações</h3>
+            <div className="space-y-3">{agas.map((aga, index) => <AGARecord key={aga.id} aga={aga} current={index === 0} />)}</div>
+          </div>
+        </>
+      )}
+    </div>
   );
 }

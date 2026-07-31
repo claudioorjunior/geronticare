@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { createTRPCRouter, clinicalProcedure } from '../server';
 import { avaliacoesGeriatricas, usuarios } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import { criarAvaliacaoSchema, interpretarEscala } from '@/lib/validations/escalas';
+import { calcularAgaScores, criarAvaliacaoSchema, interpretarEscala } from '@/lib/validations/escalas';
 import { verificarOwnershipPaciente } from '../ownership';
 
 export const avaliacoesGeriatricasRouter = createTRPCRouter({
@@ -47,10 +47,28 @@ export const avaliacoesGeriatricasRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await verificarOwnershipPaciente(ctx.db, input.pacienteId, ctx.instituicaoId);
 
+      const scores = input.respostas ? calcularAgaScores(input.respostas) : undefined;
+
       const [novaAvaliacao] = await ctx.db
         .insert(avaliacoesGeriatricas)
         .values({
-          ...input,
+          pacienteId: input.pacienteId,
+          dataAvaliacao: input.dataAvaliacao,
+          katzScore: input.katzScore,
+          lawtonScore: input.lawtonScore,
+          rdc502Autocuidado: input.rdc502Autocuidado,
+          rdc502Cognicao: input.rdc502Cognicao,
+          meemScore: input.meemScore,
+          gds15Score: input.gds15Score,
+          manScore: input.manScore,
+          tugSegundos: input.tugSegundos,
+          comorbidades: input.comorbidades,
+          medicamentos: input.medicamentos,
+          suporteSocial: input.suporteSocial,
+          moradia: input.moradia,
+          observacoes: input.observacoes,
+          respostas: input.respostas,
+          ...(scores ?? {}),
           profissionalId: ctx.userId,
         })
         .returning();

@@ -1,4 +1,5 @@
 import { pgTable, text, timestamp, uuid, integer, boolean, jsonb, pgEnum, index } from 'drizzle-orm/pg-core';
+import type { AgaAnswers } from '@/lib/validations/aga-form';
 
 // Enums
 export const sexoEnum = pgEnum('sexo', ['masculino', 'feminino', 'outro']);
@@ -135,6 +136,7 @@ export const avaliacoesGeriatricas = pgTable('avaliacoes_geriatricas', {
   gds15Score: integer('gds15_score'), // 0-15 (Escala de Depressão Geriátrica)
   manScore: integer('man_score'), // Mini Avaliação Nutricional
   tugSegundos: integer('tug_segundos'), // Timed Up and Go (segundos)
+  respostas: jsonb('respostas').$type<AgaAnswers>(),
   
   // Comorbidades
   comorbidades: jsonb('comorbidades').$type<string[]>(),
