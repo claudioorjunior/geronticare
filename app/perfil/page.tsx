@@ -7,7 +7,7 @@ import { Field } from '@/components/ui/field';
 import { authClient } from '@/lib/auth/client';
 import { trpc } from '@/lib/trpc/client';
 
-const TIPOS_MIME_IMAGEM = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const TIPOS_MIME_IMAGEM = ['image/jpeg', 'image/png', 'image/webp'];
 const TAMANHO_MAXIMO_BYTES = 10 * 1024 * 1024;
 
 export default function PerfilPage() {
@@ -35,7 +35,7 @@ export default function PerfilPage() {
   const selecionarFoto = (file: File | undefined) => {
     if (!file) return;
     if (!TIPOS_MIME_IMAGEM.includes(file.type)) {
-      setMsg({ tipo: 'erro', texto: 'Use uma imagem JPEG, PNG, WebP ou GIF.' });
+      setMsg({ tipo: 'erro', texto: 'Use uma imagem JPEG, PNG ou WebP.' });
       return;
     }
     if (file.size > TAMANHO_MAXIMO_BYTES) {
@@ -219,6 +219,8 @@ export default function PerfilPage() {
             <div className="mb-5 flex items-center gap-5">
               <div className="relative">
                 {avatarSrc ? (
+                  // O avatar pode vir de storages configuráveis em instalações self-hosted.
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={avatarSrc}
                     alt="Avatar"
@@ -240,7 +242,7 @@ export default function PerfilPage() {
                   <Camera className="h-3 w-3" />
                   <input
                     type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    accept="image/jpeg,image/png,image/webp"
                     onChange={(e) => {
                       selecionarFoto(e.currentTarget.files?.[0]);
                       e.currentTarget.value = '';

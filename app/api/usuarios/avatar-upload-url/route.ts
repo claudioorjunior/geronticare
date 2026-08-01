@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm';
 import { gerarChaveAvatar, gerarUrlPublica, gerarUrlUpload } from '@/lib/storage/s3';
 import { z } from 'zod';
 
-const TIPOS_MIME_IMAGEM = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
+const TIPOS_MIME_IMAGEM = ['image/jpeg', 'image/png', 'image/webp'] as const;
 const TAMANHO_MAXIMO_BYTES = 10 * 1024 * 1024;
 
 const bodySchema = z.object({
