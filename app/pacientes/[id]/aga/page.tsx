@@ -1,12 +1,14 @@
 'use client';
 
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
-import { AlertCircle, Calendar, CheckCircle2, ClipboardCheck, User } from 'lucide-react';
+import { AlertCircle, Calendar, CheckCircle2, ClipboardCheck, FileText, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { trpc } from '@/lib/trpc/client';
 import { useUserRole } from '@/lib/auth/use-user-role';
 import { AgaForm } from '@/components/pacientes/AgaForm';
+import { AgaComparison } from '@/components/pacientes/AgaComparison';
 import { formatarData } from '@/lib/utils';
 import {
   classificarGrauDependenciaRdc502,
@@ -118,7 +120,7 @@ function ScaleCards({ aga }: { aga: AvaliacaoGeriatrica }) {
   );
 }
 
-function AGARecord({ aga, current }: { aga: AvaliacaoGeriatrica; current: boolean }) {
+function AGARecord({ aga, current, patientId }: { aga: AvaliacaoGeriatrica; current: boolean; patientId: string }) {
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -133,6 +135,15 @@ function AGARecord({ aga, current }: { aga: AvaliacaoGeriatrica; current: boolea
         <ScaleCards aga={aga} />
       </div>
       {aga.observacoes && <p className="mt-4 border-t border-slate-100 pt-4 text-sm leading-relaxed text-slate-600">{aga.observacoes}</p>}
+      <div className="mt-4 border-t border-slate-100 pt-4">
+        <Link
+          href={`/pacientes/${patientId}/aga/${aga.id}/relatorio`}
+          className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-teal-700 hover:text-teal-900"
+        >
+          <FileText className="h-4 w-4" />
+          Ver relatório
+        </Link>
+      </div>
     </article>
   );
 }
@@ -222,16 +233,24 @@ function AGAPageContent({ patientId, role }: { patientId: string; role: string |
                 <div>
                   <div className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-teal-600" /><h3 className="text-sm font-semibold text-slate-900">Última avaliação</h3></div>
                   <div className="mt-2 flex items-center gap-2 text-xs text-slate-500"><Calendar className="h-3.5 w-3.5" />{formatarData(current.dataAvaliacao)}<User className="ml-2 h-3.5 w-3.5" />Profissional responsável</div>
+                  <Link
+                    href={`/pacientes/${patientId}/aga/${current.id}/relatorio`}
+                    className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-medium text-teal-700 hover:text-teal-900"
+                  >
+                    <FileText className="h-4 w-4" />
+                    Ver relatório
+                  </Link>
                 </div>
               </div>
               <ScaleCards aga={current} />
             </div>
             <CurrentClassification aga={current} />
           </div>
+          {agas[1] && <AgaComparison atual={current} anterior={agas[1]} />}
           {current.observacoes && <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><h3 className="text-sm font-semibold text-slate-900">Observações da avaliação atual</h3><p className="mt-2 text-sm leading-relaxed text-slate-600">{current.observacoes}</p></div>}
           <div>
             <h3 className="mb-3 text-sm font-semibold text-slate-900">Histórico de avaliações</h3>
-            <div className="space-y-3">{agas.map((aga, index) => <AGARecord key={aga.id} aga={aga} current={index === 0} />)}</div>
+            <div className="space-y-3">{agas.map((aga, index) => <AGARecord key={aga.id} aga={aga} current={index === 0} patientId={patientId} />)}</div>
           </div>
         </>
       )}

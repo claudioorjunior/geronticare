@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { createTRPCRouter, clinicalProcedure } from '../server';
 import { avaliacoesGeriatricas, usuarios } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
@@ -18,19 +19,29 @@ export const avaliacoesGeriatricasRouter = createTRPCRouter({
     }),
 
   buscar: clinicalProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(z.object({ id: z.string().uuid(), pacienteId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const avaliacao = await ctx.db.query.avaliacoesGeriatricas.findFirst({
         where: eq(avaliacoesGeriatricas.id, input.id),
       });
 
       if (!avaliacao) return null;
+      if (avaliacao.pacienteId !== input.pacienteId) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Avaliação não encontrada' });
+      }
 
       // Verifica ownership antes de retornar dados clínicos
       await verificarOwnershipPaciente(ctx.db, avaliacao.pacienteId, ctx.instituicaoId);
 
+      const profissional = await ctx.db.query.usuarios.findFirst({
+        where: eq(usuarios.id, avaliacao.profissionalId),
+        columns: { nome: true, especialidade: true },
+      });
+
       return {
         ...avaliacao,
+        profissional: profissional?.nome,
+        especialidade: profissional?.especialidade,
         interpretacao: {
           katz: interpretarEscala('katz', avaliacao.katzScore),
           lawton: interpretarEscala('lawton', avaliacao.lawtonScore),
