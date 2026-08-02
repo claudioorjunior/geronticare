@@ -103,6 +103,8 @@ npm run build
 npm run start
 ```
 
+The process exposes `GET /api/health` as a cache-free liveness check for monitoring and load balancers.
+
 #### How the environment separation works
 
 - **`NODE_ENV` is always set by Next.js**: `npm run dev` → `development`, `npm run build`/`npm run start` → `production`. You never set it manually.
@@ -110,7 +112,7 @@ npm run start
 - **Developer convenience**: set `DEV_OVERRIDE_USER_ID` to impersonate any seed user (e.g. a `usuario` read-only account) to test role behavior.
 - **Production**: real login via Better-Auth (email/password). A missing or misconfigured `AUTH_*` variable makes auth fail closed — the app never falls back to anonymous access.
 
-Releases and the upcoming installer (`install.sh` / Docker Compose) target production; contributors should fork `main` and open PRs from feature branches.
+Releases target production deployments with Node.js and PostgreSQL; contributors should fork `main` and open PRs from feature branches.
 
 ### Project structure
 

@@ -104,6 +104,8 @@ npm run build
 npm run start
 ```
 
+O processo expõe `GET /api/health` como um liveness check sem cache para monitoramento e balanceadores de carga.
+
 #### Como funciona a separação de ambientes
 
 - **`NODE_ENV` é sempre definido pelo Next.js**: `npm run dev` → `development`; `npm run build`/`npm run start` → `production`. Nunca defina manualmente.
@@ -111,7 +113,7 @@ npm run start
 - **Conveniência para devs**: defina `DEV_OVERRIDE_USER_ID` para impersonar qualquer usuário do seed (ex.: uma conta `usuario` somente leitura) e testar o comportamento por papel.
 - **Produção**: login real via Better-Auth (e-mail/senha). Variável `AUTH_*` ausente ou mal configurada faz a autenticação falhar fechada — o app nunca cai em acesso anônimo.
 
-Releases e o futuro instalador (`install.sh` / Docker Compose) são para produção; contribuidores devem fazer fork do `main` e abrir PRs a partir de branches de feature.
+Releases são destinados a implantações de produção com Node.js e PostgreSQL; contribuidores devem fazer fork do `main` e abrir PRs a partir de branches de feature.
 
 ### Estrutura do projeto
 
