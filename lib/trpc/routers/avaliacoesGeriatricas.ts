@@ -1,13 +1,13 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { createTRPCRouter, clinicalProcedure } from '../server';
+import { createTRPCRouter, protectedProcedure, clinicalProcedure } from '../server';
 import { avaliacoesGeriatricas, usuarios } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { calcularAgaScores, criarAvaliacaoSchema, interpretarEscala } from '@/lib/validations/escalas';
 import { verificarOwnershipPaciente } from '../ownership';
 
 export const avaliacoesGeriatricasRouter = createTRPCRouter({
-  listar: clinicalProcedure
+  listar: protectedProcedure
     .input(z.object({ pacienteId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       await verificarOwnershipPaciente(ctx.db, input.pacienteId, ctx.instituicaoId);
@@ -18,7 +18,7 @@ export const avaliacoesGeriatricasRouter = createTRPCRouter({
       });
     }),
 
-  buscar: clinicalProcedure
+  buscar: protectedProcedure
     .input(z.object({ id: z.string().uuid(), pacienteId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const avaliacao = await ctx.db.query.avaliacoesGeriatricas.findFirst({
@@ -87,7 +87,7 @@ export const avaliacoesGeriatricasRouter = createTRPCRouter({
       return novaAvaliacao;
     }),
 
-  relatorio: clinicalProcedure
+  relatorio: protectedProcedure
     .input(z.object({ pacienteId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       await verificarOwnershipPaciente(ctx.db, input.pacienteId, ctx.instituicaoId);

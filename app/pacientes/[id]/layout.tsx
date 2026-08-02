@@ -29,9 +29,9 @@ function calcularIdade(dataNascimento?: string | Date | null): number | null {
 
 const allTabs = [
   { label: 'Dados', path: '', roles: ['admin', 'profissional', 'usuario'] },
-  { label: 'AGA', path: 'aga', roles: ['admin', 'profissional'] },
-  { label: 'Registros', path: 'registros', roles: ['admin', 'profissional'] },
-  { label: 'Sinais', path: 'sinais', roles: ['admin', 'profissional'] },
+  { label: 'AGA', path: 'aga', roles: ['admin', 'profissional', 'usuario'] },
+  { label: 'Registros', path: 'registros', roles: ['admin', 'profissional', 'usuario'] },
+  { label: 'Sinais', path: 'sinais', roles: ['admin', 'profissional', 'usuario'] },
   // ponytail: anexos tab removed — route doesn't exist yet; add when anexos page is implemented
 ];
 

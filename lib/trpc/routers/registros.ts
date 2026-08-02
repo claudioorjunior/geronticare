@@ -1,12 +1,12 @@
 import { z } from 'zod';
-import { createTRPCRouter, clinicalProcedure } from '../server';
+import { createTRPCRouter, protectedProcedure, clinicalProcedure } from '../server';
 import { registros, avaliacoesGeriatricas, sinaisVitais } from '@/lib/db/schema';
 import { eq, and, gte, lte } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { verificarOwnershipPaciente } from '../ownership';
 
 export const registrosRouter = createTRPCRouter({
-  listar: clinicalProcedure
+  listar: protectedProcedure
     .input(
       z.object({
         pacienteId: z.string().uuid(),
@@ -36,7 +36,7 @@ export const registrosRouter = createTRPCRouter({
       });
     }),
 
-  buscar: clinicalProcedure
+  buscar: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const registro = await ctx.db.query.registros.findFirst({
@@ -82,7 +82,7 @@ export const registrosRouter = createTRPCRouter({
       return novoRegistro;
     }),
 
-  timeline: clinicalProcedure
+  timeline: protectedProcedure
     .input(
       z.object({
         pacienteId: z.string().uuid(),

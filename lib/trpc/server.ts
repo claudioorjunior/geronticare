@@ -4,6 +4,7 @@ import { getAuth } from '@/lib/auth';
 import { usuarios } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import superjson from 'superjson';
+import { podeAcessarClinico, podeAdministrar } from './autorizacao';
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -48,7 +49,7 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
   };
 };
 
-type Context = Awaited<ReturnType<typeof createTRPCContext>>;
+export type Context = Awaited<ReturnType<typeof createTRPCContext>>;
 
 const t = initTRPC.context<Context>().create({
   transformer: superjson,
@@ -73,14 +74,14 @@ const isAuthed = t.middleware(({ ctx, next }) => {
 export const protectedProcedure = t.procedure.use(isAuthed);
 
 export const adminProcedure = t.procedure.use(isAuthed).use(({ ctx, next }) => {
-  if (ctx.userRole !== 'admin') {
+  if (!podeAdministrar(ctx.userRole)) {
     throw new TRPCError({ code: 'FORBIDDEN' });
   }
   return next();
 });
 
 export const clinicalProcedure = t.procedure.use(isAuthed).use(({ ctx, next }) => {
-  if (ctx.userRole !== 'admin' && ctx.userRole !== 'profissional') {
+  if (!podeAcessarClinico(ctx.userRole)) {
     throw new TRPCError({ code: 'FORBIDDEN' });
   }
   return next();
