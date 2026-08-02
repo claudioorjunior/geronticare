@@ -1,12 +1,28 @@
 import { initTRPC, TRPCError } from '@trpc/server';
-import { getDb } from '@/lib/db';
+import { getDb, type Db } from '@/lib/db';
 import { getAuth } from '@/lib/auth';
 import { usuarios } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import superjson from 'superjson';
-import { podeAcessarClinico, podeAdministrar } from './autorizacao';
+import { podeAcessarClinico, podeAdministrar, devBypassAtivo } from './autorizacao';
 
-const isDev = process.env.NODE_ENV === 'development';
+/**
+ * Bypass de autenticação para desenvolvimento local.
+ * Exige NODE_ENV=development E DEV_AUTH_BYPASS=true — nunca ativa em produção,
+ * mesmo que a variável seja setada por engano (fail-closed).
+ */
+const devAuthBypass = devBypassAtivo();
+
+// Usuário admin do seed usado como padrão no bypass local.
+const DEV_USER_ID = '320471aa-5994-4886-9ee6-1cee8e7aa810';
+
+/** Resolve instituição e papel do usuário no banco (sessão real ou bypass). */
+async function resolverUsuario(db: Db, userId: string) {
+  return db.query.usuarios.findFirst({
+    where: eq(usuarios.id, userId),
+    columns: { instituicaoId: true, role: true },
+  });
+}
 
 export const createTRPCContext = async (opts: { headers: Headers }) => {
   const db = await getDb();
@@ -27,16 +43,17 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
 
   if (session?.user?.id) {
     userId = session.user.id;
-    const user = await db.query.usuarios.findFirst({
-      where: eq(usuarios.id, session.user.id),
-      columns: { instituicaoId: true, role: true },
-    });
+    const user = await resolverUsuario(db, session.user.id);
     instituicaoId = user?.instituicaoId ?? null;
     userRole = user?.role ?? null;
-  } else if (isDev) {
-    userId = '320471aa-5994-4886-9ee6-1cee8e7aa810';
-    instituicaoId = 'ae6c72cc-c72e-4b20-9686-7d015efe9b24';
-    userRole = 'admin';
+  } else if (devAuthBypass) {
+    // Desenvolvimento: impersona um usuário do seed (ou DEV_OVERRIDE_USER_ID).
+    // Sem sessão e sem bypass, o contexto fica sem usuário -> UNAUTHORIZED.
+    // Usuário inexistente também falha fechado (sem instituição).
+    userId = process.env.DEV_OVERRIDE_USER_ID || DEV_USER_ID;
+    const user = await resolverUsuario(db, userId);
+    instituicaoId = user?.instituicaoId ?? null;
+    userRole = user?.role ?? null;
   }
 
   return {

@@ -1,10 +1,15 @@
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { getAuth } from '@/lib/auth';
+import { devBypassAtivo } from '@/lib/trpc/autorizacao';
 
 export default async function Home() {
-  // Em dev sem Better-Auth configurado, redireciona direto pro dashboard
-  if (process.env.NODE_ENV === 'development' && !process.env.AUTH_SECRET) {
+  // Acesso sem login em desenvolvimento é conveniência EXPLÍCITA:
+  // exige NODE_ENV=development + DEV_AUTH_BYPASS=true (ver .env.development.example).
+  const devBypass = devBypassAtivo();
+
+  // Em dev com bypass e sem Better-Auth configurado, redireciona direto pro dashboard
+  if (devBypass && !process.env.AUTH_SECRET) {
     redirect('/dashboard');
   }
 
@@ -18,7 +23,7 @@ export default async function Home() {
       redirect('/dashboard');
     }
   } catch {
-    if (process.env.NODE_ENV === 'development') {
+    if (devBypass) {
       redirect('/dashboard');
     }
   }

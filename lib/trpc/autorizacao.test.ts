@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { appRouter } from './root';
 import type { Db } from '@/lib/db';
 import type { Context } from './server';
+import { devBypassAtivo } from './autorizacao';
 
 /**
  * Testes de autorização por papel — invocam as procedures reais com um
@@ -50,6 +51,26 @@ function makeCaller(userRole: string | null, db: Db = makeDb()) {
   } as unknown as Context;
   return appRouter.createCaller(ctx);
 }
+
+describe('devBypassAtivo (bypass de desenvolvimento, fail-closed)', () => {
+  it('ativa apenas com NODE_ENV=development E DEV_AUTH_BYPASS=true', () => {
+    expect(devBypassAtivo({ NODE_ENV: 'development', DEV_AUTH_BYPASS: 'true' })).toBe(true);
+  });
+
+  it('nunca ativa em produção, mesmo com DEV_AUTH_BYPASS=true', () => {
+    expect(devBypassAtivo({ NODE_ENV: 'production', DEV_AUTH_BYPASS: 'true' })).toBe(false);
+  });
+
+  it('não ativa em dev sem o flag', () => {
+    expect(devBypassAtivo({ NODE_ENV: 'development' })).toBe(false);
+    expect(devBypassAtivo({ NODE_ENV: 'development', DEV_AUTH_BYPASS: 'false' })).toBe(false);
+  });
+
+  it('não ativa sem NODE_ENV', () => {
+    expect(devBypassAtivo({ DEV_AUTH_BYPASS: 'true' })).toBe(false);
+    expect(devBypassAtivo({})).toBe(false);
+  });
+});
 
 describe('autorização — leituras clínicas (protectedProcedure)', () => {
   it('usuario consegue listar AGAs do paciente', async () => {

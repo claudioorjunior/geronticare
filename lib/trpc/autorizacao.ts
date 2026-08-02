@@ -23,3 +23,12 @@ export function podeAcessarClinico(role: string | null | undefined): role is 'ad
 export function podeAdministrar(role: string | null | undefined): role is 'admin' {
   return role === 'admin';
 }
+
+/**
+ * Bypass de autenticação para desenvolvimento local (fail-closed).
+ * Exige as DUAS condições: NODE_ENV=development E DEV_AUTH_BYPASS=true.
+ * Em produção (NODE_ENV=production) nunca ativa, mesmo com a variável setada.
+ */
+export function devBypassAtivo(env: Record<string, string | undefined> = process.env): boolean {
+  return env.NODE_ENV === 'development' && env.DEV_AUTH_BYPASS === 'true';
+}
