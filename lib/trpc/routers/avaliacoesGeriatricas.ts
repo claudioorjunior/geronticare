@@ -1,12 +1,12 @@
 import { z } from 'zod';
-import { createTRPCRouter, protectedProcedure, clinicalProcedure } from '../server';
+import { createTRPCRouter, readClinicalProcedure, clinicalProcedure } from '../server';
 import { avaliacoesGeriatricas, usuarios } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { calcularAgaScores, criarAvaliacaoSchema, interpretarEscala } from '@/lib/validations/escalas';
 import { verificarOwnershipPaciente } from '../ownership';
 
 export const avaliacoesGeriatricasRouter = createTRPCRouter({
-  listar: protectedProcedure
+  listar: readClinicalProcedure
     .input(z.object({ pacienteId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       await verificarOwnershipPaciente(ctx.db, input.pacienteId, ctx.instituicaoId);
@@ -30,7 +30,7 @@ export const avaliacoesGeriatricasRouter = createTRPCRouter({
       });
     }),
 
-  buscar: protectedProcedure
+  buscar: readClinicalProcedure
     .input(z.object({ id: z.string().uuid(), pacienteId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       // Ownership primeiro: mesmo erro (NOT_FOUND) para paciente inexistente
@@ -129,7 +129,7 @@ export const avaliacoesGeriatricasRouter = createTRPCRouter({
       return novaAvaliacao;
     }),
 
-  relatorio: protectedProcedure
+  relatorio: readClinicalProcedure
     .input(z.object({ pacienteId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       await verificarOwnershipPaciente(ctx.db, input.pacienteId, ctx.instituicaoId);

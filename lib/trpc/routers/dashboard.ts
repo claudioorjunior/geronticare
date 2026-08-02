@@ -1,4 +1,4 @@
-import { createTRPCRouter, protectedProcedure } from '../server';
+import { createTRPCRouter, readClinicalProcedure } from '../server';
 import {
   pacientes,
   avaliacoesGeriatricas,
@@ -9,7 +9,7 @@ import { count, eq, and, desc, asc, gte, sql } from 'drizzle-orm';
 
 export const dashboardRouter = createTRPCRouter({
   // Resumo do dashboard — contagens agregadas + pacientes recentes
-  resumo: protectedProcedure.query(async ({ ctx }) => {
+  resumo: readClinicalProcedure.query(async ({ ctx }) => {
     const [totalRow] = await ctx.db
       .select({ value: count() })
       .from(pacientes)
@@ -56,7 +56,7 @@ export const dashboardRouter = createTRPCRouter({
   }),
 
   // Registros clínicos do dia atual (filtrados pela instituição)
-  registrosHoje: protectedProcedure.query(async ({ ctx }) => {
+  registrosHoje: readClinicalProcedure.query(async ({ ctx }) => {
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
 
@@ -86,7 +86,7 @@ export const dashboardRouter = createTRPCRouter({
 
   // Último sinal vital de cada paciente ativo da instituição
   // ponytail: subquery IN com (pacienteId, MAX(dataAfericao)); trocar por DISTINCT ON se perfilar lentidão
-  ultimosSinaisVitais: protectedProcedure.query(async ({ ctx }) => {
+  ultimosSinaisVitais: readClinicalProcedure.query(async ({ ctx }) => {
     return ctx.db
       .select({
         id: sinaisVitais.id,
@@ -122,7 +122,7 @@ export const dashboardRouter = createTRPCRouter({
   }),
 
   // Próximas 5 avaliações geriátricas agendadas
-  agasProximas: protectedProcedure.query(async ({ ctx }) => {
+  agasProximas: readClinicalProcedure.query(async ({ ctx }) => {
     const agora = new Date();
 
     return ctx.db

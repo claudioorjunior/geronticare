@@ -1,11 +1,11 @@
 import { z } from 'zod';
-import { createTRPCRouter, protectedProcedure, clinicalProcedure, adminProcedure } from '../server';
+import { createTRPCRouter, readClinicalProcedure, clinicalProcedure, adminProcedure } from '../server';
 import { pacientes } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 
 export const pacientesRouter = createTRPCRouter({
-  listar: protectedProcedure.query(async ({ ctx }) => {
+  listar: readClinicalProcedure.query(async ({ ctx }) => {
     return ctx.db.query.pacientes.findMany({
       where: and(
         eq(pacientes.ativo, true),
@@ -23,7 +23,7 @@ export const pacientesRouter = createTRPCRouter({
     });
   }),
 
-  buscar: protectedProcedure
+  buscar: readClinicalProcedure
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       const patient = await ctx.db.query.pacientes.findFirst({

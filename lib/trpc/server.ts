@@ -4,7 +4,7 @@ import { getAuth } from '@/lib/auth';
 import { usuarios } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import superjson from 'superjson';
-import { podeAcessarClinico, podeAdministrar, devBypassAtivo } from './autorizacao';
+import { podeLerClinico, podeAcessarClinico, podeAdministrar, devBypassAtivo } from './autorizacao';
 
 /**
  * Bypass de autenticação para desenvolvimento local.
@@ -94,6 +94,13 @@ const isAuthed = t.middleware(({ ctx, next }) => {
 });
 
 export const protectedProcedure = t.procedure.use(isAuthed);
+
+export const readClinicalProcedure = t.procedure.use(isAuthed).use(({ ctx, next }) => {
+  if (!podeLerClinico(ctx.userRole)) {
+    throw new TRPCError({ code: 'FORBIDDEN' });
+  }
+  return next();
+});
 
 export const adminProcedure = t.procedure.use(isAuthed).use(({ ctx, next }) => {
   if (!podeAdministrar(ctx.userRole)) {

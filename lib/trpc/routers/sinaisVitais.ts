@@ -1,12 +1,12 @@
 import { z } from 'zod';
-import { createTRPCRouter, protectedProcedure, clinicalProcedure } from '../server';
+import { createTRPCRouter, readClinicalProcedure, clinicalProcedure } from '../server';
 import { sinaisVitais } from '@/lib/db/schema';
 import { eq, and, gte, lte } from 'drizzle-orm';
 import { sinalVitalSchema } from '@/lib/validations/escalas';
 import { verificarOwnershipPaciente } from '../ownership';
 
 export const sinaisVitaisRouter = createTRPCRouter({
-  listar: protectedProcedure
+  listar: readClinicalProcedure
     .input(
       z.object({
         pacienteId: z.string().uuid(),
@@ -45,7 +45,7 @@ export const sinaisVitaisRouter = createTRPCRouter({
       return novoSinal;
     }),
 
-  ultimo: protectedProcedure
+  ultimo: readClinicalProcedure
     .input(z.object({ pacienteId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
       await verificarOwnershipPaciente(ctx.db, input.pacienteId, ctx.instituicaoId);

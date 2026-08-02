@@ -95,7 +95,7 @@ describe('devBypassAtivo (bypass de desenvolvimento, fail-closed)', () => {
   });
 });
 
-describe('autorização — leituras clínicas (protectedProcedure)', () => {
+describe('autorização — leituras clínicas (readClinicalProcedure)', () => {
   it('usuario consegue listar AGAs do paciente', async () => {
     const caller = makeCaller('usuario');
     await expect(
@@ -157,6 +157,13 @@ describe('autorização — leituras clínicas (protectedProcedure)', () => {
         tug: 'Mobilidade normal',
       },
     });
+  });
+
+  it('papel desconhecido não lê dados clínicos (FORBIDDEN)', async () => {
+    const caller = makeCaller('papel-desconhecido');
+    await expect(
+      caller.avaliacoesGeriatricas.listar({ pacienteId: PACIENTE_ID }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
   it('sem sessão não lê (UNAUTHORIZED)', async () => {
