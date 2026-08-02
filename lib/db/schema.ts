@@ -1,5 +1,7 @@
+import { relations } from 'drizzle-orm';
 import { pgTable, text, timestamp, uuid, integer, boolean, jsonb, pgEnum, index } from 'drizzle-orm/pg-core';
 import type { AgaAnswers } from '@/lib/validations/aga-form';
+import type { InstrumentoSlug } from '@/lib/instrumentos/instrumentos';
 
 // Enums
 export const sexoEnum = pgEnum('sexo', ['masculino', 'feminino', 'outro']);
@@ -126,7 +128,7 @@ export const avaliacoesGeriatricas = pgTable('avaliacoes_geriatricas', {
   pacienteId: uuid('paciente_id').references(() => pacientes.id).notNull(),
   profissionalId: uuid('profissional_id').references(() => usuarios.id).notNull(),
   dataAvaliacao: timestamp('data_avaliacao').defaultNow().notNull(),
-  
+
   // Escalas funcionais. Katz segue a direção validada no Brasil: 0 = independente.
   katzScore: integer('katz_score'), // 0-6 (número de ABVD com dependência)
   lawtonScore: integer('lawton_score'), // 0-8 (AIVD: 0 = dependente, 8 = independente)
@@ -137,7 +139,7 @@ export const avaliacoesGeriatricas = pgTable('avaliacoes_geriatricas', {
   manScore: integer('man_score'), // Mini Avaliação Nutricional
   tugSegundos: integer('tug_segundos'), // Timed Up and Go (segundos)
   respostas: jsonb('respostas').$type<AgaAnswers>(),
-  
+
   // Comorbidades
   comorbidades: jsonb('comorbidades').$type<string[]>(),
   medicamentos: jsonb('medicamentos').$type<Array<{
@@ -145,20 +147,61 @@ export const avaliacoesGeriatricas = pgTable('avaliacoes_geriatricas', {
     dose: string;
     frequencia: string;
   }>>(),
-  
+
   // Suporte social
   suporteSocial: text('suporte_social'),
   moradia: text('moradia'),
-  
+
   // Observações
   observacoes: text('observacoes'),
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   pacienteIdx: index('avaliacoes_paciente_idx').on(table.pacienteId),
   profissionalIdx: index('avaliacoes_profissional_idx').on(table.profissionalId),
 }));
+
+// Aplicações independentes de instrumentos clínicos são imutáveis. Correções
+// geram uma nova aplicação em vez de alterar o registro original.
+export const aplicacoesInstrumentos = pgTable('aplicacoes_instrumentos', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  pacienteId: uuid('paciente_id').references(() => pacientes.id).notNull(),
+  instrumento: text('instrumento').$type<InstrumentoSlug>().notNull(),
+  profissionalId: uuid('profissional_id').references(() => usuarios.id).notNull(),
+  registradoPorId: uuid('registrado_por_id').references(() => usuarios.id).notNull(),
+  dataAplicacao: timestamp('data_aplicacao').notNull(),
+  respostas: jsonb('respostas').$type<Record<string, unknown>>().notNull(),
+  escore: integer('escore'),
+  classificacao: text('classificacao').notNull(),
+  descricaoClassificacao: text('descricao_classificacao').notNull(),
+  versaoInstrumento: text('versao_instrumento').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  pacienteInstrumentoDataIdx: index('aplicacoes_paciente_instrumento_data_idx').on(
+    table.pacienteId,
+    table.instrumento,
+    table.dataAplicacao,
+  ),
+  profissionalIdx: index('aplicacoes_profissional_idx').on(table.profissionalId),
+  registradoPorIdx: index('aplicacoes_registrado_por_idx').on(table.registradoPorId),
+}));
+
+export const aplicacoesInstrumentosRelations = relations(
+  aplicacoesInstrumentos,
+  ({ one }) => ({
+    profissional: one(usuarios, {
+      fields: [aplicacoesInstrumentos.profissionalId],
+      references: [usuarios.id],
+      relationName: 'aplicacao_profissional',
+    }),
+    registradoPor: one(usuarios, {
+      fields: [aplicacoesInstrumentos.registradoPorId],
+      references: [usuarios.id],
+      relationName: 'aplicacao_registrado_por',
+    }),
+  }),
+);
 
 // Tabela: Prontuário (registros clínicos)
 export const registros = pgTable('registros', {
@@ -213,6 +256,8 @@ export type Paciente = typeof pacientes.$inferSelect;
 export type NovoPaciente = typeof pacientes.$inferInsert;
 export type AvaliacaoGeriatrica = typeof avaliacoesGeriatricas.$inferSelect;
 export type NovaAvaliacaoGeriatrica = typeof avaliacoesGeriatricas.$inferInsert;
+export type AplicacaoInstrumento = typeof aplicacoesInstrumentos.$inferSelect;
+export type NovaAplicacaoInstrumento = typeof aplicacoesInstrumentos.$inferInsert;
 export type Registro = typeof registros.$inferSelect;
 export type NovoRegistro = typeof registros.$inferInsert;
 export type SinaisVitais = typeof sinaisVitais.$inferSelect;

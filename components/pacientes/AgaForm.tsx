@@ -22,8 +22,8 @@ import type { Rdc502Autocuidado, Rdc502Cognicao } from '@/lib/validations/escala
 
 type AgaFormProps = {
   pacienteId: string;
-  onCancel: () => void;
-  create: (input: {
+  onCancelAction: () => void;
+  createAction: (input: {
     pacienteId: string;
     dataAvaliacao?: Date;
     respostas: NonNullable<ReturnType<typeof draftToAgaAnswers>>;
@@ -359,7 +359,13 @@ function TugSection({ draft, setDraft }: { draft: AgaDraft; setDraft: (value: Ag
   );
 }
 
-export function AgaForm({ pacienteId, onCancel, create, isPending, errorMessage }: AgaFormProps) {
+export function AgaForm({
+  pacienteId,
+  onCancelAction,
+  createAction,
+  isPending,
+  errorMessage,
+}: AgaFormProps) {
   const [draft, setDraft] = useState<AgaDraft>(() => createEmptyAgaDraft());
   const [dataAvaliacao, setDataAvaliacao] = useState('');
   const [observacoes, setObservacoes] = useState('');
@@ -373,7 +379,7 @@ export function AgaForm({ pacienteId, onCancel, create, isPending, errorMessage 
       return;
     }
     setValidationMessage('');
-    create({
+    createAction({
       pacienteId,
       dataAvaliacao: dataAvaliacao ? new Date(`${dataAvaliacao}T12:00:00`) : undefined,
       respostas: answers,
@@ -416,11 +422,9 @@ export function AgaForm({ pacienteId, onCancel, create, isPending, errorMessage 
         </div>
       )}
       <div className="flex flex-wrap items-center justify-end gap-3">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={isPending}>Cancelar</Button>
+        <Button type="button" variant="outline" onClick={onCancelAction} disabled={isPending}>Cancelar</Button>
         <Button type="button" onClick={handleSubmit} disabled={isPending} className="bg-teal-600 text-white hover:bg-teal-700">{isPending ? 'Salvando...' : 'Salvar avaliação'}</Button>
       </div>
     </div>
   );
 }
-
-

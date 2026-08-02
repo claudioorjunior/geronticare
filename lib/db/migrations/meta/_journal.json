@@ -15,6 +15,13 @@
       "when": 1785479928934,
       "tag": "0001_smooth_nitro",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785651694408,
+      "tag": "0002_exotic_dexter_bennett",
+      "breakpoints": true
     }
   ]
 }

@@ -197,8 +197,8 @@ function AGAPageContent({ patientId, role }: { patientId: string; role: string |
         {canEdit ? (
           <AgaForm
             pacienteId={patientId}
-            onCancel={() => setShowForm(false)}
-            create={(input) => criarAga.mutate(input)}
+            onCancelAction={() => setShowForm(false)}
+            createAction={(input) => criarAga.mutate(input)}
             isPending={criarAga.isPending}
             errorMessage={criarAga.error?.message}
           />

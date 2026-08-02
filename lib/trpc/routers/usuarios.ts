@@ -1,10 +1,28 @@
 import { z } from 'zod';
 import { createTRPCRouter, protectedProcedure, adminProcedure } from '../server';
 import { usuarios } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, or, isNotNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 
 export const usuariosRouter = createTRPCRouter({
+  listarProfissionaisAtivos: protectedProcedure.query(async ({ ctx }) => {
+    return ctx.db.query.usuarios.findMany({
+      where: and(
+        eq(usuarios.instituicaoId, ctx.instituicaoId),
+        eq(usuarios.ativo, true),
+        or(eq(usuarios.role, 'admin'), eq(usuarios.role, 'profissional')),
+        isNotNull(usuarios.especialidade),
+      ),
+      orderBy: (usuarios, { asc }) => [asc(usuarios.nome)],
+      columns: {
+        id: true,
+        nome: true,
+        especialidade: true,
+        registroProfissional: true,
+      },
+    });
+  }),
+
   listar: adminProcedure.query(async ({ ctx }) => {
     return ctx.db.query.usuarios.findMany({
       where: eq(usuarios.instituicaoId, ctx.instituicaoId),

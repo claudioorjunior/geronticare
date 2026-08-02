@@ -29,6 +29,7 @@ function calcularIdade(dataNascimento?: string | Date | null): number | null {
 
 const allTabs = [
   { label: 'Dados', path: '', roles: ['admin', 'profissional', 'usuario'] },
+  { label: 'Avaliações', path: 'avaliacoes', roles: ['admin', 'profissional', 'usuario'] },
   { label: 'AGA', path: 'aga', roles: ['admin', 'profissional', 'usuario'] },
   { label: 'Registros', path: 'registros', roles: ['admin', 'profissional', 'usuario'] },
   { label: 'Sinais', path: 'sinais', roles: ['admin', 'profissional', 'usuario'] },
@@ -136,7 +137,7 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
       {/* Container único: abas + conteúdo */}
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
         {/* Abas */}
-        <nav className="flex gap-6 border-b border-slate-200 px-6 pt-4">
+        <nav aria-label="Seções do prontuário" className="flex gap-6 overflow-x-auto border-b border-slate-200 px-6 pt-4">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.path;
             const href = tab.path
@@ -147,7 +148,8 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
               <Link
                 key={tab.path || 'dados'}
                 href={href}
-                className={`pb-3 text-sm font-medium transition-all ${
+                aria-current={isActive ? 'page' : undefined}
+                className={`min-h-11 shrink-0 pb-3 text-sm font-medium transition-all ${
                   isActive
                     ? 'border-b-2 border-slate-900 text-slate-900'
                     : 'border-b-2 border-transparent text-slate-500 hover:text-slate-700'

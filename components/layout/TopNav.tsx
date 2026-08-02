@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
@@ -88,12 +89,12 @@ export function TopNav() {
     <nav className="sticky top-0 z-50 w-full border-b border-m3-outline-variant bg-m3-surface">
       <div className="flex h-14 items-center px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto">
         {/* Logo + Brand */}
-        <Link href="/dashboard" className="flex items-center gap-2 font-semibold text-lg mr-8 shrink-0">
+        <Link href="/dashboard" className="mr-2 flex shrink-0 items-center gap-2 text-lg font-semibold sm:mr-4 lg:mr-8">
           <span className="text-m3-primary">GerontiCare</span>
         </Link>
 
         {/* Global Navigation — persistent, shows active page */}
-        <nav className="hidden md:flex items-end gap-6 h-full text-sm font-medium">
+        <nav className="hidden h-full items-end gap-6 text-sm font-medium lg:flex">
           <Link href="/dashboard" className={navLinkClass('/dashboard')}>
             Dashboard
           </Link>
@@ -114,7 +115,7 @@ export function TopNav() {
         </nav>
 
         {/* Global Patient Search */}
-        <div className="flex-1 max-w-sm mx-6 relative">
+        <div className="relative mx-2 min-w-0 max-w-sm flex-1 sm:mx-4 lg:mx-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-m3-outline pointer-events-none" />
             <Input
@@ -182,16 +183,20 @@ export function TopNav() {
               onClick={() => setMenuOpen((v) => !v)}
               aria-haspopup="menu"
               aria-expanded={menuOpen}
+              aria-label="Abrir menu do usuário"
               className="flex items-center gap-2 text-sm rounded-full pl-1 pr-2 py-1 hover:bg-m3-surface-variant transition-colors"
             >
-              <div className="text-right">
+              <div className="hidden text-right sm:block">
                 <div className="text-label-md font-medium text-m3-on-surface">{perfil?.nome ?? 'Usuário'}</div>
                 <div className="text-label-sm text-m3-secondary capitalize">{perfil?.role ?? userRole ?? 'carregando'}</div>
               </div>
               {perfil?.image ? (
-                <img
+                <Image
                   src={perfil.image}
                   alt=""
+                  width={32}
+                  height={32}
+                  unoptimized
                   className="h-8 w-8 rounded-full object-cover bg-m3-surface-variant"
                 />
               ) : (

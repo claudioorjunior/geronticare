@@ -75,10 +75,10 @@ const estadoCivilLabels: Record<(typeof estadoCivilOptions)[number], string> = {
 
 export function PatientForm({
   open,
-  onClose,
+  onCloseAction,
 }: {
   open: boolean;
-  onClose: () => void;
+  onCloseAction: () => void;
 }) {
   const router = useRouter();
   const { role } = useUserRole();
@@ -100,7 +100,7 @@ export function PatientForm({
     onSuccess: (paciente) => {
       utils.pacientes.listar.invalidate();
       setSubmitMsg(null);
-      onClose();
+      onCloseAction();
       reset();
       // Navega para o prontuário do paciente recém-criado
       if (paciente?.id) router.push(`/pacientes/${paciente.id}`);
@@ -123,7 +123,7 @@ export function PatientForm({
   React.useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseAction();
     };
     document.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
@@ -132,7 +132,7 @@ export function PatientForm({
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
     };
-  }, [open, onClose]);
+  }, [open, onCloseAction]);
 
   function reset() {
     setForm({ ...emptyForm });
@@ -251,7 +251,7 @@ export function PatientForm({
       role="dialog"
       aria-modal="true"
       aria-labelledby="patient-form-title"
-      onClick={onClose}
+      onClick={onCloseAction}
     >
       <div
         ref={dialogRef}
@@ -270,7 +270,7 @@ export function PatientForm({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={onCloseAction}
             className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors focus-visible:ring-2 focus-visible:ring-teal-600/30"
             aria-label="Fechar formulário"
           >
@@ -566,7 +566,7 @@ export function PatientForm({
               type="button"
               variant="ghost"
               size="lg"
-              onClick={onClose}
+              onClick={onCloseAction}
               disabled={isLoading}
             >
               Cancelar
