@@ -128,7 +128,7 @@ export const avaliacoesGeriatricas = pgTable('avaliacoes_geriatricas', {
   pacienteId: uuid('paciente_id').references(() => pacientes.id).notNull(),
   profissionalId: uuid('profissional_id').references(() => usuarios.id).notNull(),
   dataAvaliacao: timestamp('data_avaliacao').defaultNow().notNull(),
-
+  
   // Escalas funcionais. Katz segue a direção validada no Brasil: 0 = independente.
   katzScore: integer('katz_score'), // 0-6 (número de ABVD com dependência)
   lawtonScore: integer('lawton_score'), // 0-8 (AIVD: 0 = dependente, 8 = independente)
@@ -139,7 +139,7 @@ export const avaliacoesGeriatricas = pgTable('avaliacoes_geriatricas', {
   manScore: integer('man_score'), // Mini Avaliação Nutricional
   tugSegundos: integer('tug_segundos'), // Timed Up and Go (segundos)
   respostas: jsonb('respostas').$type<AgaAnswers>(),
-
+  
   // Comorbidades
   comorbidades: jsonb('comorbidades').$type<string[]>(),
   medicamentos: jsonb('medicamentos').$type<Array<{
@@ -147,14 +147,14 @@ export const avaliacoesGeriatricas = pgTable('avaliacoes_geriatricas', {
     dose: string;
     frequencia: string;
   }>>(),
-
+  
   // Suporte social
   suporteSocial: text('suporte_social'),
   moradia: text('moradia'),
-
+  
   // Observações
   observacoes: text('observacoes'),
-
+  
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
