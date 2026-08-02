@@ -1,31 +1,14 @@
 import { z } from 'zod';
 import { agaAnswersSchema, calcularAgaScores, type AgaAnswers } from './aga-form';
 
-// Schema para validação de escalas geriátricas
-export const escalasGeriatricasSchema = z.object({
-  katzScore: z.number().int().min(0).max(6).optional(),
-  lawtonScore: z.number().int().min(0).max(8).optional(),
-  rdc502Autocuidado: z.enum(['nenhuma', 'ate_tres', 'todas']).optional(),
-  rdc502Cognicao: z.enum(['sem_comprometimento', 'alteracao_controlada', 'comprometimento']).optional(),
-  meemScore: z.number().int().min(0).max(30).optional(),
-  gds15Score: z.number().int().min(0).max(15).optional(),
-  manScore: z.number().int().min(0).max(14).optional(),
-  tugSegundos: z.number().int().min(0).max(300).optional(), // max ~5min, acima disso é erro de registro
-});
-
-// Schema para criação de AGA
-export const criarAvaliacaoSchema = z.object({
+// Schema para criação de AGA — preenchida EXCLUSIVAMENTE pelo formulário de
+// múltipla escolha (agaAnswersSchema). Os escores são derivados no servidor
+// por calcularAgaScores; campos de escore manual NÃO são aceitos
+// (strictObject rejeita qualquer chave fora do schema).
+export const criarAvaliacaoSchema = z.strictObject({
   pacienteId: z.string().uuid(),
   dataAvaliacao: z.coerce.date().optional(),
-  respostas: agaAnswersSchema.optional(),
-  katzScore: z.number().int().min(0).max(6).optional(),
-  lawtonScore: z.number().int().min(0).max(8).optional(),
-  rdc502Autocuidado: z.enum(['nenhuma', 'ate_tres', 'todas']).optional(),
-  rdc502Cognicao: z.enum(['sem_comprometimento', 'alteracao_controlada', 'comprometimento']).optional(),
-  meemScore: z.number().int().min(0).max(30).optional(),
-  gds15Score: z.number().int().min(0).max(15).optional(),
-  manScore: z.number().int().min(0).max(14).optional(),
-  tugSegundos: z.number().int().min(0).max(300).optional(),
+  respostas: agaAnswersSchema,
   comorbidades: z.array(z.string().max(200)).max(50).optional(),
   medicamentos: z.array(
     z.object({

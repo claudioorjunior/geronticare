@@ -1,8 +1,7 @@
 import { z } from 'zod';
-import { TRPCError } from '@trpc/server';
 import { createTRPCRouter, protectedProcedure, clinicalProcedure } from '../server';
 import { avaliacoesGeriatricas, usuarios } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { calcularAgaScores, criarAvaliacaoSchema, interpretarEscala } from '@/lib/validations/escalas';
 import { verificarOwnershipPaciente } from '../ownership';
 
@@ -21,17 +20,20 @@ export const avaliacoesGeriatricasRouter = createTRPCRouter({
   buscar: protectedProcedure
     .input(z.object({ id: z.string().uuid(), pacienteId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
+      // Ownership primeiro: mesmo erro (NOT_FOUND) para paciente inexistente
+      // ou de outra instituição — não revela a existência do paciente.
+      await verificarOwnershipPaciente(ctx.db, input.pacienteId, ctx.instituicaoId);
+
+      // Consulta direta por id + pacienteId: id de outro paciente retorna
+      // null, sem revelar que a avaliação existe em outro contexto.
       const avaliacao = await ctx.db.query.avaliacoesGeriatricas.findFirst({
-        where: eq(avaliacoesGeriatricas.id, input.id),
+        where: and(
+          eq(avaliacoesGeriatricas.id, input.id),
+          eq(avaliacoesGeriatricas.pacienteId, input.pacienteId),
+        ),
       });
 
       if (!avaliacao) return null;
-      if (avaliacao.pacienteId !== input.pacienteId) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Avaliação não encontrada' });
-      }
-
-      // Verifica ownership antes de retornar dados clínicos
-      await verificarOwnershipPaciente(ctx.db, avaliacao.pacienteId, ctx.instituicaoId);
 
       const profissional = await ctx.db.query.usuarios.findFirst({
         where: eq(usuarios.id, avaliacao.profissionalId),
@@ -58,28 +60,22 @@ export const avaliacoesGeriatricasRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await verificarOwnershipPaciente(ctx.db, input.pacienteId, ctx.instituicaoId);
 
-      const scores = input.respostas ? calcularAgaScores(input.respostas) : undefined;
+      // Escores derivados EXCLUSIVAMENTE das respostas do formulário de
+      // múltipla escolha — o servidor nunca aceita escores manuais.
+      const scores = calcularAgaScores(input.respostas);
 
       const [novaAvaliacao] = await ctx.db
         .insert(avaliacoesGeriatricas)
         .values({
           pacienteId: input.pacienteId,
           dataAvaliacao: input.dataAvaliacao,
-          katzScore: input.katzScore,
-          lawtonScore: input.lawtonScore,
-          rdc502Autocuidado: input.rdc502Autocuidado,
-          rdc502Cognicao: input.rdc502Cognicao,
-          meemScore: input.meemScore,
-          gds15Score: input.gds15Score,
-          manScore: input.manScore,
-          tugSegundos: input.tugSegundos,
+          ...scores,
           comorbidades: input.comorbidades,
           medicamentos: input.medicamentos,
           suporteSocial: input.suporteSocial,
           moradia: input.moradia,
           observacoes: input.observacoes,
           respostas: input.respostas,
-          ...(scores ?? {}),
           profissionalId: ctx.userId,
         })
         .returning();
