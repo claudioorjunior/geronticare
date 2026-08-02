@@ -47,6 +47,13 @@ We welcome contributions to GerontiCare! This document explains how to contribut
 
 Use the **Bug Report** issue template.
 
+### Releases (maintainers)
+
+1. Make sure `CHANGELOG.md` has a `## [X.Y.Z] - Não lançado` section covering the release
+2. Run `./scripts/release.sh X.Y.Z` — it runs lint/type-check/tests, bumps `package.json`, stamps the changelog date, and creates the `vX.Y.Z` commit + annotated tag
+3. Push with `git push origin HEAD --follow-tags`
+4. The `Release` workflow (`.github/workflows/release.yml`) validates the tag and publishes the GitHub Release with notes extracted from the changelog
+
 ---
 
 ## Português
@@ -93,3 +100,10 @@ Contribuições são bem-vindas! Este documento explica como contribuir.
 ### Reportando Bugs
 
 Use o template de issue **Bug Report**.
+
+### Releases (maintainers)
+
+1. Garanta que o `CHANGELOG.md` tem uma seção `## [X.Y.Z] - Não lançado` cobrindo o release
+2. Rode `./scripts/release.sh X.Y.Z` — ele executa lint/type-check/testes, atualiza o `package.json`, fixa a data no changelog e cria o commit + tag anotada `vX.Y.Z`
+3. Publique com `git push origin HEAD --follow-tags`
+4. O workflow `Release` (`.github/workflows/release.yml`) valida a tag e publica a GitHub Release com as notas extraídas do changelog
