@@ -2,8 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { appRouter } from './root';
 import type { Db } from '@/lib/db';
 import type { Context } from './server';
+import * as autorizacao from './autorizacao';
 import { devBypassAtivo } from './autorizacao';
-import type { AgaAnswers } from '@/lib/validations/aga-form';
+import { RESPOSTAS_VALIDAS } from './aga-fixtures';
 
 /**
  * Testes de autorização por papel — invocam as procedures reais com um
@@ -20,58 +21,6 @@ import type { AgaAnswers } from '@/lib/validations/aga-form';
 
 const PACIENTE = { id: '1b2a3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d', instituicaoId: 'inst-1' };
 const PACIENTE_ID = PACIENTE.id;
-
-/** Respostas válidas do formulário AGA (todas as escalas preenchidas). */
-const RESPOSTAS_VALIDAS: AgaAnswers = {
-  rdc502: { autocuidado: 'nenhuma', cognicao: 'sem_comprometimento' },
-  katz: {
-    banho: 'independente',
-    vestir: 'independente',
-    banheiro: 'independente',
-    transferencia: 'independente',
-    continencia: 'controle_completo',
-    alimentacao: 'independente',
-  },
-  lawton: {
-    telefone: 'disca_numeros',
-    compras: 'todas_sem_ajuda',
-    refeicoes: 'planeja_prepara_serve',
-    tarefas: 'sem_ajuda',
-    lavanderia: 'sem_ajuda',
-    transporte: 'publico_dirige',
-    medicacao: 'doses_sem_ajuda',
-    financas: 'administra',
-  },
-  meem: {
-    escolaridadeAnos: 8,
-    orientacao_temporal: 5,
-    orientacao_espacial: 5,
-    registro: 3,
-    atencao_calculo: 5,
-    evocacao: 3,
-    nomeacao: 2,
-    repeticao: 1,
-    comando: 3,
-    leitura: 1,
-    escrita: 1,
-    copia: 1,
-  },
-  gds15: {
-    q1: 'sim', q2: 'nao', q3: 'nao', q4: 'nao', q5: 'sim',
-    q6: 'nao', q7: 'sim', q8: 'nao', q9: 'nao', q10: 'nao',
-    q11: 'sim', q12: 'nao', q13: 'sim', q14: 'nao', q15: 'nao',
-  },
-  man: {
-    ingesta: 2,
-    perdaPeso: 0,
-    mobilidade: 2,
-    estresse: 2,
-    neuropsicologico: 2,
-    fonteAntropometrica: 'imc',
-    imc: 3,
-  },
-  tug: { segundos: 8 },
-};
 
 function makeDb(overrides: Partial<Db> = {}) {
   const insertCalls: unknown[] = [];
@@ -107,6 +56,24 @@ function makeCaller(userRole: string | null, db: Db = makeDb().db) {
   } as unknown as Context;
   return appRouter.createCaller(ctx);
 }
+
+describe('política de leitura clínica', () => {
+  it.each(['admin', 'profissional', 'usuario'])('%s pode ler dados clínicos', (role) => {
+    const podeLerClinico = (autorizacao as typeof autorizacao & {
+      podeLerClinico?: (value: string | null | undefined) => boolean;
+    }).podeLerClinico;
+
+    expect(podeLerClinico?.(role)).toBe(true);
+  });
+
+  it('papel ausente não pode ler dados clínicos', () => {
+    const podeLerClinico = (autorizacao as typeof autorizacao & {
+      podeLerClinico?: (value: string | null | undefined) => boolean;
+    }).podeLerClinico;
+
+    expect(podeLerClinico?.(null)).toBe(false);
+  });
+});
 
 describe('devBypassAtivo (bypass de desenvolvimento, fail-closed)', () => {
   it('ativa apenas com NODE_ENV=development E DEV_AUTH_BYPASS=true', () => {

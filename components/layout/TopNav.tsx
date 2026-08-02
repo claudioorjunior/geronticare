@@ -4,9 +4,10 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import { Search, User, LogOut, X, Bell, ChevronDown } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { useUserRole } from '@/lib/auth/use-user-role';
-import { authClient } from '@/lib/auth/client';
+import { authClient, logoutAndClearClientState } from '@/lib/auth/client';
 
 // Mock patients for dev (replace with tRPC search later)
 const mockPatients = [
@@ -18,6 +19,7 @@ const mockPatients = [
 export function TopNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: perfil, role: userRole } = useUserRole();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -64,8 +66,15 @@ export function TopNav() {
   }, [menuOpen]);
 
   const handleLogout = async () => {
-    await authClient.signOut();
-    router.push('/');
+    try {
+      await logoutAndClearClientState({
+        signOut: () => authClient.signOut(),
+        clearCache: () => queryClient.clear(),
+        redirect: () => router.replace('/'),
+      });
+    } catch {
+      // O estado local já foi limpo no finally; a próxima navegação revalida a sessão.
+    }
   };
 
   const navLinkClass = (path: string) =>

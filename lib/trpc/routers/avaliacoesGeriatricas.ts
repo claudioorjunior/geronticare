@@ -14,6 +14,19 @@ export const avaliacoesGeriatricasRouter = createTRPCRouter({
       return ctx.db.query.avaliacoesGeriatricas.findMany({
         where: eq(avaliacoesGeriatricas.pacienteId, input.pacienteId),
         orderBy: (avaliacoesGeriatricas, { desc }) => [desc(avaliacoesGeriatricas.dataAvaliacao)],
+        columns: {
+          id: true,
+          dataAvaliacao: true,
+          katzScore: true,
+          lawtonScore: true,
+          meemScore: true,
+          gds15Score: true,
+          manScore: true,
+          tugSegundos: true,
+          rdc502Autocuidado: true,
+          rdc502Cognicao: true,
+          observacoes: true,
+        },
       });
     }),
 
@@ -31,6 +44,24 @@ export const avaliacoesGeriatricasRouter = createTRPCRouter({
           eq(avaliacoesGeriatricas.id, input.id),
           eq(avaliacoesGeriatricas.pacienteId, input.pacienteId),
         ),
+        columns: {
+          id: true,
+          profissionalId: true,
+          dataAvaliacao: true,
+          katzScore: true,
+          lawtonScore: true,
+          meemScore: true,
+          gds15Score: true,
+          manScore: true,
+          tugSegundos: true,
+          rdc502Autocuidado: true,
+          rdc502Cognicao: true,
+          comorbidades: true,
+          medicamentos: true,
+          suporteSocial: true,
+          moradia: true,
+          observacoes: true,
+        },
       });
 
       if (!avaliacao) return null;
@@ -41,7 +72,21 @@ export const avaliacoesGeriatricasRouter = createTRPCRouter({
       });
 
       return {
-        ...avaliacao,
+        id: avaliacao.id,
+        dataAvaliacao: avaliacao.dataAvaliacao,
+        katzScore: avaliacao.katzScore,
+        lawtonScore: avaliacao.lawtonScore,
+        meemScore: avaliacao.meemScore,
+        gds15Score: avaliacao.gds15Score,
+        manScore: avaliacao.manScore,
+        tugSegundos: avaliacao.tugSegundos,
+        rdc502Autocuidado: avaliacao.rdc502Autocuidado,
+        rdc502Cognicao: avaliacao.rdc502Cognicao,
+        observacoes: avaliacao.observacoes,
+        comorbidades: avaliacao.comorbidades,
+        medicamentos: avaliacao.medicamentos,
+        suporteSocial: avaliacao.suporteSocial,
+        moradia: avaliacao.moradia,
         profissional: profissional?.nome,
         especialidade: profissional?.especialidade,
         interpretacao: {
@@ -78,8 +123,9 @@ export const avaliacoesGeriatricasRouter = createTRPCRouter({
           respostas: input.respostas,
           profissionalId: ctx.userId,
         })
-        .returning();
+        .returning({ id: avaliacoesGeriatricas.id });
 
+      // DTO mínimo: nunca ecoa `respostas` nem escores de volta ao navegador.
       return novaAvaliacao;
     }),
 
@@ -91,6 +137,16 @@ export const avaliacoesGeriatricasRouter = createTRPCRouter({
       const avaliacao = await ctx.db.query.avaliacoesGeriatricas.findFirst({
         where: eq(avaliacoesGeriatricas.pacienteId, input.pacienteId),
         orderBy: (avaliacoesGeriatricas, { desc }) => [desc(avaliacoesGeriatricas.dataAvaliacao)],
+        columns: {
+          profissionalId: true,
+          dataAvaliacao: true,
+          katzScore: true,
+          lawtonScore: true,
+          meemScore: true,
+          gds15Score: true,
+          manScore: true,
+          tugSegundos: true,
+        },
       });
 
       if (!avaliacao) return null;
@@ -101,7 +157,15 @@ export const avaliacoesGeriatricasRouter = createTRPCRouter({
       });
 
       return {
-        avaliacao,
+        avaliacao: {
+          dataAvaliacao: avaliacao.dataAvaliacao,
+          katzScore: avaliacao.katzScore,
+          lawtonScore: avaliacao.lawtonScore,
+          meemScore: avaliacao.meemScore,
+          gds15Score: avaliacao.gds15Score,
+          manScore: avaliacao.manScore,
+          tugSegundos: avaliacao.tugSegundos,
+        },
         profissional: profissional?.nome,
         especialidade: profissional?.especialidade,
         interpretacao: {

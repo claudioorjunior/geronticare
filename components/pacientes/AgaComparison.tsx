@@ -1,12 +1,17 @@
 import { ArrowDown, ArrowUp, CircleHelp, Minus } from 'lucide-react';
-import type { AvaliacaoGeriatrica } from '@/lib/db/schema';
 import { formatarData } from '@/lib/utils';
 import {
   compararAvaliacoes,
   compararClassificacaoRdc502,
+  type AgaComparisonInput,
+  type AgaRdcComparisonInput,
   type AgaScaleComparison,
   type AgaTrend,
 } from '@/lib/validations/aga-comparison';
+
+type AgaComparisonRecord = AgaComparisonInput & AgaRdcComparisonInput & {
+  dataAvaliacao: Date;
+};
 
 const trendStyles: Record<AgaTrend, { label: string; className: string; icon: typeof ArrowUp }> = {
   melhora: { label: 'Melhora', className: 'border-emerald-200 bg-emerald-50 text-emerald-800', icon: ArrowUp },
@@ -47,7 +52,7 @@ function TrendBadge({ trend }: { trend: AgaTrend }) {
   );
 }
 
-export function AgaComparison({ atual, anterior }: { atual: AvaliacaoGeriatrica; anterior: AvaliacaoGeriatrica }) {
+export function AgaComparison({ atual, anterior }: { atual: AgaComparisonRecord; anterior: AgaComparisonRecord }) {
   const comparison = compararAvaliacoes(atual, anterior);
   const classificationComparison = compararClassificacaoRdc502(atual, anterior);
   const comparable = comparison.escalas.filter((scale) => scale.tendencia !== 'indisponivel');

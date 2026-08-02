@@ -14,6 +14,11 @@
 
 export type UserRole = 'admin' | 'profissional' | 'usuario';
 
+/** Leitura clínica: inclui o papel administrativo `usuario`. */
+export function podeLerClinico(role: string | null | undefined): role is UserRole {
+  return role === 'admin' || role === 'profissional' || role === 'usuario';
+}
+
 /** Escrita clínica: AGA, registros, sinais vitais. */
 export function podeAcessarClinico(role: string | null | undefined): role is 'admin' | 'profissional' {
   return role === 'admin' || role === 'profissional';

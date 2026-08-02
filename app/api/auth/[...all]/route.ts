@@ -1,12 +1,11 @@
 import { NextRequest } from 'next/server';
 import { getAuth } from '@/lib/auth';
+import { withPrivateNoStore } from '@/lib/http/private-response';
 
-export async function GET(request: NextRequest) {
+async function handler(request: NextRequest) {
   const auth = await getAuth();
-  return auth.handler(request);
+  const response = await auth.handler(request);
+  return withPrivateNoStore(response);
 }
 
-export async function POST(request: NextRequest) {
-  const auth = await getAuth();
-  return auth.handler(request);
-}
+export { handler as GET, handler as POST };

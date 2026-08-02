@@ -91,7 +91,7 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
             >
               <ArrowLeft className="h-4 w-4" />
             </Link>
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-teal-500 to-teal-700 text-white shadow-sm shrink-0">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-linear-to-br from-teal-500 to-teal-700 text-white shadow-sm shrink-0">
               <span className="text-sm font-bold tracking-wide">{getInitials(paciente.nome)}</span>
             </div>
             <div>

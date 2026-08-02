@@ -20,7 +20,7 @@ const DEV_USER_ID = '320471aa-5994-4886-9ee6-1cee8e7aa810';
 async function resolverUsuario(db: Db, userId: string) {
   return db.query.usuarios.findFirst({
     where: eq(usuarios.id, userId),
-    columns: { instituicaoId: true, role: true },
+    columns: { instituicaoId: true, role: true, ativo: true },
   });
 }
 
@@ -42,18 +42,23 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
   let userId: string | null = null;
 
   if (session?.user?.id) {
-    userId = session.user.id;
     const user = await resolverUsuario(db, session.user.id);
-    instituicaoId = user?.instituicaoId ?? null;
-    userRole = user?.role ?? null;
+    if (user?.ativo) {
+      userId = session.user.id;
+      instituicaoId = user.instituicaoId;
+      userRole = user.role;
+    }
   } else if (devAuthBypass) {
     // Desenvolvimento: impersona um usuário do seed (ou DEV_OVERRIDE_USER_ID).
     // Sem sessão e sem bypass, o contexto fica sem usuário -> UNAUTHORIZED.
     // Usuário inexistente também falha fechado (sem instituição).
-    userId = process.env.DEV_OVERRIDE_USER_ID || DEV_USER_ID;
-    const user = await resolverUsuario(db, userId);
-    instituicaoId = user?.instituicaoId ?? null;
-    userRole = user?.role ?? null;
+    const overrideUserId = process.env.DEV_OVERRIDE_USER_ID || DEV_USER_ID;
+    const user = await resolverUsuario(db, overrideUserId);
+    if (user?.ativo) {
+      userId = overrideUserId;
+      instituicaoId = user.instituicaoId;
+      userRole = user.role;
+    }
   }
 
   return {

@@ -14,8 +14,12 @@ import {
   toDateInput,
   mascaraCPF,
 } from '@/lib/validations/pacientes';
-import type { Paciente, AvaliacaoGeriatrica } from '@/lib/db/schema';
+import type { RouterOutputs } from '@/lib/trpc/types';
+import { podeAcessarClinico, podeLerClinico } from '@/lib/trpc/autorizacao';
 import { formatarData } from '@/lib/utils';
+
+type PacienteDetails = RouterOutputs['pacientes']['buscar'];
+type AgaSummaryReport = RouterOutputs['avaliacoesGeriatricas']['relatorio'];
 
 function Kpi({ icon: Icon, label, value, unit }: { icon: typeof Activity; label: string; value: string; unit: string }) {
   return (
@@ -34,7 +38,8 @@ function Kpi({ icon: Icon, label, value, unit }: { icon: typeof Activity; label:
 export default function PatientDadosPage() {
   const params = useParams<{ id: string }>();
   const { role } = useUserRole();
-  const canViewClinical = role === 'admin' || role === 'profissional';
+  const canViewClinical = podeLerClinico(role);
+  const canEditClinical = podeAcessarClinico(role);
   const pacienteQ = trpc.pacientes.buscar.useQuery(
     { id: params.id },
     { enabled: Boolean(params.id) },
@@ -127,6 +132,7 @@ export default function PatientDadosPage() {
         isLoading={relatorioAGA.isLoading}
         isError={relatorioAGA.isError}
         canViewClinical={canViewClinical}
+        canEditClinical={canEditClinical}
       />
 
       {/* Keyed pelo id para recriar estado do form na navegação entre pacientes */}
@@ -139,7 +145,7 @@ export default function PatientDadosPage() {
 // Componente-filho com estado local de edição. Keyed pelo id do paciente no pai,
 // então recria estado do zero quando navega para outro paciente — sem useEffect.
 
-function EditForm({ paciente }: { paciente: Paciente }) {
+function EditForm({ paciente }: { paciente: PacienteDetails }) {
   const { role } = useUserRole();
   const utils = trpc.useUtils();
   const params = useParams<{ id: string }>();
@@ -348,24 +354,14 @@ function AGASummaryCard({
   isLoading,
   isError,
   canViewClinical,
+  canEditClinical,
 }: {
   pacienteId: string;
-  relatorio: {
-    avaliacao: AvaliacaoGeriatrica;
-    profissional?: string;
-    especialidade?: string | null;
-    interpretacao?: {
-      katz: string | null;
-      lawton: string | null;
-      meem: string | null;
-      gds15: string | null;
-      man: string | null;
-      tug: string | null;
-    };
-  } | null | undefined;
+  relatorio: AgaSummaryReport | undefined;
   isLoading: boolean;
   isError: boolean;
   canViewClinical: boolean;
+  canEditClinical: boolean;
 }) {
   if (!canViewClinical) {
     return (
@@ -381,7 +377,7 @@ function AGASummaryCard({
     );
   }
 
-  const canEdit = canViewClinical;
+  const canEdit = canEditClinical;
 
   if (isLoading) {
     return (
@@ -455,15 +451,13 @@ function AGASummaryCard({
           <User className="h-3.5 w-3.5" />
           <span>{profissional}</span>
           {especialidade && <span className="text-slate-400">· {especialidade}</span>}
-          {canEdit && (
-            <Link
-              href={`/pacientes/${pacienteId}/aga`}
-              className="ml-auto inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 font-medium transition-colors"
-            >
-              Ver avaliação completa
-              <ChevronRight className="h-3.5 w-3.5" />
-            </Link>
-          )}
+          <Link
+            href={`/pacientes/${pacienteId}/aga`}
+            className="ml-auto inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 font-medium transition-colors"
+          >
+            Ver avaliação completa
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
         </div>
       )}
 

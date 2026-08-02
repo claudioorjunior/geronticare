@@ -16,7 +16,9 @@ import {
   type Rdc502Autocuidado,
   type Rdc502Cognicao,
 } from '@/lib/validations/escalas';
-import type { AvaliacaoGeriatrica } from '@/lib/db/schema';
+import type { RouterOutputs } from '@/lib/trpc/types';
+
+type AgaListItem = RouterOutputs['avaliacoesGeriatricas']['listar'][number];
 
 type ScaleKey = 'katz' | 'lawton' | 'meem' | 'gds15' | 'man' | 'tug';
 
@@ -72,7 +74,7 @@ const toneClasses = {
   muted: 'border-slate-200 bg-slate-50 text-slate-500',
 };
 
-function getScaleSummaries(aga: AvaliacaoGeriatrica): ScaleSummary[] {
+function getScaleSummaries(aga: AgaListItem): ScaleSummary[] {
   return [
     { key: 'katz', label: scaleLabels.katz, max: 6, score: aga.katzScore, interpretation: interpretarEscala('katz', aga.katzScore) },
     { key: 'lawton', label: scaleLabels.lawton, max: 8, score: aga.lawtonScore, interpretation: interpretarEscala('lawton', aga.lawtonScore) },
@@ -83,7 +85,7 @@ function getScaleSummaries(aga: AvaliacaoGeriatrica): ScaleSummary[] {
   ];
 }
 
-function CurrentClassification({ aga }: { aga: AvaliacaoGeriatrica }) {
+function CurrentClassification({ aga }: { aga: AgaListItem }) {
   const autocuidado = aga.rdc502Autocuidado as Rdc502Autocuidado | null;
   const cognicao = aga.rdc502Cognicao as Rdc502Cognicao | null;
   const classification = classificarGrauDependenciaRdc502(autocuidado, cognicao);
@@ -99,7 +101,7 @@ function CurrentClassification({ aga }: { aga: AvaliacaoGeriatrica }) {
   );
 }
 
-function ScaleCards({ aga }: { aga: AvaliacaoGeriatrica }) {
+function ScaleCards({ aga }: { aga: AgaListItem }) {
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
       {getScaleSummaries(aga).map((scale) => {
@@ -120,7 +122,7 @@ function ScaleCards({ aga }: { aga: AvaliacaoGeriatrica }) {
   );
 }
 
-function AGARecord({ aga, current, patientId }: { aga: AvaliacaoGeriatrica; current: boolean; patientId: string }) {
+function AGARecord({ aga, current, patientId }: { aga: AgaListItem; current: boolean; patientId: string }) {
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -129,7 +131,7 @@ function AGARecord({ aga, current, patientId }: { aga: AvaliacaoGeriatrica; curr
           <time className="text-sm font-semibold text-slate-900">{formatarData(aga.dataAvaliacao)}</time>
           {current && <span className="rounded-full bg-teal-50 px-2 py-1 text-[11px] font-semibold text-teal-700">Atual</span>}
         </div>
-        {aga.respostas && <span className="text-xs text-slate-400">Formulário completo</span>}
+
       </div>
       <div className="mt-4">
         <ScaleCards aga={aga} />
@@ -179,7 +181,7 @@ function AGAPageContent({ patientId, role }: { patientId: string; role: string |
     return <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-700" role="alert"><div className="flex items-center gap-2 font-medium"><AlertCircle className="h-4 w-4" /> Não foi possível carregar as avaliações.</div><p className="mt-1 text-xs">{agasQuery.error.message}</p></div>;
   }
 
-  const agas = (agasQuery.data ?? []) as AvaliacaoGeriatrica[];
+  const agas = agasQuery.data ?? [];
   const current = agas[0];
 
   if (showForm) {

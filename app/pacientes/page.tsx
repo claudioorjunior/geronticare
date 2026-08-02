@@ -8,10 +8,11 @@ import { useUserRole } from '@/lib/auth/use-user-role';
 import { trpc } from '@/lib/trpc/client';
 import { PatientForm } from '@/components/pacientes/PatientForm';
 import { formatarData } from '@/lib/utils';
-import type { Paciente } from '@/lib/db/schema';
+import type { RouterOutputs } from '@/lib/trpc/types';
 
 // ── Types ──
 
+type PacienteListItem = RouterOutputs['pacientes']['listar'][number];
 type PacienteStatus = 'Ativo' | 'Inativo' | 'Alerta';
 type OrderKey = 'recentes' | 'nome' | 'idade_desc';
 
@@ -67,7 +68,7 @@ const statusConfig: Record<PacienteStatus, { bg: string; text: string; dot: stri
 };
 
 // Mapeia Paciente (tRPC/DB) → linha da tabela, derivando idade/status
-function paraLinha(p: Paciente): PacienteLinha {
+function paraLinha(p: PacienteListItem): PacienteLinha {
   return {
     id: p.id,
     nome: p.nome,

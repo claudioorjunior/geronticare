@@ -12,6 +12,14 @@ export const pacientesRouter = createTRPCRouter({
         eq(pacientes.instituicaoId, ctx.instituicaoId)
       ),
       orderBy: (pacientes, { desc }) => [desc(pacientes.createdAt)],
+      columns: {
+        id: true,
+        nome: true,
+        cpf: true,
+        dataNascimento: true,
+        dataAdmissao: true,
+        ativo: true,
+      },
     });
   }),
 
@@ -23,6 +31,18 @@ export const pacientesRouter = createTRPCRouter({
           eq(pacientes.id, input.id),
           eq(pacientes.instituicaoId, ctx.instituicaoId),
         ),
+        columns: {
+          id: true,
+          nome: true,
+          dataNascimento: true,
+          sexo: true,
+          telefone: true,
+          cpf: true,
+          email: true,
+          dataAdmissao: true,
+          contatoEmergencia: true,
+          ativo: true,
+        },
       });
       if (!patient) {
         throw new TRPCError({
@@ -85,7 +105,8 @@ export const pacientesRouter = createTRPCRouter({
           ...input,
           instituicaoId: ctx.instituicaoId,
         })
-        .returning();
+        .returning({ id: pacientes.id });
+      // DTO mínimo: o cliente só precisa do id para navegar/invalidar cache.
       return novoPaciente;
     }),
 
@@ -144,13 +165,14 @@ export const pacientesRouter = createTRPCRouter({
             eq(pacientes.instituicaoId, ctx.instituicaoId)
           )
         )
-        .returning();
+        .returning({ id: pacientes.id });
       if (!pacienteAtualizado) {
         throw new TRPCError({
           code: 'NOT_FOUND',
           message: 'Paciente não encontrado',
         });
       }
+      // DTO mínimo: dados atualizados são recarregados via invalidate().
       return pacienteAtualizado;
     }),
 
