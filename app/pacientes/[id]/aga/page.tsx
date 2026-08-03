@@ -2,119 +2,110 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useState } from 'react';
-import { AlertCircle, Calendar, CheckCircle2, ClipboardCheck, FileText, User } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { trpc } from '@/lib/trpc/client';
-import { useUserRole } from '@/lib/auth/use-user-role';
-import { AgaForm } from '@/components/pacientes/AgaForm';
-import { AgaComparison } from '@/components/pacientes/AgaComparison';
-import { formatarData } from '@/lib/utils';
+import { useMemo, useState } from 'react';
 import {
-  classificarGrauDependenciaRdc502,
-  interpretarEscala,
-  type Rdc502Autocuidado,
-  type Rdc502Cognicao,
-} from '@/lib/validations/escalas';
+  AlertCircle,
+  Calendar,
+  CheckCircle2,
+  ClipboardCheck,
+  FileText,
+  Loader2,
+  User,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { AgaComparison } from '@/components/pacientes/AgaComparison';
+import { useUserRole } from '@/lib/auth/use-user-role';
+import {
+  formatarEspecialidade,
+  formatarEscoreInstrumento,
+} from '@/lib/instrumentos/apresentacao';
+import {
+  getInstrumentDefinition,
+  isInstrumentoSlug,
+  type InstrumentoSlug,
+} from '@/lib/instrumentos/instrumentos';
+import { trpc } from '@/lib/trpc/client';
 import type { RouterOutputs } from '@/lib/trpc/types';
+import { formatarData } from '@/lib/utils';
+import type {
+  AgaComparisonInput,
+  AgaRdcComparisonInput,
+} from '@/lib/validations/aga-comparison';
 
-type AgaListItem = RouterOutputs['avaliacoesGeriatricas']['listar'][number];
-
-type ScaleKey = 'katz' | 'lawton' | 'meem' | 'gds15' | 'man' | 'tug';
-
-type ScaleSummary = {
-  key: ScaleKey;
-  label: string;
-  max?: number;
-  unit?: string;
-  score: number | null;
-  interpretation: string | null;
-};
-
-const scaleLabels: Record<ScaleKey, string> = {
-  katz: 'Katz',
-  lawton: 'Lawton',
-  meem: 'MEEM',
-  gds15: 'GDS-15',
-  man: 'MAN',
-  tug: 'TUG',
-};
-
-const scaleDescriptions: Record<ScaleKey, string> = {
-  katz: 'Dependências em atividades básicas',
-  lawton: 'Independência em atividades instrumentais',
-  meem: 'Rastreamento cognitivo',
-  gds15: 'Rastreamento de humor',
-  man: 'Triagem nutricional',
-  tug: 'Mobilidade e risco de queda',
-};
-
-function toneFor(key: ScaleKey, score: number | null): 'ok' | 'warn' | 'risk' | 'muted' {
-  if (score == null) return 'muted';
-  switch (key) {
-    case 'katz':
-      return score === 0 ? 'ok' : score >= 4 ? 'risk' : 'warn';
-    case 'lawton':
-      return score >= 7 ? 'ok' : score >= 4 ? 'warn' : 'risk';
-    case 'meem':
-      return score >= 24 ? 'ok' : score >= 18 ? 'warn' : 'risk';
-    case 'gds15':
-      return score <= 5 ? 'ok' : score <= 10 ? 'warn' : 'risk';
-    case 'man':
-      return score >= 12 ? 'ok' : score >= 8 ? 'warn' : 'risk';
-    case 'tug':
-      return score < 10 ? 'ok' : score < 20 ? 'warn' : 'risk';
-  }
-}
+type AgaListItem = RouterOutputs['agas']['listar'][number];
+type AgaDetail = RouterOutputs['agas']['buscar'];
+type AplicacaoDisponivel = RouterOutputs['agas']['aplicacoesDisponiveis'][number];
+type AgaAplicacao = AgaDetail['aplicacoes'][number];
 
 const toneClasses = {
   ok: 'border-emerald-200 bg-emerald-50 text-emerald-800',
   warn: 'border-amber-200 bg-amber-50 text-amber-800',
   risk: 'border-red-200 bg-red-50 text-red-800',
   muted: 'border-slate-200 bg-slate-50 text-slate-500',
-};
+} as const;
 
-function getScaleSummaries(aga: AgaListItem): ScaleSummary[] {
-  return [
-    { key: 'katz', label: scaleLabels.katz, max: 6, score: aga.katzScore, interpretation: interpretarEscala('katz', aga.katzScore) },
-    { key: 'lawton', label: scaleLabels.lawton, max: 8, score: aga.lawtonScore, interpretation: interpretarEscala('lawton', aga.lawtonScore) },
-    { key: 'meem', label: scaleLabels.meem, max: 30, score: aga.meemScore, interpretation: interpretarEscala('meem', aga.meemScore) },
-    { key: 'gds15', label: scaleLabels.gds15, max: 15, score: aga.gds15Score, interpretation: interpretarEscala('gds15', aga.gds15Score) },
-    { key: 'man', label: scaleLabels.man, max: 14, score: aga.manScore, interpretation: interpretarEscala('man', aga.manScore) },
-    { key: 'tug', label: scaleLabels.tug, unit: 's', score: aga.tugSegundos, interpretation: interpretarEscala('tug', aga.tugSegundos) },
-  ];
+function toneForRdc(label: string | null | undefined): keyof typeof toneClasses {
+  if (!label) return 'muted';
+  if (label.includes('I') && !label.includes('II') && !label.includes('III')) return 'ok';
+  if (label.includes('III')) return 'risk';
+  if (label.includes('II')) return 'warn';
+  return 'muted';
 }
 
-function CurrentClassification({ aga }: { aga: AgaListItem }) {
-  const autocuidado = aga.rdc502Autocuidado as Rdc502Autocuidado | null;
-  const cognicao = aga.rdc502Cognicao as Rdc502Cognicao | null;
-  const classification = classificarGrauDependenciaRdc502(autocuidado, cognicao);
+function isComparisonScale(slug: string): slug is Exclude<InstrumentoSlug, 'rdc502'> {
+  return slug === 'katz' || slug === 'lawton' || slug === 'meem' || slug === 'gds15' || slug === 'man' || slug === 'tug';
+}
 
-  return (
-    <div className={`rounded-xl border p-5 ${classification ? toneClasses[classification.tone] : toneClasses.muted}`}>
-      <p className="text-xs font-semibold uppercase tracking-wide">Classificação atual</p>
-      <p className="mt-1 text-xl font-semibold">{classification?.label ?? 'Não informada'}</p>
-      <p className="mt-1 text-xs leading-relaxed">
-        {classification?.fundamento ?? 'A avaliação registrada não contém autocuidado e cognição suficientes para calcular o grau RDC 502/2021.'}
+function scoresFromApplications(aplicacoes: AgaAplicacao[]): AgaComparisonInput & AgaRdcComparisonInput {
+  const scores: AgaComparisonInput & AgaRdcComparisonInput = {};
+  for (const app of aplicacoes) {
+    if (!isInstrumentoSlug(app.instrumento)) continue;
+    if (app.instrumento === 'rdc502') {
+      const respostas = app.respostas as { autocuidado?: string; cognicao?: string } | null;
+      scores.rdc502Autocuidado = respostas?.autocuidado ?? null;
+      scores.rdc502Cognicao = respostas?.cognicao ?? null;
+      continue;
+    }
+    if (!isComparisonScale(app.instrumento)) continue;
+    const field =
+      app.instrumento === 'tug'
+        ? 'tugSegundos'
+        : (`${app.instrumento}Score` as keyof AgaComparisonInput);
+    scores[field] = app.escore;
+  }
+  return scores;
+}
+
+function ApplicationCards({ aplicacoes }: { aplicacoes: AgaAplicacao[] }) {
+  if (aplicacoes.length === 0) {
+    return (
+      <p className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+        Nenhuma aplicação consolidada nesta AGA.
       </p>
-    </div>
-  );
-}
+    );
+  }
 
-function ScaleCards({ aga }: { aga: AgaListItem }) {
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-      {getScaleSummaries(aga).map((scale) => {
-        const tone = toneFor(scale.key, scale.score);
+      {aplicacoes.map((app) => {
+        const slug = isInstrumentoSlug(app.instrumento) ? app.instrumento : null;
+        const label = slug ? getInstrumentDefinition(slug).nomeCurto : app.instrumento;
+        const scoreLabel = slug
+          ? formatarEscoreInstrumento(slug, app.escore)
+          : app.escore == null
+            ? 'Sem escore'
+            : String(app.escore);
+        const tone: keyof typeof toneClasses =
+          app.instrumento === 'rdc502' ? toneForRdc(app.classificacao) : 'muted';
+
         return (
-          <div key={scale.key} className={`rounded-xl border p-4 ${toneClasses[tone]}`}>
-            <div className="text-xs font-semibold tracking-wide">{scale.label}</div>
-            <div className="mt-2 text-2xl font-semibold tabular-nums">
-              {scale.score ?? 'n/d'}
-              {scale.max !== undefined && <span className="text-sm font-normal opacity-60">/{scale.max}</span>}
-              {scale.unit && <span className="text-sm font-normal opacity-60"> {scale.unit}</span>}
-            </div>
-            <p className="mt-1 text-[11px] leading-relaxed opacity-80">{scale.interpretation ?? scaleDescriptions[scale.key]}</p>
+          <div key={app.id} className={`rounded-xl border p-4 ${toneClasses[tone]}`}>
+            <div className="text-xs font-semibold tracking-wide">{label}</div>
+            <div className="mt-2 text-sm font-semibold tabular-nums">{scoreLabel}</div>
+            <p className="mt-1 text-[11px] leading-relaxed opacity-80">
+              {app.classificacao}
+              {app.profissional?.nome ? ` · ${app.profissional.nome}` : ''}
+            </p>
           </div>
         );
       })}
@@ -122,31 +113,315 @@ function ScaleCards({ aga }: { aga: AgaListItem }) {
   );
 }
 
-function AGARecord({ aga, current, patientId }: { aga: AgaListItem; current: boolean; patientId: string }) {
+function CurrentClassification({ classificacao }: { classificacao: string | null }) {
+  const tone = toneForRdc(classificacao);
+  return (
+    <div className={`rounded-xl border p-5 ${toneClasses[tone]}`}>
+      <p className="text-xs font-semibold uppercase tracking-wide">Classificação atual</p>
+      <p className="mt-1 text-xl font-semibold">{classificacao ?? 'Não informada'}</p>
+      <p className="mt-1 text-xs leading-relaxed">
+        Resultado consolidado a partir da RDC 502/2021 selecionada na AGA.
+      </p>
+    </div>
+  );
+}
+
+function AGARecord({
+  aga,
+  current,
+  patientId,
+}: {
+  aga: AgaListItem;
+  current: boolean;
+  patientId: string;
+}) {
+  const isDraft = aga.status === 'rascunho';
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-teal-600" />
-          <time className="text-sm font-semibold text-slate-900">{formatarData(aga.dataAvaliacao)}</time>
-          {current && <span className="rounded-full bg-teal-50 px-2 py-1 text-[11px] font-semibold text-teal-700">Atual</span>}
+          <time className="text-sm font-semibold text-slate-900">
+            {formatarData(aga.dataAvaliacao)}
+          </time>
+          {current && (
+            <span className="rounded-full bg-teal-50 px-2 py-1 text-[11px] font-semibold text-teal-700">
+              Atual
+            </span>
+          )}
+          <span
+            className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
+              isDraft
+                ? 'bg-amber-50 text-amber-800'
+                : 'bg-emerald-50 text-emerald-800'
+            }`}
+          >
+            {isDraft ? 'Rascunho' : 'Concluída'}
+          </span>
         </div>
-
+        {aga.classificacao && (
+          <span className="text-xs font-medium text-slate-600">{aga.classificacao}</span>
+        )}
       </div>
-      <div className="mt-4">
-        <ScaleCards aga={aga} />
-      </div>
-      {aga.observacoes && <p className="mt-4 border-t border-slate-100 pt-4 text-sm leading-relaxed text-slate-600">{aga.observacoes}</p>}
-      <div className="mt-4 border-t border-slate-100 pt-4">
-        <Link
-          href={`/pacientes/${patientId}/aga/${aga.id}/relatorio`}
-          className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-teal-700 hover:text-teal-900"
-        >
-          <FileText className="h-4 w-4" />
-          Ver relatório
-        </Link>
-      </div>
+      {aga.observacoes && (
+        <p className="mt-4 border-t border-slate-100 pt-4 text-sm leading-relaxed text-slate-600">
+          {aga.observacoes}
+        </p>
+      )}
+      {!isDraft && (
+        <div className="mt-4 border-t border-slate-100 pt-4">
+          <Link
+            href={`/pacientes/${patientId}/aga/${aga.id}/relatorio`}
+            className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-teal-700 hover:text-teal-900"
+          >
+            <FileText className="h-4 w-4" />
+            Ver relatório
+          </Link>
+        </div>
+      )}
     </article>
+  );
+}
+
+function ConsolidationForm({
+  patientId,
+  onCancel,
+  onDone,
+}: {
+  patientId: string;
+  onCancel: () => void;
+  onDone: (message: string) => void;
+}) {
+  const utils = trpc.useUtils();
+  const [dataAvaliacao, setDataAvaliacao] = useState(
+    () => new Date().toISOString().slice(0, 10),
+  );
+  const [observacoes, setObservacoes] = useState('');
+  const [selected, setSelected] = useState<Record<string, string>>({});
+  const [error, setError] = useState('');
+  const [pending, setPending] = useState(false);
+
+  const disponiveisQuery = trpc.agas.aplicacoesDisponiveis.useQuery(
+    { pacienteId: patientId },
+    { enabled: Boolean(patientId) },
+  );
+  const criarRascunho = trpc.agas.criarRascunho.useMutation();
+  const selecionar = trpc.agas.selecionarAplicacoes.useMutation();
+  const concluir = trpc.agas.concluir.useMutation();
+
+  const byInstrument = useMemo(() => {
+    const map = new Map<string, AplicacaoDisponivel[]>();
+    for (const app of disponiveisQuery.data ?? []) {
+      const list = map.get(app.instrumento) ?? [];
+      list.push(app);
+      map.set(app.instrumento, list);
+    }
+    return map;
+  }, [disponiveisQuery.data]);
+
+  function toggle(instrumento: string, aplicacaoId: string) {
+    setSelected((prev) => {
+      if (prev[instrumento] === aplicacaoId) {
+        const next = { ...prev };
+        delete next[instrumento];
+        return next;
+      }
+      return { ...prev, [instrumento]: aplicacaoId };
+    });
+  }
+
+  async function handleSubmit() {
+    setError('');
+    const aplicacaoIds = Object.values(selected);
+    if (!selected.rdc502) {
+      setError('Selecione uma aplicação RDC 502 para concluir a AGA.');
+      return;
+    }
+    if (aplicacaoIds.length === 0) {
+      setError('Selecione ao menos uma aplicação preenchida.');
+      return;
+    }
+
+    setPending(true);
+    try {
+      const draft = await criarRascunho.mutateAsync({
+        pacienteId: patientId,
+        dataAvaliacao: new Date(`${dataAvaliacao}T12:00:00`),
+        observacoes: observacoes.trim() || undefined,
+      });
+      await selecionar.mutateAsync({
+        pacienteId: patientId,
+        agaId: draft.id,
+        aplicacaoIds,
+      });
+      await concluir.mutateAsync({
+        pacienteId: patientId,
+        agaId: draft.id,
+      });
+      await utils.agas.listar.invalidate({ pacienteId: patientId });
+      onDone('AGA consolidada com sucesso.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível consolidar a AGA.');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  if (disponiveisQuery.isPending) {
+    return (
+      <div className="flex min-h-40 items-center justify-center gap-2 text-sm text-slate-500" aria-live="polite">
+        <Loader2 className="h-4 w-4 animate-spin text-teal-600" />
+        Carregando aplicações disponíveis...
+      </div>
+    );
+  }
+
+  if (disponiveisQuery.isError) {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-700" role="alert">
+        <div className="flex items-center gap-2 font-medium">
+          <AlertCircle className="h-4 w-4" />
+          Não foi possível carregar as aplicações.
+        </div>
+        <p className="mt-1 text-xs">{disponiveisQuery.error.message}</p>
+      </div>
+    );
+  }
+
+  const empty = (disponiveisQuery.data ?? []).length === 0;
+
+  return (
+    <div className="space-y-5">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">Consolidar nova AGA</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Selecione aplicações já preenchidas pela equipe. A RDC 502 é obrigatória.
+          </p>
+        </div>
+        <Button variant="outline" onClick={onCancel} disabled={pending}>
+          Voltar para avaliações
+        </Button>
+      </div>
+
+      <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-2">
+        <label className="block text-sm">
+          <span className="font-medium text-slate-700">Data da avaliação</span>
+          <input
+            type="date"
+            value={dataAvaliacao}
+            onChange={(event) => setDataAvaliacao(event.target.value)}
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="block text-sm md:col-span-2">
+          <span className="font-medium text-slate-700">Observações</span>
+          <textarea
+            value={observacoes}
+            onChange={(event) => setObservacoes(event.target.value)}
+            rows={3}
+            maxLength={5000}
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            placeholder="Opcional"
+          />
+        </label>
+      </div>
+
+      {empty ? (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600">
+          Não há aplicações preenchidas para este paciente. A equipe registra as escalas em Avaliações;
+          depois elas aparecem aqui para consolidação.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {[...byInstrument.entries()].map(([instrumento, apps]) => {
+            const slug = isInstrumentoSlug(instrumento) ? instrumento : null;
+            const title = slug ? getInstrumentDefinition(slug).nome : instrumento;
+            const required = instrumento === 'rdc502';
+            return (
+              <section
+                key={instrumento}
+                className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+              >
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    {title}
+                    {required ? (
+                      <span className="ml-2 text-[11px] font-semibold uppercase tracking-wide text-teal-700">
+                        obrigatória
+                      </span>
+                    ) : null}
+                  </h3>
+                  <span className="text-xs text-slate-500">1 por instrumento</span>
+                </div>
+                <div className="space-y-2">
+                  {apps.map((app) => {
+                    const checked = selected[instrumento] === app.id;
+                    const score = isInstrumentoSlug(app.instrumento)
+                      ? formatarEscoreInstrumento(app.instrumento, app.escore)
+                      : String(app.escore ?? '—');
+                    return (
+                      <label
+                        key={app.id}
+                        className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm ${
+                          checked
+                            ? 'border-teal-300 bg-teal-50'
+                            : 'border-slate-200 bg-white hover:border-slate-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="mt-1"
+                          checked={checked}
+                          onChange={() => toggle(instrumento, app.id)}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="font-medium text-slate-800">
+                            {formatarData(app.dataAplicacao)} · {score}
+                          </span>
+                          <span className="mt-0.5 block text-xs text-slate-500">
+                            {app.classificacao}
+                            {app.profissional?.nome
+                              ? ` · ${app.profissional.nome} (${formatarEspecialidade(app.profissional.especialidade)})`
+                              : ''}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">
+          {error}
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-3">
+        <Button
+          onClick={() => void handleSubmit()}
+          disabled={pending || empty}
+          className="bg-teal-600 text-white hover:bg-teal-700"
+        >
+          {pending ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Consolidando...
+            </>
+          ) : (
+            'Consolidar AGA'
+          )}
+        </Button>
+        <Button variant="outline" onClick={onCancel} disabled={pending}>
+          Cancelar
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -157,75 +432,116 @@ export default function AGAPage() {
 }
 
 function AGAPageContent({ patientId, role }: { patientId: string; role: string | null }) {
-  const utils = trpc.useUtils();
   const [showForm, setShowForm] = useState(false);
   const [message, setMessage] = useState('');
   const canEdit = role === 'admin' || role === 'profissional';
-  const agasQuery = trpc.avaliacoesGeriatricas.listar.useQuery({ pacienteId: patientId }, { enabled: Boolean(patientId) });
-  const criarAga = trpc.avaliacoesGeriatricas.criar.useMutation({
-    onSuccess: () => {
-      utils.avaliacoesGeriatricas.listar.invalidate({ pacienteId: patientId });
-      utils.avaliacoesGeriatricas.relatorio.invalidate({ pacienteId: patientId });
-      setShowForm(false);
-      setMessage('Avaliação salva com sucesso.');
-      window.setTimeout(() => setMessage(''), 2500);
-    },
-    onError: (error) => setMessage(error.message),
-  });
 
-  if (agasQuery.isPending) {
-    return <div className="py-12 text-center text-sm text-slate-500" aria-live="polite">Carregando avaliações...</div>;
-  }
-
-  if (agasQuery.isError) {
-    return <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-700" role="alert"><div className="flex items-center gap-2 font-medium"><AlertCircle className="h-4 w-4" /> Não foi possível carregar as avaliações.</div><p className="mt-1 text-xs">{agasQuery.error.message}</p></div>;
-  }
+  const agasQuery = trpc.agas.listar.useQuery(
+    { pacienteId: patientId },
+    { enabled: Boolean(patientId) },
+  );
 
   const agas = agasQuery.data ?? [];
-  const current = agas[0];
+  const current = agas.find((aga) => aga.status === 'concluida') ?? agas[0];
+  const previousConcluded = agas.filter((aga) => aga.status === 'concluida').slice(0, 2);
+  const currentId = previousConcluded[0]?.id;
+  const previousId = previousConcluded[1]?.id;
 
-  if (showForm) {
+  const currentDetailQuery = trpc.agas.buscar.useQuery(
+    { pacienteId: patientId, agaId: currentId! },
+    { enabled: Boolean(patientId && currentId) },
+  );
+  const previousDetailQuery = trpc.agas.buscar.useQuery(
+    { pacienteId: patientId, agaId: previousId! },
+    { enabled: Boolean(patientId && previousId) },
+  );
+
+  if (agasQuery.isPending) {
     return (
-      <div>
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">Nova avaliação geriátrica ampla</h2>
-            <p className="mt-1 text-sm text-slate-500">Preencha cada escala selecionando as opções do instrumento.</p>
-          </div>
-          <Button variant="outline" onClick={() => setShowForm(false)}>Voltar para avaliações</Button>
-        </div>
-        {canEdit ? (
-          <AgaForm
-            pacienteId={patientId}
-            onCancelAction={() => setShowForm(false)}
-            createAction={(input) => criarAga.mutate(input)}
-            isPending={criarAga.isPending}
-            errorMessage={criarAga.error?.message}
-          />
-        ) : (
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600">Usuários sem perfil clínico não podem preencher uma AGA.</div>
-        )}
+      <div className="py-12 text-center text-sm text-slate-500" aria-live="polite">
+        Carregando avaliações...
       </div>
     );
   }
+
+  if (agasQuery.isError) {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-700" role="alert">
+        <div className="flex items-center gap-2 font-medium">
+          <AlertCircle className="h-4 w-4" /> Não foi possível carregar as avaliações.
+        </div>
+        <p className="mt-1 text-xs">{agasQuery.error.message}</p>
+      </div>
+    );
+  }
+
+  if (showForm) {
+    if (!canEdit) {
+      return (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600">
+          Usuários sem perfil clínico não podem consolidar uma AGA.
+        </div>
+      );
+    }
+    return (
+      <ConsolidationForm
+        patientId={patientId}
+        onCancel={() => setShowForm(false)}
+        onDone={(msg) => {
+          setShowForm(false);
+          setMessage(msg);
+          window.setTimeout(() => setMessage(''), 2500);
+        }}
+      />
+    );
+  }
+
+  const currentDetail = currentDetailQuery.data;
+  const previousDetail = previousDetailQuery.data;
+  const comparisonReady =
+    currentDetail &&
+    previousDetail &&
+    currentDetail.status === 'concluida' &&
+    previousDetail.status === 'concluida';
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">Avaliações geriátricas amplas</h2>
-          <p className="mt-1 text-sm text-slate-500">Histórico de avaliações preenchidas e classificação funcional atual.</p>
+          <p className="mt-1 text-sm text-slate-500">
+            Consolidação das escalas preenchidas e linha do tempo de evolução.
+          </p>
         </div>
-        {canEdit && <Button onClick={() => setShowForm(true)} className="bg-teal-600 text-white hover:bg-teal-700">Incluir nova AGA</Button>}
+        {canEdit && (
+          <Button
+            onClick={() => setShowForm(true)}
+            className="bg-teal-600 text-white hover:bg-teal-700"
+          >
+            Incluir nova AGA
+          </Button>
+        )}
       </div>
 
-      {message && <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700" role="status"><CheckCircle2 className="h-4 w-4" />{message}</div>}
+      {message && (
+        <div
+          className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700"
+          role="status"
+        >
+          <CheckCircle2 className="h-4 w-4" />
+          {message}
+        </div>
+      )}
 
       {!current ? (
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center">
           <ClipboardCheck className="mx-auto mb-3 h-9 w-9 text-slate-300" />
-          <p className="text-sm font-medium text-slate-700">Nenhuma AGA preenchida.</p>
-          <p className="mt-1 text-xs text-slate-500">{canEdit ? 'Inicie uma avaliação para registrar as escalas do paciente.' : 'Apenas profissionais podem registrar avaliações.'}</p>
+          <p className="text-sm font-medium text-slate-700">Nenhuma AGA consolidada.</p>
+          <p className="mt-1 text-xs text-slate-500">
+            {canEdit
+              ? 'Consolide aplicações já preenchidas pela equipe multiprofissional.'
+              : 'Apenas profissionais podem consolidar avaliações.'}
+          </p>
         </div>
       ) : (
         <>
@@ -233,26 +549,74 @@ function AGAPageContent({ patientId, role }: { patientId: string; role: string |
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-teal-600" /><h3 className="text-sm font-semibold text-slate-900">Última avaliação</h3></div>
-                  <div className="mt-2 flex items-center gap-2 text-xs text-slate-500"><Calendar className="h-3.5 w-3.5" />{formatarData(current.dataAvaliacao)}<User className="ml-2 h-3.5 w-3.5" />Profissional responsável</div>
-                  <Link
-                    href={`/pacientes/${patientId}/aga/${current.id}/relatorio`}
-                    className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-medium text-teal-700 hover:text-teal-900"
-                  >
-                    <FileText className="h-4 w-4" />
-                    Ver relatório
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-teal-600" />
+                    <h3 className="text-sm font-semibold text-slate-900">
+                      {current.status === 'concluida' ? 'Última avaliação' : 'Rascunho em aberto'}
+                    </h3>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                    <Calendar className="h-3.5 w-3.5" />
+                    {formatarData(current.dataAvaliacao)}
+                    <User className="ml-2 h-3.5 w-3.5" />
+                    Consolidação multiprofissional
+                  </div>
+                  {current.status === 'concluida' && (
+                    <Link
+                      href={`/pacientes/${patientId}/aga/${current.id}/relatorio`}
+                      className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-medium text-teal-700 hover:text-teal-900"
+                    >
+                      <FileText className="h-4 w-4" />
+                      Ver relatório
+                    </Link>
+                  )}
                 </div>
               </div>
-              <ScaleCards aga={current} />
+              {currentDetailQuery.isPending ? (
+                <div className="py-6 text-sm text-slate-500" aria-live="polite">
+                  Carregando aplicações consolidadas...
+                </div>
+              ) : currentDetail ? (
+                <ApplicationCards aplicacoes={currentDetail.aplicacoes} />
+              ) : (
+                <p className="text-sm text-slate-500">Sem detalhe da consolidação.</p>
+              )}
             </div>
-            <CurrentClassification aga={current} />
+            <CurrentClassification classificacao={current.classificacao} />
           </div>
-          {agas[1] && <AgaComparison atual={current} anterior={agas[1]} />}
-          {current.observacoes && <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><h3 className="text-sm font-semibold text-slate-900">Observações da avaliação atual</h3><p className="mt-2 text-sm leading-relaxed text-slate-600">{current.observacoes}</p></div>}
+
+          {comparisonReady && (
+            <AgaComparison
+              atual={{
+                dataAvaliacao: currentDetail.dataAvaliacao,
+                ...scoresFromApplications(currentDetail.aplicacoes),
+              }}
+              anterior={{
+                dataAvaliacao: previousDetail.dataAvaliacao,
+                ...scoresFromApplications(previousDetail.aplicacoes),
+              }}
+            />
+          )}
+
+          {current.observacoes && (
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-900">Observações da avaliação atual</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">{current.observacoes}</p>
+            </div>
+          )}
+
           <div>
-            <h3 className="mb-3 text-sm font-semibold text-slate-900">Histórico de avaliações</h3>
-            <div className="space-y-3">{agas.map((aga, index) => <AGARecord key={aga.id} aga={aga} current={index === 0} patientId={patientId} />)}</div>
+            <h3 className="mb-3 text-sm font-semibold text-slate-900">Linha do tempo de AGAs</h3>
+            <div className="space-y-3">
+              {agas.map((aga, index) => (
+                <AGARecord
+                  key={aga.id}
+                  aga={aga}
+                  current={index === 0}
+                  patientId={patientId}
+                />
+              ))}
+            </div>
           </div>
         </>
       )}

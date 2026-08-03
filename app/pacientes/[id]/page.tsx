@@ -17,9 +17,13 @@ import {
 import type { RouterOutputs } from '@/lib/trpc/types';
 import { podeAcessarClinico, podeLerClinico } from '@/lib/trpc/autorizacao';
 import { formatarData } from '@/lib/utils';
+import { getInstrumentDefinition } from '@/lib/instrumentos/instrumentos';
+import {
+  montarRelatorioAga,
+  type AgaDetail,
+} from '@/lib/relatorios/aga-relatorio';
 
 type PacienteDetails = RouterOutputs['pacientes']['buscar'];
-type AgaSummaryReport = RouterOutputs['avaliacoesGeriatricas']['relatorio'];
 
 function Kpi({ icon: Icon, label, value, unit }: { icon: typeof Activity; label: string; value: string; unit: string }) {
   return (
@@ -53,10 +57,17 @@ export default function PatientDadosPage() {
 
   const [agora] = useState(() => Date.now());
 
-  // Último relatório AGA
-  const relatorioAGA = trpc.avaliacoesGeriatricas.relatorio.useQuery(
+  // Última AGA concluída do modelo novo (consolidação de aplicações).
+  const agasQuery = trpc.agas.listar.useQuery(
     { pacienteId: params.id },
     { enabled: Boolean(params.id) && canViewClinical },
+  );
+  const ultimaConcluidaId = (agasQuery.data ?? []).find(
+    (aga) => aga.status === 'concluida',
+  )?.id;
+  const agaDetalheQuery = trpc.agas.buscar.useQuery(
+    { pacienteId: params.id, agaId: ultimaConcluidaId! },
+    { enabled: Boolean(params.id && ultimaConcluidaId) && canViewClinical },
   );
 
   if (pacienteQ.isError) {
@@ -128,9 +139,12 @@ export default function PatientDadosPage() {
       {/* ── Resumo Clínico AGA ── */}
       <AGASummaryCard
         pacienteId={params.id}
-        relatorio={relatorioAGA.data}
-        isLoading={relatorioAGA.isLoading}
-        isError={relatorioAGA.isError}
+        aga={agaDetalheQuery.data}
+        isLoading={
+          agasQuery.isPending ||
+          (ultimaConcluidaId ? agaDetalheQuery.isPending : false)
+        }
+        isError={agasQuery.isError || agaDetalheQuery.isError}
         canViewClinical={canViewClinical}
         canEditClinical={canEditClinical}
       />
@@ -342,22 +356,32 @@ const toneBgClass: Record<string, string> = {
   ok: 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200',
   warn: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200',
   risk: 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200',
+  muted: 'bg-slate-50 text-slate-500 ring-1 ring-inset ring-slate-200',
+};
+
+const toneForRdc = (label: string | null | undefined): 'ok' | 'warn' | 'risk' | 'muted' => {
+  if (!label) return 'muted';
+  if (label.includes('I') && !label.includes('II') && !label.includes('III')) return 'ok';
+  if (label.includes('III')) return 'risk';
+  if (label.includes('II')) return 'warn';
+  return 'muted';
 };
 
 // ── AGASummaryCard ──
-// Resumo clínico da última AGA, exibido no primeiro acesso ao paciente.
-// Estados: loading, erro, ausência (com CTA) e dados preenchidos.
+// Resumo clínico da última AGA concluída (modelo novo), exibido no primeiro
+// acesso ao paciente. Estados: loading, erro, ausência (com CTA) e dados
+// preenchidos. Fonte: agas.buscar (snapshot de aplicações).
 
 function AGASummaryCard({
   pacienteId,
-  relatorio,
+  aga,
   isLoading,
   isError,
   canViewClinical,
   canEditClinical,
 }: {
   pacienteId: string;
-  relatorio: AgaSummaryReport | undefined;
+  aga: AgaDetail | undefined;
   isLoading: boolean;
   isError: boolean;
   canViewClinical: boolean;
@@ -402,7 +426,7 @@ function AGASummaryCard({
     );
   }
 
-  if (!relatorio) {
+  if (!aga) {
     return (
       <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between">
@@ -421,7 +445,7 @@ function AGASummaryCard({
           )}
         </div>
         <p className="mt-3 text-sm text-slate-500">
-          Nenhuma Avaliação Geriátrica Ampla registrada para este paciente.
+          Nenhuma Avaliação Geriátrica Ampla concluída para este paciente.
         </p>
         {!canEdit && (
           <p className="mt-1 text-xs text-slate-400">
@@ -432,7 +456,8 @@ function AGASummaryCard({
     );
   }
 
-  const { avaliacao, profissional, especialidade, interpretacao } = relatorio;
+  const report = montarRelatorioAga(aga);
+  const rdcTone = toneForRdc(aga.classificacao);
 
   return (
     <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -440,17 +465,24 @@ function AGASummaryCard({
         <div className="flex items-center gap-2">
           <ClipboardList className="h-5 w-5 text-teal-600" />
           <h3 className="text-sm font-semibold text-slate-900">Resumo Clínico — AGA</h3>
+          {aga.classificacao && (
+            <span
+              className={`rounded-full px-2 py-1 text-[11px] font-semibold ${toneBgClass[rdcTone]}`}
+            >
+              {aga.classificacao}
+            </span>
+          )}
         </div>
         <time className="text-xs text-slate-400">
-          {formatarData(avaliacao.dataAvaliacao)}
+          {formatarData(report.dataAvaliacao)}
         </time>
       </div>
 
-      {profissional && (
+      {report.profissional && (
         <div className="mb-4 flex items-center gap-2 text-xs text-slate-500">
           <User className="h-3.5 w-3.5" />
-          <span>{profissional}</span>
-          {especialidade && <span className="text-slate-400">· {especialidade}</span>}
+          <span>{report.profissional}</span>
+          {report.especialidade && <span className="text-slate-400">· {report.especialidade}</span>}
           <Link
             href={`/pacientes/${pacienteId}/aga`}
             className="ml-auto inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 font-medium transition-colors"
@@ -462,28 +494,23 @@ function AGASummaryCard({
       )}
 
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-        {[
-          { key: 'katz' as const, label: 'Katz', max: 6, score: avaliacao.katzScore, interp: interpretacao?.katz },
-          { key: 'lawton' as const, label: 'Lawton', max: 8, score: avaliacao.lawtonScore, interp: interpretacao?.lawton },
-          { key: 'meem' as const, label: 'MEEM', max: 30, score: avaliacao.meemScore, interp: interpretacao?.meem },
-          { key: 'gds15' as const, label: 'GDS-15', max: 15, score: avaliacao.gds15Score, interp: interpretacao?.gds15 },
-          { key: 'man' as const, label: 'MAN', max: 14, score: avaliacao.manScore, interp: interpretacao?.man },
-          { key: 'tug' as const, label: 'TUG', max: 300, score: avaliacao.tugSegundos, interp: interpretacao?.tug, unit: 's' },
-        ].map(({ key, label, max, score, interp, unit }) => {
-          const tone = toneForScale(key, score);
+        {report.escalas.map((escala) => {
+          const def = getInstrumentDefinition(escala.key);
+          const unit = escala.unit === 'segundos' ? 's' : undefined;
+          const tone = toneForScale(escala.key, escala.score);
           return (
-            <div key={key} className={`rounded-lg border p-3 text-center ${toneBgClass[tone]}`}>
-              <div className="text-[11px] font-medium tracking-wider uppercase">{label}</div>
+            <div key={escala.key} className={`rounded-lg border p-3 text-center ${toneBgClass[tone]}`}>
+              <div className="text-[11px] font-medium tracking-wider uppercase">{def.nomeCurto}</div>
               <div className="mt-1 text-lg font-semibold tabular-nums">
-                {score ?? '—'}
+                {escala.score ?? '—'}
                 {unit ? (
                   <span className="text-xs font-normal opacity-60">{unit}</span>
                 ) : (
-                  <span className="text-xs font-normal opacity-60">/{max}</span>
+                  <span className="text-xs font-normal opacity-60">/{escala.max}</span>
                 )}
               </div>
-              {interp && (
-                <div className="mt-1 text-[10px] leading-tight opacity-80">{interp}</div>
+              {escala.interpretation && (
+                <div className="mt-1 text-[10px] leading-tight opacity-80">{escala.interpretation}</div>
               )}
             </div>
           );

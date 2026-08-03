@@ -9,8 +9,8 @@
 </p>
 
 <p align="center">
-  <strong>Open-source electronic health record specialized in geriatric care.</strong><br>
-  A multi-tenant system for long-term care facilities (ILPIs) and geriatric clinics.
+  <strong>Open-source geriatric care platform for ILPIs — EHR today, ERP for long-term care tomorrow.</strong><br>
+  A multi-tenant clinical record for Brazilian long-term care facilities, on the path to becoming a full facility operating system.
 </p>
 
 <p align="center">
@@ -30,15 +30,17 @@
 <a name="english"></a>
 ## 🇺🇸 English
 
-**GerontiCare** is an open-source electronic health record (EHR) system specialized in geriatric care, designed for **ILPIs** (*Instituições de Longa Permanência para Idosos* — Brazilian long-term care facilities for the elderly) and geriatric clinics.
+**GerontiCare** is an open-source geriatric care platform built for **ILPIs** (*Instituições de Longa Permanência para Idosos* — Brazilian long-term care facilities for the elderly) and geriatric clinics.
 
-It unifies the multiprofessional clinical record, the Comprehensive Geriatric Assessment (CGA/AGA), and vital sign monitoring into a single interface designed for aging care — with automatic interpretation of the most widely used geriatric scales (Katz, Lawton, MEEM, GDS-15, MNA, TUG).
+**Today** it is a clinical record (EHR): multiprofessional notes, Comprehensive Geriatric Assessment (CGA/AGA) with automatic interpretation of the main geriatric scales (Katz, Lawton, MEEM, GDS-15, MNA, TUG), vital sign monitoring, and S3-compatible anexos — multi-tenant and role-aware, in one interface.
+
+**Our goal** is to grow GerontiCare into a full **ERP for ILPIs** — the operating system of the facility — extending beyond clinical care into the administrative, financial, and operational layers of long-term care, always with the resident's clinical record at the center.
 
 ### Why this exists
 
-Brazilian ILPIs and geriatric clinics manage complex, multidisciplinary care for elderly residents with limited tools — often a mix of paper charts and spreadsheets. Critical information is scattered across professions (medicine, nursing, physiotherapy, occupational therapy, nutrition, psychology, social work), making it hard to see the full clinical picture.
+Brazilian ILPIs and geriatric clinics manage complex, multidisciplinary care for elderly residents with limited tools — often a mix of paper charts and spreadsheets. Critical information is scattered across professions (medicine, nursing, physiotherapy, occupational therapy, nutrition, psychology, social work), making it hard to see the full clinical picture of the resident or of the facility as a whole.
 
-GerontiCare brings everything together: structured geriatric assessments with automatic scoring, a unified clinical timeline across all professions, and anexos (lab results, imaging, documents) stored securely in S3-compatible storage — all isolated per institution via multi-tenancy.
+GerontiCare starts by unifying the clinical layer: structured geriatric assessments with automatic scoring, a multiprofessional timeline, and anexos (lab results, imaging, documents) stored securely in S3-compatible storage — all isolated per institution via multi-tenancy. The long-term aim is the full facility stack on top of that core.
 
 ### Features
 

@@ -1,5 +1,5 @@
 import { relations } from 'drizzle-orm';
-import { pgTable, text, timestamp, uuid, integer, boolean, jsonb, pgEnum, index } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, uuid, integer, boolean, jsonb, pgEnum, index, unique } from 'drizzle-orm/pg-core';
 import type { AgaAnswers } from '@/lib/validations/aga-form';
 import type { InstrumentoSlug } from '@/lib/instrumentos/instrumentos';
 
@@ -203,6 +203,58 @@ export const aplicacoesInstrumentosRelations = relations(
   }),
 );
 
+export const agaStatusEnum = pgEnum('aga_status', ['rascunho', 'concluida']);
+
+export const agas = pgTable('agas', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  pacienteId: uuid('paciente_id').references(() => pacientes.id).notNull(),
+  criadoPorId: uuid('criado_por_id').references(() => usuarios.id).notNull(),
+  status: agaStatusEnum('status').default('rascunho').notNull(),
+  dataAvaliacao: timestamp('data_avaliacao').defaultNow().notNull(),
+  observacoes: text('observacoes'),
+  resultado: text('resultado'),
+  classificacao: text('classificacao'),
+  descricaoClassificacao: text('descricao_classificacao'),
+  concluidaEm: timestamp('concluida_em'),
+  concluidaPorId: uuid('concluida_por_id').references(() => usuarios.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({ pacienteIdx: index('agas_paciente_idx').on(table.pacienteId) }));
+
+export const agaAplicacoes = pgTable('aga_aplicacoes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  agaId: uuid('aga_id').references(() => agas.id).notNull(),
+  aplicacaoInstrumentoId: uuid('aplicacao_instrumento_id').references(() => aplicacoesInstrumentos.id).notNull(),
+  instrumento: text('instrumento').$type<InstrumentoSlug>().notNull(),
+  profissionalId: uuid('profissional_id').references(() => usuarios.id).notNull(),
+  registradoPorId: uuid('registrado_por_id').references(() => usuarios.id).notNull(),
+  dataAplicacao: timestamp('data_aplicacao').notNull(),
+  respostas: jsonb('respostas').$type<Record<string, unknown>>().notNull(),
+  escore: integer('escore'),
+  classificacao: text('classificacao').notNull(),
+  descricaoClassificacao: text('descricao_classificacao').notNull(),
+  versaoInstrumento: text('versao_instrumento').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  agaInstrumentoUnique: unique('aga_aplicacoes_aga_instrumento_unique').on(table.agaId, table.instrumento),
+  agaAplicacaoUnique: unique('aga_aplicacoes_aga_aplicacao_unique').on(table.agaId, table.aplicacaoInstrumentoId),
+  agaIdx: index('aga_aplicacoes_aga_idx').on(table.agaId),
+}));
+
+export const agasRelations = relations(agas, ({ one, many }) => ({
+  paciente: one(pacientes, { fields: [agas.pacienteId], references: [pacientes.id] }),
+  criadoPor: one(usuarios, { fields: [agas.criadoPorId], references: [usuarios.id], relationName: 'aga_criado_por' }),
+  concluidaPor: one(usuarios, { fields: [agas.concluidaPorId], references: [usuarios.id], relationName: 'aga_concluida_por' }),
+  aplicacoes: many(agaAplicacoes),
+}));
+
+export const agaAplicacoesRelations = relations(agaAplicacoes, ({ one }) => ({
+  aga: one(agas, { fields: [agaAplicacoes.agaId], references: [agas.id] }),
+  aplicacaoInstrumento: one(aplicacoesInstrumentos, { fields: [agaAplicacoes.aplicacaoInstrumentoId], references: [aplicacoesInstrumentos.id] }),
+  profissional: one(usuarios, { fields: [agaAplicacoes.profissionalId], references: [usuarios.id], relationName: 'aga_aplicacao_profissional' }),
+  registradoPor: one(usuarios, { fields: [agaAplicacoes.registradoPorId], references: [usuarios.id], relationName: 'aga_aplicacao_registrado_por' }),
+}));
+
 // Tabela: Prontuário (registros clínicos)
 export const registros = pgTable('registros', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -258,6 +310,10 @@ export type AvaliacaoGeriatrica = typeof avaliacoesGeriatricas.$inferSelect;
 export type NovaAvaliacaoGeriatrica = typeof avaliacoesGeriatricas.$inferInsert;
 export type AplicacaoInstrumento = typeof aplicacoesInstrumentos.$inferSelect;
 export type NovaAplicacaoInstrumento = typeof aplicacoesInstrumentos.$inferInsert;
+export type Aga = typeof agas.$inferSelect;
+export type NovaAga = typeof agas.$inferInsert;
+export type AgaAplicacao = typeof agaAplicacoes.$inferSelect;
+export type NovaAgaAplicacao = typeof agaAplicacoes.$inferInsert;
 export type Registro = typeof registros.$inferSelect;
 export type NovoRegistro = typeof registros.$inferInsert;
 export type SinaisVitais = typeof sinaisVitais.$inferSelect;

@@ -8,20 +8,11 @@ import { trpc } from '@/lib/trpc/client';
 import { formatarData } from '@/lib/utils';
 import {
   classificarGrauDependenciaRdc502,
-  type Rdc502Autocuidado,
-  type Rdc502Cognicao,
 } from '@/lib/validations/escalas';
-
-type ScaleKey = 'katz' | 'lawton' | 'meem' | 'gds15' | 'man' | 'tug';
-
-type ScaleDefinition = {
-  key: ScaleKey;
-  label: string;
-  max?: number;
-  unit?: string;
-  interpretation: string | null;
-  score: number | null;
-};
+import {
+  montarRelatorioAga,
+  type RelatorioEscala,
+} from '@/lib/relatorios/aga-relatorio';
 
 function getAge(dataNascimento: string | Date): number | null {
   const nascimento = new Date(dataNascimento);
@@ -36,7 +27,7 @@ function getAge(dataNascimento: string | Date): number | null {
   return idade;
 }
 
-function formatScore(scale: ScaleDefinition): string {
+function formatScore(scale: RelatorioEscala): string {
   if (scale.score === null) return 'Não informado';
   if (scale.unit) return `${scale.score} ${scale.unit}`;
   return scale.max ? `${scale.score}/${scale.max}` : `${scale.score}`;
@@ -48,8 +39,8 @@ export default function AgaReportPage() {
     { id: params.id },
     { enabled: Boolean(params.id) },
   );
-  const avaliacaoQuery = trpc.avaliacoesGeriatricas.buscar.useQuery(
-    { id: params.avaliacaoId, pacienteId: params.id },
+  const avaliacaoQuery = trpc.agas.buscar.useQuery(
+    { agaId: params.avaliacaoId, pacienteId: params.id },
     { enabled: Boolean(params.avaliacaoId) },
   );
 
@@ -77,20 +68,12 @@ export default function AgaReportPage() {
   }
 
   const paciente = pacienteQuery.data;
-  const report = avaliacaoQuery.data;
-  const avaliacao = report;
+  const report = montarRelatorioAga(avaliacaoQuery.data);
   const classification = classificarGrauDependenciaRdc502(
-    avaliacao.rdc502Autocuidado as Rdc502Autocuidado | null,
-    avaliacao.rdc502Cognicao as Rdc502Cognicao | null,
+    report.rdc502Autocuidado,
+    report.rdc502Cognicao,
   );
-  const scales: ScaleDefinition[] = [
-    { key: 'katz', label: 'Katz — autonomia básica', max: 6, interpretation: avaliacao.interpretacao.katz, score: avaliacao.katzScore },
-    { key: 'lawton', label: 'Lawton — autonomia instrumental', max: 8, interpretation: avaliacao.interpretacao.lawton, score: avaliacao.lawtonScore },
-    { key: 'meem', label: 'MEEM — cognição', max: 30, interpretation: avaliacao.interpretacao.meem, score: avaliacao.meemScore },
-    { key: 'gds15', label: 'GDS-15 — humor', max: 15, interpretation: avaliacao.interpretacao.gds15, score: avaliacao.gds15Score },
-    { key: 'man', label: 'MAN — nutrição', max: 14, interpretation: avaliacao.interpretacao.man, score: avaliacao.manScore },
-    { key: 'tug', label: 'TUG — mobilidade', unit: 'segundos', interpretation: avaliacao.interpretacao.tug, score: avaliacao.tugSegundos },
-  ];
+  const scales = report.escalas;
 
   return (
     <main className="space-y-5">
@@ -122,7 +105,7 @@ export default function AgaReportPage() {
             </div>
             <div className="text-right text-xs text-slate-500">
               <p>Avaliação realizada em</p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">{formatarData(avaliacao.dataAvaliacao)}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-900">{formatarData(report.dataAvaliacao)}</p>
             </div>
           </div>
 
@@ -140,8 +123,8 @@ export default function AgaReportPage() {
             </div>
             <div>
               <p className="text-xs text-slate-500">Profissional responsável</p>
-              <p className="mt-1 font-semibold text-slate-900">{avaliacao.profissional ?? 'Não informado'}</p>
-              {avaliacao.especialidade && <p className="text-xs text-slate-500">{avaliacao.especialidade}</p>}
+              <p className="mt-1 font-semibold text-slate-900">{report.profissional ?? 'Não informado'}</p>
+              {report.especialidade && <p className="text-xs text-slate-500">{report.especialidade}</p>}
             </div>
           </div>
         </header>
@@ -180,23 +163,23 @@ export default function AgaReportPage() {
         </section>
 
         <section className="grid gap-5 md:grid-cols-2 print:grid-cols-2">
-          <ReportList title="Comorbidades" items={avaliacao.comorbidades ?? []} empty="Não informado" />
+          <ReportList title="Comorbidades" items={report.comorbidades ?? []} empty="Não informado" />
           <ReportList
             title="Medicamentos em uso"
-            items={(avaliacao.medicamentos ?? []).map((medicamento) => `${medicamento.nome} — ${medicamento.dose} — ${medicamento.frequencia}`)}
+            items={(report.medicamentos ?? []).map((medicamento) => `${medicamento.nome} — ${medicamento.dose} — ${medicamento.frequencia}`)}
             empty="Não informado"
           />
         </section>
 
         <section className="grid gap-5 border-t border-slate-200 pt-5 md:grid-cols-2 print:grid-cols-2">
-          <ReportText title="Suporte social" value={avaliacao.suporteSocial} />
-          <ReportText title="Moradia" value={avaliacao.moradia} />
+          <ReportText title="Suporte social" value={report.suporteSocial} />
+          <ReportText title="Moradia" value={report.moradia} />
         </section>
 
         <section className="border-t border-slate-200 pt-5">
           <h2 className="text-sm font-semibold text-slate-900">Observações clínicas</h2>
           <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
-            {avaliacao.observacoes || 'Não informado'}
+            {report.observacoes || 'Não informado'}
           </p>
         </section>
 

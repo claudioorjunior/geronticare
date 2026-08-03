@@ -9,8 +9,8 @@
 </p>
 
 <p align="center">
-  <strong>Prontuário eletrônico open-source especializado em cuidado geriátrico.</strong><br>
-  Um sistema multi-tenant para ILPIs e clínicas geriátricas.
+  <strong>Plataforma open-source de cuidado geriátrico para ILPIs — EHR hoje, ERP de longa permanência amanhã.</strong><br>
+  Prontuário multi-tenant para instituições de longa permanência, no caminho de virar o sistema operacional da casa.
 </p>
 
 > **⚠️ NÃO ESTÁ PRONTO PARA PRODUÇÃO** — O GerontiCare está em desenvolvimento pré-alfa. **Não utilize com pacientes reais ou em ambientes de produção.** O sistema pode produzir avaliações incorretas, falsos positivos ou perda de dados. Use apenas para desenvolvimento, testes e avaliação.
@@ -31,15 +31,17 @@
 <a name="portugues"></a>
 ## 🇧🇷 Português (Brasil)
 
-**GerontiCare** é um sistema de prontuário eletrônico (EHR) open-source especializado em cuidado geriátrico, projetado para **ILPIs** (*Instituições de Longa Permanência para Idosos*) e clínicas geriátricas.
+**GerontiCare** é uma plataforma open-source de cuidado geriátrico feita para **ILPIs** (*Instituições de Longa Permanência para Idosos*) e clínicas geriátricas.
 
-Ele unifica o prontuário multiprofissional, a Avaliação Geriátrica Ampla (AGA) e o monitoramento de sinais vitais em uma única interface pensada para o envelhecimento — com interpretação automática das escalas geriátricas mais utilizadas (Katz, Lawton, MEEM, GDS-15, MAN, TUG).
+**Hoje** é um prontuário clínico (EHR): evolução multiprofissional, Avaliação Geriátrica Ampla (AGA) com interpretação automática das principais escalas (Katz, Lawton, MEEM, GDS-15, MNA, TUG), sinais vitais e anexos em storage S3-compatible — multi-tenant e com papéis por profissional, numa só interface.
+
+**Nosso objetivo** é transformar o GerontiCare num **ERP completo para ILPIs** — o sistema operacional da instituição — indo além do clínico e cobrindo as camadas administrativa, financeira e operacional da longa permanência, sempre com o prontuário do residente no centro.
 
 ### Por que este projeto existe
 
-ILPIs brasileiras e clínicas geriátricas gerenciam um cuidado complexo e multidisciplinar para idosos com ferramentas limitadas — muitas vezes uma mistura de prontuários em papel e planilhas. Informações críticas estão espalhadas entre profissões (medicina, enfermagem, fisioterapia, terapia ocupacional, nutrição, psicologia, serviço social), dificultando a visão completa do quadro clínico.
+ILPIs brasileiras e clínicas geriátricas gerenciam um cuidado complexo e multidisciplinar para idosos com ferramentas limitadas — muitas vezes uma mistura de prontuários em papel e planilhas. Informações críticas ficam espalhadas entre profissões (medicina, enfermagem, fisioterapia, terapia ocupacional, nutrição, psicologia, serviço social), dificultando a visão completa do residente e da instituição.
 
-O GerontiCare reúne tudo: avaliações geriátricas estruturadas com pontuação automática, uma linha do tempo clínica unificada entre todas as profissões, e anexos (resultados de exames, imagens, documentos) armazenados com segurança em storage S3-compatible — tudo isolado por instituição via multi-tenancy.
+O GerontiCare começa unificando a camada clínica: avaliações geriátricas estruturadas com pontuação automática, linha do tempo multiprofissional e anexos (exames, imagens, documentos) em storage S3-compatible — tudo isolado por instituição via multi-tenancy. A meta de longo prazo é o stack completo da casa em cima desse núcleo.
 
 ### Funcionalidades
 
