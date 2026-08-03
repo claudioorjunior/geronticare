@@ -50,9 +50,12 @@ export const sinaisVitaisRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       await verificarOwnershipPaciente(ctx.db, input.pacienteId, ctx.instituicaoId);
 
-      return ctx.db.query.sinaisVitais.findFirst({
-        where: eq(sinaisVitais.pacienteId, input.pacienteId),
-        orderBy: (sinaisVitais, { desc }) => [desc(sinaisVitais.dataAfericao)],
-      });
+      // null (not undefined): React Query rejects undefined query data.
+      return (
+        (await ctx.db.query.sinaisVitais.findFirst({
+          where: eq(sinaisVitais.pacienteId, input.pacienteId),
+          orderBy: (sinaisVitais, { desc }) => [desc(sinaisVitais.dataAfericao)],
+        })) ?? null
+      );
     }),
 });
