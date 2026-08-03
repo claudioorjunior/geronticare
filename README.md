@@ -9,8 +9,8 @@
 </p>
 
 <p align="center">
-  <strong>Open-source electronic health record specialized in geriatric care.</strong><br>
-  A multi-tenant system for long-term care facilities (ILPIs) and geriatric clinics.
+  <strong>Open-source geriatric care platform for ILPIs — EHR today, ERP for long-term care tomorrow.</strong><br>
+  A multi-tenant clinical record for Brazilian long-term care facilities, on the path to becoming a full facility operating system.
 </p>
 
 <p align="center">
@@ -30,15 +30,17 @@
 <a name="english"></a>
 ## 🇺🇸 English
 
-**GerontiCare** is an open-source electronic health record (EHR) system specialized in geriatric care, designed for **ILPIs** (*Instituições de Longa Permanência para Idosos* — Brazilian long-term care facilities for the elderly) and geriatric clinics.
+**GerontiCare** is an open-source geriatric care platform built for **ILPIs** (*Instituições de Longa Permanência para Idosos* — Brazilian long-term care facilities for the elderly) and geriatric clinics.
 
-It unifies the multiprofessional clinical record, the Comprehensive Geriatric Assessment (CGA/AGA), and vital sign monitoring into a single interface designed for aging care — with automatic interpretation of the most widely used geriatric scales (Katz, Lawton, MEEM, GDS-15, MNA, TUG).
+**Today** it is a clinical record (EHR): multiprofessional notes, Comprehensive Geriatric Assessment (CGA/AGA) with automatic interpretation of the main geriatric scales (Katz, Lawton, MEEM, GDS-15, MNA, TUG), vital sign monitoring, and S3-compatible anexos — multi-tenant and role-aware, in one interface.
+
+**Our goal** is to grow GerontiCare into a full **ERP for ILPIs** — the operating system of the facility — extending beyond clinical care into the administrative, financial, and operational layers of long-term care, always with the resident's clinical record at the center.
 
 ### Why this exists
 
-Brazilian ILPIs and geriatric clinics manage complex, multidisciplinary care for elderly residents with limited tools — often a mix of paper charts and spreadsheets. Critical information is scattered across professions (medicine, nursing, physiotherapy, occupational therapy, nutrition, psychology, social work), making it hard to see the full clinical picture.
+Brazilian ILPIs and geriatric clinics manage complex, multidisciplinary care for elderly residents with limited tools — often a mix of paper charts and spreadsheets. Critical information is scattered across professions (medicine, nursing, physiotherapy, occupational therapy, nutrition, psychology, social work), making it hard to see the full clinical picture of the resident or of the facility as a whole.
 
-GerontiCare brings everything together: structured geriatric assessments with automatic scoring, a unified clinical timeline across all professions, and anexos (lab results, imaging, documents) stored securely in S3-compatible storage — all isolated per institution via multi-tenancy.
+GerontiCare starts by unifying the clinical layer: structured geriatric assessments with automatic scoring, a multiprofessional timeline, and anexos (lab results, imaging, documents) stored securely in S3-compatible storage — all isolated per institution via multi-tenancy. The long-term aim is the full facility stack on top of that core.
 
 ### Features
 
@@ -70,27 +72,49 @@ GerontiCare brings everything together: structured geriatric assessments with au
 | Storage | AWS S3 SDK (S3-compatible) |
 | Language | TypeScript 5 (strict) |
 
-### Quick start
+### Quick start (development)
 
 ```bash
 # 1. Clone
+
 git clone https://github.com/claudioorjunior/geronticare.git
 cd geronticare
 
 # 2. Install
 npm install
 
-# 3. Configure
-cp .env.example .env.local
-# fill in DATABASE_URL, AUTH_SECRET, AUTH_URL, S3_* vars
+# 3. Configure (development — embedded PGlite DB, no PostgreSQL needed)
+cp .env.development.example .env.local
+# DEV_AUTH_BYPASS=true already grants a seed admin session with no login
 
-# 4. Apply schema to database
-npm run db:push
-
-# 5. Run
+# 4. Run
 npm run dev
 # open http://localhost:3000
 ```
+
+> Dev uses an embedded PGlite database (seeded automatically) — no `db:push` needed.
+> The `db:push`/`db:generate` scripts target an external PostgreSQL via `DATABASE_URL`.
+
+### Production environment
+
+```bash
+# Build and serve with PostgreSQL
+cp .env.production.example .env.production
+# fill in DATABASE_URL, AUTH_SECRET, AUTH_URL, S3_* vars
+npm run build
+npm run start
+```
+
+The process exposes `GET /api/health` as a cache-free liveness check for monitoring and load balancers.
+
+#### How the environment separation works
+
+- **`NODE_ENV` is always set by Next.js**: `npm run dev` → `development`, `npm run build`/`npm run start` → `production`. You never set it manually.
+- **Dev access bypass** (`lib/trpc/server.ts`): the seed admin session only activates when **both** `NODE_ENV=development` and `DEV_AUTH_BYPASS=true` are present — it is *fail-closed* by construction and can never activate in a production build, even if the variable leaks into production env.
+- **Developer convenience**: set `DEV_OVERRIDE_USER_ID` to impersonate any seed user (e.g. a `usuario` read-only account) to test role behavior.
+- **Production**: real login via Better-Auth (email/password). A missing or misconfigured `AUTH_*` variable makes auth fail closed — the app never falls back to anonymous access.
+
+Releases target production deployments with Node.js and PostgreSQL; contributors should fork `main` and open PRs from feature branches.
 
 ### Project structure
 
