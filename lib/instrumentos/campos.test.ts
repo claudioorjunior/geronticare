@@ -23,9 +23,8 @@ const MEEM_COMPLETO = {
 };
 
 describe('campos declarativos dos instrumentos', () => {
-  it('declara os campos dos sete instrumentos sem formulários duplicados', () => {
+  it('declara os campos dos seis instrumentos sem formulários duplicados', () => {
     const quantidadesEsperadas = {
-      rdc502: 2,
       katz: 6,
       lawton: 8,
       meem: 12,
@@ -42,11 +41,6 @@ describe('campos declarativos dos instrumentos', () => {
   });
 
   it('cria um rascunho vazio para todos os campos do instrumento', () => {
-    expect(createInstrumentDraft('rdc502')).toEqual({
-      autocuidado: '',
-      cognicao: '',
-    });
-
     expect(createInstrumentDraft('tug')).toEqual({ segundos: '' });
   });
 
@@ -90,9 +84,6 @@ describe('campos declarativos dos instrumentos', () => {
   });
 
   it('formata respostas persistidas com os rótulos humanos e unidades', () => {
-    expect(formatInstrumentAnswer('rdc502', 'autocuidado', 'ate_tres')).toBe(
-      'Necessita ajuda em até três atividades de autocuidado',
-    );
     expect(formatInstrumentAnswer('meem', 'orientacao_temporal', 5)).toBe(
       '5 de 5 pontos',
     );

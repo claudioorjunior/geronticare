@@ -75,6 +75,68 @@ export function interpretarEscala(nome: string, score: number | null | undefined
   }
 }
 
+export type GrauDependenciaRdc502 = {
+  grau: 'I' | 'II' | 'III';
+  label: 'Grau I' | 'Grau II' | 'Grau III';
+  tone: 'ok' | 'warn' | 'risk';
+  fundamento: string;
+  requerConfirmacao: boolean;
+};
+
+// Grau de dependência sugerido pela RDC 502/2021 a partir das escalas já
+// aplicadas: Katz (autocuidado/ABVD) e MEEM (rastreio cognitivo). A RDC não
+// prescreve um formulário — define dois eixos (autocuidado + cognição) e
+// exige avaliação auditável. O MEEM é rastreio, não diagnóstico: escore
+// abaixo do corte (24) sugere comprometimento e exige confirmação clínica de
+// profissional habilitado (orientação ANVISA). A confirmação final é sempre
+// do profissional; esta função apenas deriva a sugestão.
+export function derivarGrauDependenciaRdc502(input: {
+  katzScore: number | null | undefined;
+  meemScore?: number | null | undefined;
+}): GrauDependenciaRdc502 | null {
+  const { katzScore, meemScore } = input;
+  if (katzScore === null || katzScore === undefined) return null;
+  if (!Number.isInteger(katzScore) || katzScore < 0 || katzScore > 6) return null;
+
+  let grau: 'I' | 'II' | 'III';
+  let base: string;
+
+  if (katzScore === 0) {
+    grau = 'I';
+    base = 'Independente nas atividades básicas de autocuidado (Katz 0 de 6).';
+  } else if (katzScore <= 3) {
+    grau = 'II';
+    base = `Dependência em ${katzScore} de 6 atividades de autocuidado (Katz), dentro do limite de três atividades exigido para o grau II.`;
+  } else {
+    grau = 'III';
+    base = `Dependência em ${katzScore} de 6 atividades de autocuidado (Katz), exigindo assistência em todas as atividades.`;
+  }
+
+  let fundamento = base;
+  let requerConfirmacao = false;
+
+  if (meemScore !== null && meemScore !== undefined) {
+    if (meemScore < 24) {
+      grau = 'III';
+      fundamento = `${base} Rastreio cognitivo alterado (MEEM ${meemScore}/30, abaixo do corte de 24) — sugestão de comprometimento cognitivo, requer confirmação clínica.`;
+      requerConfirmacao = true;
+    } else {
+      fundamento = `${base} Rastreio cognitivo preservado (MEEM ${meemScore}/30).`;
+    }
+  } else {
+    fundamento = `${base} Cognição não avaliada — requer confirmação clínica.`;
+    requerConfirmacao = true;
+  }
+
+  const tone = grau === 'I' ? 'ok' : grau === 'II' ? 'warn' : 'risk';
+  return { grau, label: `Grau ${grau}` as const, tone, fundamento, requerConfirmacao };
+}
+
+// ── Fluxo legado (AGA monolítica, /avaliacoes) ─────────────────────────────
+// A classificação por 2 perguntas foi descontinuada no modelo novo (a AGA
+// consolida as escalas e deriva o grau por derivarGrauDependenciaRdc502), mas
+// o formulário legado AgaForm ainda grava avaliacoesGeriatricas com esses
+// campos. Mantidos apenas para retrocompat até o A6 (legado só leitura).
 export type Rdc502Autocuidado = 'nenhuma' | 'ate_tres' | 'todas';
 export type Rdc502Cognicao = 'sem_comprometimento' | 'alteracao_controlada' | 'comprometimento';
 
@@ -85,8 +147,6 @@ export type GrauDependenciaAnvisa = {
   fundamento: string;
 };
 
-// A RDC 502/2021 não transforma Katz ou Lawton em um grau. Para ILPI, o grau
-// depende do autocuidado e do comprometimento cognitivo informados na avaliação.
 export function classificarGrauDependenciaRdc502(
   autocuidado: Rdc502Autocuidado | null | undefined,
   cognicao: Rdc502Cognicao | null | undefined,

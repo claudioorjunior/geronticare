@@ -7,9 +7,6 @@ import { Button } from '@/components/ui/button';
 import { trpc } from '@/lib/trpc/client';
 import { formatarData } from '@/lib/utils';
 import {
-  classificarGrauDependenciaRdc502,
-} from '@/lib/validations/escalas';
-import {
   montarRelatorioAga,
   type RelatorioEscala,
 } from '@/lib/relatorios/aga-relatorio';
@@ -69,10 +66,7 @@ export default function AgaReportPage() {
 
   const paciente = pacienteQuery.data;
   const report = montarRelatorioAga(avaliacaoQuery.data);
-  const classification = classificarGrauDependenciaRdc502(
-    report.rdc502Autocuidado,
-    report.rdc502Cognicao,
-  );
+  const classification = report.classificacao;
   const scales = report.escalas;
 
   return (
@@ -131,9 +125,9 @@ export default function AgaReportPage() {
 
         <section className="rounded-xl border border-teal-200 bg-teal-50 p-5 print:border-slate-300 print:bg-white">
           <p className="text-xs font-semibold uppercase tracking-wide text-teal-800 print:text-slate-700">Classificação funcional atual</p>
-          <h2 className="mt-1 text-2xl font-bold text-slate-900">{classification?.label ?? 'Não informada'}</h2>
+          <h2 className="mt-1 text-2xl font-bold text-slate-900">{classification ?? 'Não informada'}</h2>
           <p className="mt-2 text-sm leading-relaxed text-slate-700">
-            {classification?.fundamento ?? 'Não há dados suficientes para calcular a classificação RDC 502/2021.'}
+            {report.fundamentoClassificacao ?? 'Não há dados suficientes para a classificação RDC 502/2021.'}
           </p>
         </section>
 

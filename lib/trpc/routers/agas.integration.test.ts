@@ -22,7 +22,6 @@ let caller: Caller;
 let db!: Db;
 
 const respostas = {
-  rdc502: { autocuidado: 'ate_tres', cognicao: 'sem_comprometimento' },
   katz: {
     banho: 'independente',
     vestir: 'independente',
@@ -77,7 +76,7 @@ beforeAll(async () => {
 describe('integração AGA (PGlite real)', () => {
   it('aplica migrations e seed e conecta o fluxo preenchimento -> consolidação -> relatório', async () => {
     // 1) Professionals fill independent instrument applications.
-    const criar = (instrumento: 'rdc502' | 'katz' | 'meem' | 'man' | 'tug', profissionalId: string) =>
+    const criar = (instrumento: 'katz' | 'meem' | 'man' | 'tug', profissionalId: string) =>
       caller.aplicacoesInstrumentos.criar({
         pacienteId: PACIENTE,
         instrumento,
@@ -86,24 +85,23 @@ describe('integração AGA (PGlite real)', () => {
         respostas: respostas[instrumento],
       });
 
-    const [rdc, katz, meem, man, tug] = await Promise.all([
-      criar('rdc502', MEDICO),
+    const [katz, meem, man, tug] = await Promise.all([
       criar('katz', MEDICO),
       criar('meem', MEDICO),
       criar('man', NUTRI),
       criar('tug', FISIO),
     ]);
-    expect(rdc).toHaveProperty('id');
+    expect(katz).toHaveProperty('id');
     expect(tug).toHaveProperty('id');
 
     // 2) Consolidator sees the filled applications through the relation.
     const disponiveis = await caller.agas.aplicacoesDisponiveis({ pacienteId: PACIENTE });
-    expect(disponiveis).toHaveLength(5);
+    expect(disponiveis).toHaveLength(4);
     const porInstrumento = new Map(disponiveis.map((app) => [app.instrumento, app]));
     expect(porInstrumento.get('man')?.profissional?.nome).toBe('Nutri. Marina Alves');
     expect(porInstrumento.get('tug')?.profissional?.nome).toBe('Fisiot. Paulo Santos');
 
-    // 3) Consolidate: draft -> snapshot -> conclude.
+    // 3) Consolidate: draft -> snapshot -> conclude with confirmed grade.
     const draft = await caller.agas.criarRascunho({
       pacienteId: PACIENTE,
       dataAvaliacao: new Date('2026-07-05T12:00:00Z'),
@@ -112,33 +110,36 @@ describe('integração AGA (PGlite real)', () => {
     await caller.agas.selecionarAplicacoes({
       pacienteId: PACIENTE,
       agaId: draft.id,
-      aplicacaoIds: [rdc.id, katz.id, meem.id, man.id, tug.id],
+      aplicacaoIds: [katz.id, meem.id, man.id, tug.id],
     });
-    const concluida = await caller.agas.concluir({ pacienteId: PACIENTE, agaId: draft.id });
+    const concluida = await caller.agas.concluir({
+      pacienteId: PACIENTE,
+      agaId: draft.id,
+      grau: 'I',
+    });
     expect(concluida.id).toBe(draft.id);
 
     // 4) Listing reflects the concluded AGA.
     const listar = await caller.agas.listar({ pacienteId: PACIENTE });
     expect(listar).toHaveLength(1);
-    expect(listar[0]).toMatchObject({ status: 'concluida', classificacao: 'Grau II' });
+    expect(listar[0]).toMatchObject({ status: 'concluida', classificacao: 'Grau I' });
 
     // 5) buscar returns the immutable snapshot with relations resolved.
     const buscar = await caller.agas.buscar({ pacienteId: PACIENTE, agaId: draft.id });
     expect(buscar.status).toBe('concluida');
     expect(buscar.concluidaPor?.nome).toBe('Dr. Mock');
-    expect(buscar.aplicacoes).toHaveLength(5);
-    const rdcSnap = buscar.aplicacoes.find((app) => app.instrumento === 'rdc502');
+    expect(buscar.aplicacoes).toHaveLength(4);
     const katzSnap = buscar.aplicacoes.find((app) => app.instrumento === 'katz');
-    expect(rdcSnap?.respostas).toEqual(respostas.rdc502);
-    expect(rdcSnap?.classificacao).toBe('Grau II');
+    const meemSnap = buscar.aplicacoes.find((app) => app.instrumento === 'meem');
     expect(katzSnap?.escore).toBe(0);
     expect(katzSnap?.profissional?.nome).toBe('Dr. Mock');
+    expect(meemSnap?.escore).toBe(30);
 
     // 6) Report connector maps the snapshot faithfully.
     const relatorio = montarRelatorioAga(buscar);
     expect(relatorio.profissional).toBe('Dr. Mock');
-    expect(relatorio.rdc502Autocuidado).toBe('ate_tres');
-    expect(relatorio.rdc502Cognicao).toBe('sem_comprometimento');
+    expect(relatorio.classificacao).toBe('Grau I');
+    expect(relatorio.fundamentoClassificacao).toContain('RDC 502/2021');
     const escalas = new Map(relatorio.escalas.map((escala) => [escala.key, escala]));
     expect(escalas.get('katz')).toMatchObject({ score: 0, interpretation: 'Independente em ABVD' });
     expect(escalas.get('meem')).toMatchObject({ score: 30, interpretation: 'Normal' });
@@ -191,10 +192,42 @@ describe('integração AGA (PGlite real)', () => {
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 
-  it('exige RDC 502 explícita para concluir (RDC 502/2021)', async () => {
+  it('exige Katz e grau confirmado para concluir (RDC 502/2021)', async () => {
     const draft = await caller.agas.criarRascunho({ pacienteId: PACIENTE });
     await expect(
-      caller.agas.concluir({ pacienteId: PACIENTE, agaId: draft.id }),
+      caller.agas.concluir({ pacienteId: PACIENTE, agaId: draft.id, grau: 'I' }),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  it('exige justificativa clínica ao divergir do grau sugerido pelas escalas', async () => {
+    const katz = await caller.aplicacoesInstrumentos.criar({
+      pacienteId: PACIENTE,
+      instrumento: 'katz',
+      profissionalId: MEDICO,
+      dataAplicacao,
+      respostas: respostas.katz,
+    });
+    const draft = await caller.agas.criarRascunho({ pacienteId: PACIENTE });
+    await caller.agas.selecionarAplicacoes({
+      pacienteId: PACIENTE,
+      agaId: draft.id,
+      aplicacaoIds: [katz.id],
+    });
+
+    await expect(
+      caller.agas.concluir({ pacienteId: PACIENTE, agaId: draft.id, grau: 'III' }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    const concluida = await caller.agas.concluir({
+      pacienteId: PACIENTE,
+      agaId: draft.id,
+      grau: 'III',
+      justificativaGrau: 'Limitação funcional relevante registrada em prontuário, ainda que o Katz pontue 0.',
+    });
+    expect(concluida.id).toBe(draft.id);
+
+    const buscar = await caller.agas.buscar({ pacienteId: PACIENTE, agaId: draft.id });
+    expect(buscar.classificacao).toBe('Grau III');
+    expect(buscar.descricaoClassificacao).toContain('Justificativa clínica');
   });
 });

@@ -11,7 +11,7 @@ function makeAga(overrides: Partial<AgaDetail> = {}): AgaDetail {
     observacoes: 'Paciente mantém acompanhamento multiprofissional.',
     resultado: 'Grau II',
     classificacao: 'Grau II',
-    descricaoClassificacao: 'rdc502: Grau II — Dependência em até três atividades de autocuidado.',
+    descricaoClassificacao: 'RDC 502/2021 — grau confirmado: Grau II.\nDerivado de: Dependência em 2 de 6 atividades de autocuidado (Katz). Rastreio cognitivo preservado (MEEM 30/30).',
     concluidaEm: new Date('2026-07-05T12:30:00Z'),
     concluidaPorId: '55555555-5555-4555-8555-555555555555',
     createdAt: new Date('2026-07-05T12:00:00Z'),
@@ -27,14 +27,14 @@ function makeAga(overrides: Partial<AgaDetail> = {}): AgaDetail {
         id: '33333333-3333-4333-8333-333333333333',
         agaId: '22222222-2222-4222-8222-222222222222',
         aplicacaoInstrumentoId: '44444444-4444-4444-8444-444444444444',
-        instrumento: 'rdc502',
+        instrumento: 'meem',
         profissionalId: '55555555-5555-4555-8555-555555555555',
         registradoPorId: '55555555-5555-4555-8555-555555555555',
         dataAplicacao: new Date('2026-07-01T12:00:00Z'),
-        respostas: { autocuidado: 'ate_tres', cognicao: 'sem_comprometimento' },
-        escore: null,
-        classificacao: 'Grau II',
-        descricaoClassificacao: 'Dependência em até três atividades de autocuidado.',
+        respostas: { orientacao_temporal: 5, evocacao: 3 },
+        escore: 30,
+        classificacao: 'Normal',
+        descricaoClassificacao: 'Normal',
         versaoInstrumento: '1.0',
         createdAt: new Date('2026-07-01T12:00:00Z'),
         profissional: { id: '55555555-5555-4555-8555-555555555555', nome: 'Dra. Ana', especialidade: 'medicina', registroProfissional: 'CRM 123' },
@@ -63,14 +63,14 @@ function makeAga(overrides: Partial<AgaDetail> = {}): AgaDetail {
 }
 
 describe('montarRelatorioAga', () => {
-  it('maps RDC 502 answers, concluded-by professional and observations', () => {
+  it('maps the confirmed RDC 502 grade, concluded-by professional and observations', () => {
     const relatorio = montarRelatorioAga(makeAga());
 
     expect(relatorio.dataAvaliacao).toEqual(new Date('2026-07-05T12:00:00Z'));
     expect(relatorio.profissional).toBe('Dra. Ana');
     expect(relatorio.especialidade).toBe('medicina');
-    expect(relatorio.rdc502Autocuidado).toBe('ate_tres');
-    expect(relatorio.rdc502Cognicao).toBe('sem_comprometimento');
+    expect(relatorio.classificacao).toBe('Grau II');
+    expect(relatorio.fundamentoClassificacao).toContain('RDC 502/2021');
     expect(relatorio.observacoes).toBe('Paciente mantém acompanhamento multiprofissional.');
   });
 
@@ -80,7 +80,7 @@ describe('montarRelatorioAga', () => {
     expect(relatorio.escalas).toEqual([
       expect.objectContaining({ key: 'katz', score: 2, interpretation: 'Dependência em 2 de 6 ABVD', max: 6 }),
       expect.objectContaining({ key: 'lawton', score: null, interpretation: null, max: 8 }),
-      expect.objectContaining({ key: 'meem', score: null, interpretation: null, max: 30 }),
+      expect.objectContaining({ key: 'meem', score: 30, interpretation: 'Normal', max: 30 }),
       expect.objectContaining({ key: 'gds15', score: null, interpretation: null, max: 15 }),
       expect.objectContaining({ key: 'man', score: null, interpretation: null, max: 14 }),
       expect.objectContaining({ key: 'tug', score: null, interpretation: null, unit: 'segundos' }),
@@ -96,20 +96,11 @@ describe('montarRelatorioAga', () => {
     expect(relatorio.moradia).toBeNull();
   });
 
-  it('returns null classification inputs when RDC 502 is missing or malformed', () => {
-    const semRdc = makeAga();
-    semRdc.aplicacoes = semRdc.aplicacoes.filter((app) => app.instrumento !== 'rdc502');
-    expect(montarRelatorioAga(semRdc).rdc502Autocuidado).toBeNull();
-    expect(montarRelatorioAga(semRdc).rdc502Cognicao).toBeNull();
-
-    const rdcInvalida = makeAga();
-    rdcInvalida.aplicacoes = rdcInvalida.aplicacoes.map((app) =>
-      app.instrumento === 'rdc502'
-        ? { ...app, respostas: { autocuidado: 'fora_do_enum', cognicao: null } }
-        : app,
-    );
-    expect(montarRelatorioAga(rdcInvalida).rdc502Autocuidado).toBeNull();
-    expect(montarRelatorioAga(rdcInvalida).rdc502Cognicao).toBeNull();
+  it('exposes null classification when the AGA has no confirmed grade', () => {
+    const semGrau = makeAga({ classificacao: null, descricaoClassificacao: null });
+    const relatorio = montarRelatorioAga(semGrau);
+    expect(relatorio.classificacao).toBeNull();
+    expect(relatorio.fundamentoClassificacao).toBeNull();
   });
 
   it('shows no professional when the AGA was not concluded', () => {

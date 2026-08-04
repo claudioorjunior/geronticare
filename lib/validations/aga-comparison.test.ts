@@ -61,12 +61,23 @@ describe('compararAvaliacoes', () => {
 
   it('resume a evolução da classificação RDC sem criar diagnóstico', () => {
     expect(compararClassificacaoRdc502(
-      { rdc502Autocuidado: 'ate_tres', rdc502Cognicao: 'alteracao_controlada' },
-      { rdc502Autocuidado: 'todas', rdc502Cognicao: 'comprometimento' },
+      { classificacao: 'Grau II' },
+      { classificacao: 'Grau III' },
     )).toEqual(expect.objectContaining({
       anterior: 'Grau III',
       atual: 'Grau II',
       tendencia: 'melhora',
+    }));
+  });
+
+  it('marca a comparação como indisponível quando a classificação não é um grau válido', () => {
+    expect(compararClassificacaoRdc502(
+      { classificacao: null },
+      { classificacao: 'Grau I' },
+    )).toEqual(expect.objectContaining({
+      anterior: 'Grau I',
+      atual: 'Não informada',
+      tendencia: 'indisponivel',
     }));
   });
 });

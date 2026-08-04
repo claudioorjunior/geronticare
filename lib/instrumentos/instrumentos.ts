@@ -10,15 +10,10 @@ import {
   lawtonAnswersSchema,
   manAnswersSchema,
   meemAnswersSchema,
-  rdc502AnswersSchema,
 } from '@/lib/validations/aga-form';
-import {
-  classificarGrauDependenciaRdc502,
-  interpretarEscala,
-} from '@/lib/validations/escalas';
+import { interpretarEscala } from '@/lib/validations/escalas';
 
 export const INSTRUMENTO_SLUGS = [
-  'rdc502',
   'katz',
   'lawton',
   'meem',
@@ -47,7 +42,6 @@ export type DefinicaoInstrumento = {
 };
 
 const katzSchema = z.strictObject(katzAnswersSchema.shape);
-const rdc502Schema = z.strictObject(rdc502AnswersSchema.shape);
 const lawtonSchema = z
   .strictObject(lawtonAnswersSchema.shape)
   .superRefine((respostas, context) => {
@@ -97,16 +91,6 @@ const tugSchema = z.strictObject({
 });
 
 const definitions: Record<InstrumentoSlug, DefinicaoInstrumento> = {
-  rdc502: {
-    slug: 'rdc502',
-    nome: 'Classificação RDC 502',
-    nomeCurto: 'RDC 502',
-    dominio: 'Grau de dependência',
-    descricao: 'Classifica o grau de dependência para autocuidado e cognição conforme a RDC 502/2021.',
-    versao: '1.0',
-    itens: [],
-    schema: rdc502Schema,
-  },
   katz: {
     slug: 'katz',
     nome: 'Índice de Katz',
@@ -180,7 +164,7 @@ export function getInstrumentDefinition(slug: InstrumentoSlug): DefinicaoInstrum
 }
 
 function resultadoComEscore(
-  slug: Exclude<InstrumentoSlug, 'rdc502'>,
+  slug: InstrumentoSlug,
   escore: number,
 ): ResultadoInstrumento {
   const classificacao = interpretarEscala(slug, escore);
@@ -200,24 +184,6 @@ export function evaluateInstrument(
   slug: InstrumentoSlug,
   respostas: unknown,
 ): ResultadoInstrumento {
-  if (slug === 'rdc502') {
-    const parsed = rdc502Schema.parse(respostas);
-    const resultado = classificarGrauDependenciaRdc502(
-      parsed.autocuidado,
-      parsed.cognicao,
-    );
-
-    if (!resultado) {
-      throw new Error('Não foi possível classificar a RDC 502.');
-    }
-
-    return {
-      escore: null,
-      classificacao: resultado.label,
-      descricao: resultado.fundamento,
-    };
-  }
-
   if (slug === 'katz') {
     const parsed = katzSchema.parse(respostas);
     const escore = KATZ_ITEMS.reduce((total, item) => {

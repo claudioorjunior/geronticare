@@ -1,8 +1,3 @@
-import {
-  classificarGrauDependenciaRdc502,
-  type Rdc502Autocuidado,
-  type Rdc502Cognicao,
-} from './escalas';
 
 export type AgaComparisonScale = 'katz' | 'lawton' | 'meem' | 'gds15' | 'man' | 'tug';
 export type AgaTrend = 'melhora' | 'piora' | 'estavel' | 'indisponivel';
@@ -37,8 +32,7 @@ export type AgaComparisonResult = {
 };
 
 export type AgaRdcComparisonInput = {
-  rdc502Autocuidado?: string | null;
-  rdc502Cognicao?: string | null;
+  classificacao: string | null;
 };
 
 export type AgaRdcComparisonResult = {
@@ -95,12 +89,13 @@ export function compararClassificacaoRdc502(
   };
 }
 
+function parseGrauLabel(label: string | null | undefined): 'Grau I' | 'Grau II' | 'Grau III' | null {
+  if (label === 'Grau I' || label === 'Grau II' || label === 'Grau III') return label;
+  return null;
+}
+
 function getRdcGrade(input: AgaRdcComparisonInput): 'Grau I' | 'Grau II' | 'Grau III' | null {
-  const classification = classificarGrauDependenciaRdc502(
-    input.rdc502Autocuidado as Rdc502Autocuidado | null,
-    input.rdc502Cognicao as Rdc502Cognicao | null,
-  );
-  return classification?.label ?? null;
+  return parseGrauLabel(input.classificacao);
 }
 
 function getTrend(delta: number | null, higherIsBetter: boolean): AgaTrend {

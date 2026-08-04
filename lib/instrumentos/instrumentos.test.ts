@@ -7,9 +7,8 @@ import {
 } from '@/lib/instrumentos/instrumentos';
 
 describe('registry de instrumentos', () => {
-  it('expõe os sete instrumentos multiprofissionais', () => {
+  it('expõe os seis instrumentos multiprofissionais', () => {
     expect(INSTRUMENTO_SLUGS).toEqual([
-      'rdc502',
       'katz',
       'lawton',
       'meem',
@@ -72,17 +71,8 @@ describe('registry de instrumentos', () => {
     });
   });
 
-  it('calcula classificação da RDC 502', () => {
-    expect(
-      evaluateInstrument('rdc502', {
-        autocuidado: 'ate_tres',
-        cognicao: 'sem_comprometimento',
-      }),
-    ).toMatchObject({
-      escore: null,
-      classificacao: 'Grau II',
-      descricao: expect.stringContaining('Dependência em até três'),
-    });
+  it('rejeita slugs fora do catálogo (a RDC 502 deixou de ser instrumento preenchível)', () => {
+    expect(isInstrumentoSlug('rdc502')).toBe(false);
   });
 
   it('calcula Lawton aceitando somente opções conhecidas', () => {

@@ -11,6 +11,6 @@ describe('apresentação de aplicações de instrumentos', () => {
   it('apresenta escore com unidade quando aplicável', () => {
     expect(formatarEscoreInstrumento('meem', 27)).toBe('27 pontos');
     expect(formatarEscoreInstrumento('tug', 12)).toBe('12 segundos');
-    expect(formatarEscoreInstrumento('rdc502', null)).toBe('Sem escore numérico');
+    expect(formatarEscoreInstrumento('katz', null)).toBe('Sem escore numérico');
   });
 });

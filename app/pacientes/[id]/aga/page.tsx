@@ -27,10 +27,8 @@ import {
 import { trpc } from '@/lib/trpc/client';
 import type { RouterOutputs } from '@/lib/trpc/types';
 import { formatarData } from '@/lib/utils';
-import type {
-  AgaComparisonInput,
-  AgaRdcComparisonInput,
-} from '@/lib/validations/aga-comparison';
+import { derivarGrauDependenciaRdc502 } from '@/lib/validations/escalas';
+import type { AgaComparisonInput } from '@/lib/validations/aga-comparison';
 
 type AgaListItem = RouterOutputs['agas']['listar'][number];
 type AgaDetail = RouterOutputs['agas']['buscar'];
@@ -52,20 +50,14 @@ function toneForRdc(label: string | null | undefined): keyof typeof toneClasses 
   return 'muted';
 }
 
-function isComparisonScale(slug: string): slug is Exclude<InstrumentoSlug, 'rdc502'> {
+function isComparisonScale(slug: string): slug is InstrumentoSlug {
   return slug === 'katz' || slug === 'lawton' || slug === 'meem' || slug === 'gds15' || slug === 'man' || slug === 'tug';
 }
 
-function scoresFromApplications(aplicacoes: AgaAplicacao[]): AgaComparisonInput & AgaRdcComparisonInput {
-  const scores: AgaComparisonInput & AgaRdcComparisonInput = {};
+function scoresFromApplications(aplicacoes: AgaAplicacao[]): AgaComparisonInput {
+  const scores: AgaComparisonInput = {};
   for (const app of aplicacoes) {
     if (!isInstrumentoSlug(app.instrumento)) continue;
-    if (app.instrumento === 'rdc502') {
-      const respostas = app.respostas as { autocuidado?: string; cognicao?: string } | null;
-      scores.rdc502Autocuidado = respostas?.autocuidado ?? null;
-      scores.rdc502Cognicao = respostas?.cognicao ?? null;
-      continue;
-    }
     if (!isComparisonScale(app.instrumento)) continue;
     const field =
       app.instrumento === 'tug'
@@ -95,11 +87,9 @@ function ApplicationCards({ aplicacoes }: { aplicacoes: AgaAplicacao[] }) {
           : app.escore == null
             ? 'Sem escore'
             : String(app.escore);
-        const tone: keyof typeof toneClasses =
-          app.instrumento === 'rdc502' ? toneForRdc(app.classificacao) : 'muted';
 
         return (
-          <div key={app.id} className={`rounded-xl border p-4 ${toneClasses[tone]}`}>
+          <div key={app.id} className="rounded-xl border p-4 text-slate-700">
             <div className="text-xs font-semibold tracking-wide">{label}</div>
             <div className="mt-2 text-sm font-semibold tabular-nums">{scoreLabel}</div>
             <p className="mt-1 text-[11px] leading-relaxed opacity-80">
@@ -120,7 +110,7 @@ function CurrentClassification({ classificacao }: { classificacao: string | null
       <p className="text-xs font-semibold uppercase tracking-wide">Classificação atual</p>
       <p className="mt-1 text-xl font-semibold">{classificacao ?? 'Não informada'}</p>
       <p className="mt-1 text-xs leading-relaxed">
-        Resultado consolidado a partir da RDC 502/2021 selecionada na AGA.
+        Grau de dependência confirmado pela equipe a partir das escalas (RDC 502/2021).
       </p>
     </div>
   );
@@ -198,6 +188,8 @@ function ConsolidationForm({
   );
   const [observacoes, setObservacoes] = useState('');
   const [selected, setSelected] = useState<Record<string, string>>({});
+  const [grau, setGrau] = useState<'I' | 'II' | 'III' | ''>('');
+  const [justificativaGrau, setJustificativaGrau] = useState('');
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
 
@@ -219,6 +211,28 @@ function ConsolidationForm({
     return map;
   }, [disponiveisQuery.data]);
 
+  const selectedApps = useMemo(() => {
+    const map = new Map<string, AplicacaoDisponivel>();
+    for (const app of disponiveisQuery.data ?? []) {
+      if (selected[app.instrumento] === app.id) map.set(app.instrumento, app);
+    }
+    return map;
+  }, [disponiveisQuery.data, selected]);
+
+  const sugestaoGrau = useMemo(() => {
+    const katz = selectedApps.get('katz');
+    if (!katz) return null;
+    return derivarGrauDependenciaRdc502({
+      katzScore: katz.escore,
+      meemScore: selectedApps.get('meem')?.escore ?? null,
+    });
+  }, [selectedApps]);
+
+  // Grau efetivo: a escolha explícita do profissional, ou a sugestão derivada
+  // das escalas enquanto ele não altera. Sem efeito — o valor é derivado no
+  // render, evitando cascatas de estado.
+  const grauEfetivo: 'I' | 'II' | 'III' | '' = grau || sugestaoGrau?.grau || '';
+
   function toggle(instrumento: string, aplicacaoId: string) {
     setSelected((prev) => {
       if (prev[instrumento] === aplicacaoId) {
@@ -233,12 +247,22 @@ function ConsolidationForm({
   async function handleSubmit() {
     setError('');
     const aplicacaoIds = Object.values(selected);
-    if (!selected.rdc502) {
-      setError('Selecione uma aplicação RDC 502 para concluir a AGA.');
+    if (!selectedApps.get('katz')) {
+      setError('Selecione uma aplicação Katz para derivar o grau de dependência.');
       return;
     }
     if (aplicacaoIds.length === 0) {
       setError('Selecione ao menos uma aplicação preenchida.');
+      return;
+    }
+    const grauFinal = grau || sugestaoGrau?.grau;
+    if (!grauFinal) {
+      setError('Confirme o grau de dependência para concluir a AGA.');
+      return;
+    }
+    const divergente = Boolean(sugestaoGrau && grauFinal !== sugestaoGrau.grau);
+    if (divergente && !justificativaGrau.trim()) {
+      setError('Informe a justificativa clínica ao divergir do grau sugerido pelas escalas.');
       return;
     }
 
@@ -257,6 +281,8 @@ function ConsolidationForm({
       await concluir.mutateAsync({
         pacienteId: patientId,
         agaId: draft.id,
+        grau: grauFinal,
+        justificativaGrau: divergente ? justificativaGrau.trim() || undefined : undefined,
       });
       await utils.agas.listar.invalidate({ pacienteId: patientId });
       onDone('AGA consolidada com sucesso.');
@@ -296,7 +322,8 @@ function ConsolidationForm({
         <div>
           <h2 className="text-lg font-semibold text-slate-900">Consolidar nova AGA</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Selecione aplicações já preenchidas pela equipe. A RDC 502 é obrigatória.
+            Selecione aplicações já preenchidas pela equipe. O grau de dependência (RDC 502/2021) é
+            derivado das escalas Katz e MEEM e confirmado pelo profissional.
           </p>
         </div>
         <Button variant="outline" onClick={onCancel} disabled={pending}>
@@ -337,7 +364,6 @@ function ConsolidationForm({
           {[...byInstrument.entries()].map(([instrumento, apps]) => {
             const slug = isInstrumentoSlug(instrumento) ? instrumento : null;
             const title = slug ? getInstrumentDefinition(slug).nome : instrumento;
-            const required = instrumento === 'rdc502';
             return (
               <section
                 key={instrumento}
@@ -346,11 +372,6 @@ function ConsolidationForm({
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold text-slate-900">
                     {title}
-                    {required ? (
-                      <span className="ml-2 text-[11px] font-semibold uppercase tracking-wide text-teal-700">
-                        obrigatória
-                      </span>
-                    ) : null}
                   </h3>
                   <span className="text-xs text-slate-500">1 por instrumento</span>
                 </div>
@@ -393,6 +414,78 @@ function ConsolidationForm({
               </section>
             );
           })}
+        </div>
+      )}
+
+      {sugestaoGrau ? (
+        <div className={`rounded-xl border p-5 ${toneClasses[sugestaoGrau.tone]}`}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wide">
+              Grau de dependência — RDC 502/2021
+            </p>
+            {sugestaoGrau.requerConfirmacao && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                Requer confirmação clínica
+              </span>
+            )}
+          </div>
+          <p className="mt-2 text-sm text-slate-700">
+            Sugerido pelas escalas: <strong>{sugestaoGrau.label}</strong>
+          </p>
+          <p className="mt-1 text-xs leading-relaxed opacity-80">{sugestaoGrau.fundamento}</p>
+
+          <fieldset className="mt-4">
+            <legend className="text-xs font-medium text-slate-700">
+              Confirmar grau (obrigatório)
+            </legend>
+            <div className="mt-2 flex flex-wrap gap-3">
+              {(['I', 'II', 'III'] as const).map((opcao) => (
+                <label
+                  key={opcao}
+                  className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+                    grauEfetivo === opcao
+                      ? 'border-teal-300 bg-teal-50 font-medium text-teal-800'
+                      : 'border-slate-200 bg-white text-slate-700'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="grau-dependencia"
+                    value={opcao}
+                    checked={grauEfetivo === opcao}
+                    onChange={() => setGrau(opcao)}
+                    className="accent-teal-600"
+                  />
+                  Grau {opcao}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          {grauEfetivo && sugestaoGrau.grau !== grauEfetivo && (
+            <label className="mt-3 block text-sm">
+              <span className="font-medium text-slate-700">
+                Justificativa clínica (obrigatória por divergir do grau sugerido)
+              </span>
+              <textarea
+                value={justificativaGrau}
+                onChange={(event) => setJustificativaGrau(event.target.value)}
+                rows={2}
+                maxLength={2000}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                placeholder="Explique por que o grau confirmado diverge das escalas."
+              />
+            </label>
+          )}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+          <p className="text-xs font-semibold uppercase tracking-wide">
+            Grau de dependência — RDC 502/2021
+          </p>
+          <p className="mt-1 text-sm text-slate-600">
+            Selecione uma aplicação Katz para o sistema sugerir o grau a partir das escalas.
+          </p>
         </div>
       )}
 
@@ -589,10 +682,12 @@ function AGAPageContent({ patientId, role }: { patientId: string; role: string |
             <AgaComparison
               atual={{
                 dataAvaliacao: currentDetail.dataAvaliacao,
+                classificacao: currentDetail.classificacao,
                 ...scoresFromApplications(currentDetail.aplicacoes),
               }}
               anterior={{
                 dataAvaliacao: previousDetail.dataAvaliacao,
+                classificacao: previousDetail.classificacao,
                 ...scoresFromApplications(previousDetail.aplicacoes),
               }}
             />

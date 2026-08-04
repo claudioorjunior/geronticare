@@ -4,12 +4,16 @@ import { z } from 'zod';
 import { agaAplicacoes, agas, aplicacoesInstrumentos, usuarios } from '@/lib/db/schema';
 import type { Db } from '@/lib/db';
 import { INSTRUMENTO_SLUGS } from '@/lib/instrumentos/instrumentos';
-import { classificarGrauDependenciaRdc502, type Rdc502Autocuidado, type Rdc502Cognicao } from '@/lib/validations/escalas';
+import { derivarGrauDependenciaRdc502 } from '@/lib/validations/escalas';
 import { verificarOwnershipPaciente } from '../ownership';
 import { clinicalProcedure, createTRPCRouter, readClinicalProcedure } from '../server';
 
 const pacienteInput = z.strictObject({ pacienteId: z.string().uuid() });
 const agaInput = z.strictObject({ agaId: z.string().uuid(), pacienteId: z.string().uuid() });
+const concluirInput = agaInput.extend({
+  grau: z.enum(['I', 'II', 'III']),
+  justificativaGrau: z.string().trim().max(2000).optional(),
+});
 const applicationIds = z.array(z.string().uuid()).max(INSTRUMENTO_SLUGS.length);
 
 type AgaContext = { db: Db; instituicaoId: string };
@@ -98,21 +102,34 @@ export const agasRouter = createTRPCRouter({
     return { agaId: input.agaId };
   }),
 
-  concluir: clinicalProcedure.input(agaInput).mutation(async ({ ctx, input }) => {
+  concluir: clinicalProcedure.input(concluirInput).mutation(async ({ ctx, input }) => {
     const aga = await getAga(ctx, input.agaId, input.pacienteId);
     if (aga.status !== 'rascunho') throw new TRPCError({ code: 'BAD_REQUEST', message: 'AGA concluída é imutável.' });
     const selected = await ctx.db.query.agaAplicacoes.findMany({ where: eq(agaAplicacoes.agaId, input.agaId) });
-    const rdc = selected.find((application) => application.instrumento === 'rdc502');
-    if (!rdc) throw new TRPCError({ code: 'BAD_REQUEST', message: 'A conclusão exige uma aplicação RDC 502 selecionada explicitamente.' });
-    const respostasRdc = rdc.respostas as { autocuidado?: Rdc502Autocuidado; cognicao?: Rdc502Cognicao } | null;
-    const classification = classificarGrauDependenciaRdc502(
-      respostasRdc?.autocuidado ?? null,
-      respostasRdc?.cognicao ?? null,
-    );
-    if (!classification) throw new TRPCError({ code: 'BAD_REQUEST', message: 'A RDC 502 selecionada não possui classificação válida.' });
-    const descricao = selected.map((application) => `${application.instrumento}: ${application.classificacao} — ${application.descricaoClassificacao}`).join('\n');
+
+    const katz = selected.find((application) => application.instrumento === 'katz');
+    if (!katz) throw new TRPCError({ code: 'BAD_REQUEST', message: 'A conclusão exige uma aplicação Katz selecionada para derivar o grau de dependência (RDC 502/2021).' });
+    const meem = selected.find((application) => application.instrumento === 'meem');
+    const sugerido = derivarGrauDependenciaRdc502({
+      katzScore: katz.escore,
+      meemScore: meem?.escore ?? null,
+    });
+    if (!sugerido) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Não foi possível derivar o grau de dependência a partir das escalas selecionadas.' });
+
+    const divergente = input.grau !== sugerido.grau;
+    if (divergente && !input.justificativaGrau) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'Informe a justificativa clínica ao divergir do grau sugerido pelas escalas.' });
+    }
+
+    const label = `Grau ${input.grau}` as 'Grau I' | 'Grau II' | 'Grau III';
+    const descricao = [
+      `RDC 502/2021 — grau confirmado: ${label}.`,
+      `Derivado de: ${sugerido.fundamento}`,
+      ...(input.justificativaGrau ? [`Justificativa clínica: ${input.justificativaGrau}`] : []),
+    ].join('\n');
+
     const [completed] = await ctx.db.update(agas).set({
-      status: 'concluida', resultado: classification.label, classificacao: classification.label,
+      status: 'concluida', resultado: label, classificacao: label,
       descricaoClassificacao: descricao, concluidaEm: new Date(), concluidaPorId: ctx.userId, updatedAt: new Date(),
     }).where(and(eq(agas.id, input.agaId), eq(agas.status, 'rascunho'))).returning({ id: agas.id });
     if (!completed) throw new TRPCError({ code: 'BAD_REQUEST', message: 'AGA não pôde ser concluída.' });

@@ -49,52 +49,6 @@ export type CampoInstrumento =
   | CampoEscolhaInstrumento
   | CampoNumeroInstrumento;
 
-const rdc502Fields: readonly CampoInstrumento[] = [
-  {
-    type: 'choice',
-    control: 'radio',
-    key: 'autocuidado',
-    label: 'Necessidade de ajuda nas atividades de autocuidado',
-    hint: 'Considere alimentação, continência, transferência, higiene pessoal e banho.',
-    required: true,
-    options: [
-      {
-        value: 'nenhuma',
-        label: 'Independente nas atividades de autocuidado',
-      },
-      {
-        value: 'ate_tres',
-        label: 'Necessita ajuda em até três atividades de autocuidado',
-      },
-      {
-        value: 'todas',
-        label: 'Necessita ajuda em todas as atividades de autocuidado',
-      },
-    ],
-  },
-  {
-    type: 'choice',
-    control: 'radio',
-    key: 'cognicao',
-    label: 'Condição cognitiva',
-    required: true,
-    options: [
-      {
-        value: 'sem_comprometimento',
-        label: 'Sem comprometimento cognitivo',
-      },
-      {
-        value: 'alteracao_controlada',
-        label: 'Alteração cognitiva controlada',
-      },
-      {
-        value: 'comprometimento',
-        label: 'Comprometimento cognitivo',
-      },
-    ],
-  },
-];
-
 const katzFields: readonly CampoInstrumento[] = KATZ_ITEMS.map((item) => ({
   type: 'choice',
   control: 'radio',
@@ -211,7 +165,6 @@ const fieldsByInstrument: Record<
   InstrumentoSlug,
   readonly CampoInstrumento[]
 > = {
-  rdc502: rdc502Fields,
   katz: katzFields,
   lawton: lawtonFields,
   meem: meemFields,

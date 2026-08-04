@@ -11,7 +11,6 @@ import {
   HeartHandshake,
   ListChecks,
   Loader2,
-  ShieldCheck,
   Timer,
   type LucideIcon,
 } from 'lucide-react';
@@ -28,7 +27,6 @@ import { trpc } from '@/lib/trpc/client';
 import { formatarData } from '@/lib/utils';
 
 const instrumentIcons: Record<InstrumentoSlug, LucideIcon> = {
-  rdc502: ShieldCheck,
   katz: Activity,
   lawton: ListChecks,
   meem: Brain,

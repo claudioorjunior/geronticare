@@ -1,10 +1,6 @@
 import type { InstrumentoSlug } from '@/lib/instrumentos/instrumentos';
 import type { RouterOutputs } from '@/lib/trpc/types';
-import {
-  interpretarEscala,
-  type Rdc502Autocuidado,
-  type Rdc502Cognicao,
-} from '@/lib/validations/escalas';
+import { interpretarEscala } from '@/lib/validations/escalas';
 
 /**
  * Maps a consolidated AGA snapshot (agas.buscar) into the report shape.
@@ -33,8 +29,8 @@ export type RelatorioAga = {
   dataAvaliacao: Date;
   profissional: string | null;
   especialidade: string | null;
-  rdc502Autocuidado: Rdc502Autocuidado | null;
-  rdc502Cognicao: Rdc502Cognicao | null;
+  classificacao: string | null;
+  fundamentoClassificacao: string | null;
   escalas: RelatorioEscala[];
   observacoes: string | null;
   comorbidades: string[];
@@ -45,7 +41,7 @@ export type RelatorioAga = {
 
 const ESCALA_DEFINICOES: ReadonlyArray<{
   key: RelatorioEscalaKey;
-  instrumento: Exclude<InstrumentoSlug, 'rdc502'>;
+  instrumento: InstrumentoSlug;
   label: string;
   max?: number;
   unit?: string;
@@ -58,30 +54,12 @@ const ESCALA_DEFINICOES: ReadonlyArray<{
   { key: 'tug', instrumento: 'tug', label: 'TUG — mobilidade', unit: 'segundos' },
 ];
 
-function isAutocuidado(value: unknown): value is Rdc502Autocuidado {
-  return value === 'nenhuma' || value === 'ate_tres' || value === 'todas';
-}
-
-function isCognicao(value: unknown): value is Rdc502Cognicao {
-  return (
-    value === 'sem_comprometimento' ||
-    value === 'alteracao_controlada' ||
-    value === 'comprometimento'
-  );
-}
-
 export function montarRelatorioAga(aga: AgaDetail): RelatorioAga {
   // Last application per instrument wins; the backend enforces one per AGA.
   const porInstrumento = new Map<string, AgaAplicacao>();
   for (const aplicacao of aga.aplicacoes) {
     porInstrumento.set(aplicacao.instrumento, aplicacao);
   }
-
-  const rdc = porInstrumento.get('rdc502');
-  const respostasRdc = rdc?.respostas as
-    | { autocuidado?: unknown; cognicao?: unknown }
-    | null
-    | undefined;
 
   const escalas: RelatorioEscala[] = ESCALA_DEFINICOES.map((definicao) => {
     const aplicacao = porInstrumento.get(definicao.instrumento);
@@ -101,10 +79,8 @@ export function montarRelatorioAga(aga: AgaDetail): RelatorioAga {
     dataAvaliacao: aga.dataAvaliacao,
     profissional: aga.concluidaPor?.nome ?? null,
     especialidade: aga.concluidaPor?.especialidade ?? null,
-    rdc502Autocuidado: isAutocuidado(respostasRdc?.autocuidado)
-      ? respostasRdc.autocuidado
-      : null,
-    rdc502Cognicao: isCognicao(respostasRdc?.cognicao) ? respostasRdc.cognicao : null,
+    classificacao: aga.classificacao,
+    fundamentoClassificacao: aga.descricaoClassificacao,
     escalas,
     observacoes: aga.observacoes,
     comorbidades: [],
