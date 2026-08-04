@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Db } from '@/lib/db';
 import { appRouter } from './root';
 import type { Context } from './server';
-import { RESPOSTAS_VALIDAS } from './aga-fixtures';
 
 const PACIENTE_ID = '1b2a3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d';
 const AVALIACAO_ID = 'cccccccc-3333-4333-8333-333333333333';
@@ -78,7 +77,14 @@ function makeDb() {
   const pacienteFindFirst = vi.fn(async (options?: QueryOptions) => project(PACIENTE_COMPLETO, options));
   const avaliacaoFindMany = vi.fn(async (options?: QueryOptions) => [project(AVALIACAO_COMPLETA, options)]);
   const avaliacaoFindFirst = vi.fn(async (options?: QueryOptions) => project(AVALIACAO_COMPLETA, options));
-  const usuarioFindFirst = vi.fn(async () => ({ nome: 'Dra. Teste', especialidade: 'medicina' }));
+  const usuarioFindFirst = vi.fn(async () => ({
+    id: 'dddddddd-4444-4444-8444-444444444444',
+    instituicaoId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    nome: 'Dra. Teste',
+    especialidade: 'medicina',
+    role: 'profissional',
+    ativo: true,
+  }));
 
   // Simula o `.returning(projection)` do Drizzle: com projeção, devolve só as
   // colunas pedidas; sem projeção, devolve a linha completa (vazamento).
@@ -318,12 +324,21 @@ describe('DTOs mínimos em mutations (não ecoam a linha completa)', () => {
     expect(Object.keys(returningProjections[0] ?? {})).toEqual(['id']);
   });
 
-  it('avaliacoesGeriatricas.criar não ecoa respostas nem escores', async () => {
+  it('aplicacoesInstrumentos.criar não ecoa respostas nem escores', async () => {
     const { db, returningProjections } = makeDb();
-    const resultado = await makeCaller(db, 'profissional').avaliacoesGeriatricas.criar({
+    const resultado = await makeCaller(db, 'profissional').aplicacoesInstrumentos.criar({
       pacienteId: PACIENTE_ID,
-      dataAvaliacao: new Date('2026-07-01T00:00:00.000Z'),
-      respostas: RESPOSTAS_VALIDAS,
+      instrumento: 'katz',
+      profissionalId: 'dddddddd-4444-4444-8444-444444444444',
+      dataAplicacao: new Date('2026-07-01T00:00:00.000Z'),
+      respostas: {
+        banho: 'independente',
+        vestir: 'independente',
+        banheiro: 'independente',
+        transferencia: 'independente',
+        continencia: 'controle_completo',
+        alimentacao: 'independente',
+      },
     });
 
     expect(Object.keys(resultado)).toEqual(['id']);

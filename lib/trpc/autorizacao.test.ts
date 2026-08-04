@@ -4,7 +4,6 @@ import type { Db } from '@/lib/db';
 import type { Context } from './server';
 import * as autorizacao from './autorizacao';
 import { devBypassAtivo } from './autorizacao';
-import { RESPOSTAS_VALIDAS } from './aga-fixtures';
 
 /**
  * Testes de autorização por papel — invocam as procedures reais com um
@@ -28,6 +27,15 @@ function makeDb(overrides: Partial<Db> = {}) {
     query: {
       pacientes: {
         findFirst: vi.fn(async () => PACIENTE),
+      },
+      usuarios: {
+        findFirst: vi.fn(async () => ({
+          id: 'dddddddd-4444-4444-8444-444444444444',
+          instituicaoId: 'inst-1',
+          especialidade: 'medicina',
+          role: 'profissional',
+          ativo: true,
+        })),
       },
       avaliacoesGeriatricas: {
         findMany: vi.fn(async () => []),
@@ -175,71 +183,79 @@ describe('autorização — leituras clínicas (readClinicalProcedure)', () => {
 });
 
 describe('autorização — escrita clínica (clinicalProcedure)', () => {
-  const input = { pacienteId: PACIENTE_ID, respostas: RESPOSTAS_VALIDAS };
+  const input = {
+    pacienteId: PACIENTE_ID,
+    instrumento: 'katz',
+    profissionalId: 'dddddddd-4444-4444-8444-444444444444',
+    dataAplicacao: new Date('2026-08-01T12:00:00.000Z'),
+    respostas: {
+      banho: 'independente',
+      vestir: 'independente',
+      banheiro: 'independente',
+      transferencia: 'independente',
+      continencia: 'controle_completo',
+      alimentacao: 'independente',
+    },
+  } as const;
 
-  it('profissional consegue criar AGA', async () => {
+  it('profissional consegue registrar aplicação de instrumento', async () => {
     const caller = makeCaller('profissional');
     await expect(
-      caller.avaliacoesGeriatricas.criar(input),
+      caller.aplicacoesInstrumentos.criar(input),
     ).resolves.toMatchObject({ id: 'aga-nova' });
   });
 
-  it('admin consegue criar AGA', async () => {
+  it('admin consegue registrar aplicação de instrumento', async () => {
     const caller = makeCaller('admin');
     await expect(
-      caller.avaliacoesGeriatricas.criar(input),
+      caller.aplicacoesInstrumentos.criar(input),
     ).resolves.toMatchObject({ id: 'aga-nova' });
   });
 
   it('scores são derivados no servidor a partir das respostas do formulário', async () => {
     const { db, insertCalls } = makeDb();
     const caller = makeCaller('profissional', db);
-    await caller.avaliacoesGeriatricas.criar(input);
+    await caller.aplicacoesInstrumentos.criar(input);
 
     expect(insertCalls[0]).toMatchObject({
-      respostas: RESPOSTAS_VALIDAS,
-      katzScore: 0,
-      lawtonScore: 8,
-      meemScore: 30,
-      gds15Score: 0,
-      manScore: 11,
-      tugSegundos: 8,
-      rdc502Autocuidado: 'nenhuma',
-      rdc502Cognicao: 'sem_comprometimento',
-      profissionalId: 'user-1',
+      pacienteId: PACIENTE_ID,
+      instrumento: 'katz',
+      profissionalId: 'dddddddd-4444-4444-8444-444444444444',
+      registradoPorId: 'user-1',
+      respostas: input.respostas,
+      escore: 0,
+      classificacao: 'Independente em ABVD',
+      versaoInstrumento: expect.any(String),
     });
   });
 
-  it('rejeita escores manuais — AGA aceita apenas respostas do formulário', async () => {
+  it('rejeita escores manuais — aceita apenas respostas do formulário', async () => {
     const caller = makeCaller('profissional');
     // Payload malicioso simulado: o schema (strictObject) não aceita escores
     // manuais mesmo que o cliente tente enviá-los.
     await expect(
-      caller.avaliacoesGeriatricas.criar({ ...input, katzScore: 5 } as unknown as typeof input),
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
-    await expect(
-      caller.avaliacoesGeriatricas.criar({ ...input, tugSegundos: 12 } as unknown as typeof input),
+      caller.aplicacoesInstrumentos.criar({ ...input, escore: 5 } as unknown as typeof input),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 
   it('rejeita criação sem respostas (formulário incompleto)', async () => {
     const caller = makeCaller('profissional');
     await expect(
-      caller.avaliacoesGeriatricas.criar({ pacienteId: PACIENTE_ID } as unknown as typeof input),
+      caller.aplicacoesInstrumentos.criar({ ...input, respostas: undefined } as unknown as typeof input),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 
-  it('usuario é bloqueado ao criar AGA (FORBIDDEN)', async () => {
+  it('usuario é bloqueado ao registrar aplicação (FORBIDDEN)', async () => {
     const caller = makeCaller('usuario');
     await expect(
-      caller.avaliacoesGeriatricas.criar(input),
+      caller.aplicacoesInstrumentos.criar(input),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
-  it('sem sessão é bloqueado ao criar AGA (UNAUTHORIZED)', async () => {
+  it('sem sessão é bloqueado ao registrar aplicação (UNAUTHORIZED)', async () => {
     const caller = makeCaller(null);
     await expect(
-      caller.avaliacoesGeriatricas.criar(input),
+      caller.aplicacoesInstrumentos.criar(input),
     ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
   });
 });

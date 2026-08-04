@@ -1,10 +1,16 @@
 import { z } from 'zod';
-import { createTRPCRouter, readClinicalProcedure, clinicalProcedure } from '../server';
+import { createTRPCRouter, readClinicalProcedure } from '../server';
 import { avaliacoesGeriatricas, usuarios } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
-import { calcularAgaScores, criarAvaliacaoSchema, interpretarEscala } from '@/lib/validations/escalas';
+import { interpretarEscala } from '@/lib/validations/escalas';
 import { verificarOwnershipPaciente } from '../ownership';
 
+/**
+ * LEGACY READ-ONLY (A6, 2026-08-04).
+ * `avaliacoesGeriatricas` (AGA monolítica) não é mais gravado: o fluxo novo
+ * é `aplicacoesInstrumentos` (escalas independentes) + `agas` (consolidação).
+ * Estas procedures existem apenas para leitura de dados antigos.
+ */
 export const avaliacoesGeriatricasRouter = createTRPCRouter({
   listar: readClinicalProcedure
     .input(z.object({ pacienteId: z.string().uuid() }))
@@ -98,35 +104,6 @@ export const avaliacoesGeriatricasRouter = createTRPCRouter({
           tug: interpretarEscala('tug', avaliacao.tugSegundos),
         },
       };
-    }),
-
-  criar: clinicalProcedure
-    .input(criarAvaliacaoSchema)
-    .mutation(async ({ ctx, input }) => {
-      await verificarOwnershipPaciente(ctx.db, input.pacienteId, ctx.instituicaoId);
-
-      // Escores derivados EXCLUSIVAMENTE das respostas do formulário de
-      // múltipla escolha — o servidor nunca aceita escores manuais.
-      const scores = calcularAgaScores(input.respostas);
-
-      const [novaAvaliacao] = await ctx.db
-        .insert(avaliacoesGeriatricas)
-        .values({
-          pacienteId: input.pacienteId,
-          dataAvaliacao: input.dataAvaliacao,
-          ...scores,
-          comorbidades: input.comorbidades,
-          medicamentos: input.medicamentos,
-          suporteSocial: input.suporteSocial,
-          moradia: input.moradia,
-          observacoes: input.observacoes,
-          respostas: input.respostas,
-          profissionalId: ctx.userId,
-        })
-        .returning({ id: avaliacoesGeriatricas.id });
-
-      // DTO mínimo: nunca ecoa `respostas` nem escores de volta ao navegador.
-      return novaAvaliacao;
     }),
 
   relatorio: readClinicalProcedure
