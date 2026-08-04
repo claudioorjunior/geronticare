@@ -358,10 +358,12 @@ function DashboardProfissional() {
     glicemia: number | null;
     temperatura: number | null;
   }[];
+  // Modelo novo de AGA: não há agendamento. O backend devolve pacientes ativos
+  // sem AGA concluída (fila por admissão) e a data exibida é a da admissão.
   const agasProximas = (agasQ.data ?? []) as {
-    id: string;
+    pacienteId: string;
     pacienteNome: string;
-    dataAvaliacao: Date;
+    dataAdmissao: Date;
   }[];
 
   // Alertas: classifica cada sinal vital e mantém só os anormais
@@ -529,16 +531,16 @@ function DashboardProfissional() {
           </div>
           <div className="space-y-3">
             {agasProximas.length === 0 ? (
-              <div className="text-body-md text-m3-secondary">Nenhuma AGA agendada.</div>
+              <div className="text-body-md text-m3-secondary">Nenhuma AGA pendente.</div>
             ) : (
               agasProximas.map((a, i) => (
-                <div key={a.id ?? i} className="flex items-center justify-between rounded-m3-lg border border-m3-outline-variant/40 p-3">
+                <div key={a.pacienteId ?? i} className="flex items-center justify-between rounded-m3-lg border border-m3-outline-variant/40 p-3">
                   <div className="min-w-0">
                     <div className="text-label-md text-m3-on-surface truncate">{a.pacienteNome}</div>
                     <div className="flex items-center gap-1 mt-0.5">
                       <Calendar className="h-3.5 w-3.5 text-m3-secondary" />
                       <span className="text-label-sm text-m3-secondary tabular-nums">
-                        {a.dataAvaliacao instanceof Date ? a.dataAvaliacao.toLocaleDateString('pt-BR') : ''}
+                        {a.dataAdmissao instanceof Date ? a.dataAdmissao.toLocaleDateString('pt-BR') : ''}
                       </span>
                     </div>
                   </div>

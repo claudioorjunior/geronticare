@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { createTRPCRouter, readClinicalProcedure, clinicalProcedure } from '../server';
-import { registros, avaliacoesGeriatricas, sinaisVitais } from '@/lib/db/schema';
-import { eq, and, gte, lte } from 'drizzle-orm';
+import { registros, agas, sinaisVitais, usuarios } from '@/lib/db/schema';
+import { eq, and, gte, lte, inArray } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { verificarOwnershipPaciente } from '../ownership';
 
@@ -100,9 +100,12 @@ export const registrosRouter = createTRPCRouter({
       if (dataInicio) condicoesRegistros.push(gte(registros.dataRegistro, dataInicio));
       if (dataFim) condicoesRegistros.push(lte(registros.dataRegistro, dataFim));
 
-      const condicoesAga = [eq(avaliacoesGeriatricas.pacienteId, pacienteId)];
-      if (dataInicio) condicoesAga.push(gte(avaliacoesGeriatricas.dataAvaliacao, dataInicio));
-      if (dataFim) condicoesAga.push(lte(avaliacoesGeriatricas.dataAvaliacao, dataFim));
+      const condicoesAga = [
+        eq(agas.pacienteId, pacienteId),
+        eq(agas.status, 'concluida'),
+      ];
+      if (dataInicio) condicoesAga.push(gte(agas.dataAvaliacao, dataInicio));
+      if (dataFim) condicoesAga.push(lte(agas.dataAvaliacao, dataFim));
 
       const condicoesSinais = [eq(sinaisVitais.pacienteId, pacienteId)];
       if (dataInicio) condicoesSinais.push(gte(sinaisVitais.dataAfericao, dataInicio));
@@ -113,9 +116,9 @@ export const registrosRouter = createTRPCRouter({
           where: and(...condicoesRegistros),
           orderBy: (registros, { desc }) => [desc(registros.dataRegistro)],
         }),
-        ctx.db.query.avaliacoesGeriatricas.findMany({
+        ctx.db.query.agas.findMany({
           where: and(...condicoesAga),
-          orderBy: (avaliacoesGeriatricas, { desc }) => [desc(avaliacoesGeriatricas.dataAvaliacao)],
+          orderBy: (agas, { desc }) => [desc(agas.dataAvaliacao)],
         }),
         ctx.db.query.sinaisVitais.findMany({
           where: and(...condicoesSinais),
@@ -126,13 +129,16 @@ export const registrosRouter = createTRPCRouter({
       // Busca nomes dos profissionais (uma query para todos)
       const profissionalIds = new Set([
         ...registrosList.map(r => r.profissionalId),
-        ...agaList.map(a => a.profissionalId),
+        ...agaList.flatMap((a) => a.concluidaPorId ? [a.concluidaPorId] : []),
         ...sinaisList.map(s => s.profissionalId),
       ]);
 
       const profissionais = profissionalIds.size > 0
         ? await ctx.db.query.usuarios.findMany({
-            where: (usuarios, { inArray }) => inArray(usuarios.id, Array.from(profissionalIds)),
+            where: and(
+              inArray(usuarios.id, Array.from(profissionalIds)),
+              eq(usuarios.instituicaoId, ctx.instituicaoId),
+            ),
             columns: { id: true, nome: true, especialidade: true },
           })
         : [];
@@ -164,7 +170,7 @@ export const registrosRouter = createTRPCRouter({
       }
 
       for (const a of agaList) {
-        const prof = profMap.get(a.profissionalId);
+        const prof = a.concluidaPorId ? profMap.get(a.concluidaPorId) : undefined;
         timeline.push({
           id: a.id,
           tipo: 'aga',
@@ -173,12 +179,10 @@ export const registrosRouter = createTRPCRouter({
           profissional: prof?.nome ?? 'Desconhecido',
           especialidade: prof?.especialidade ?? 'medicina',
           detalhes: {
-            katzScore: a.katzScore,
-            lawtonScore: a.lawtonScore,
-            meemScore: a.meemScore,
-            gds15Score: a.gds15Score,
-            manScore: a.manScore,
-            tugSegundos: a.tugSegundos,
+            resultado: a.resultado,
+            classificacao: a.classificacao,
+            descricaoClassificacao: a.descricaoClassificacao,
+            concluidaEm: a.concluidaEm,
           },
         });
       }
