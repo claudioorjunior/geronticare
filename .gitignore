@@ -58,3 +58,6 @@ HARNESS.md
 .zed/settings.json
 ONDE-PAREI.md
 Dev Geronticare*.md
+# internal planning docs (keep local, never publish)
+ROADMAP.md
+PRD.md
