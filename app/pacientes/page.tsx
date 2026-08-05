@@ -4,13 +4,15 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Search, ChevronRight, ChevronLeft, Users, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useDevRole } from '@/lib/dev/use-dev-role';
+import { useUserRole } from '@/lib/auth/use-user-role';
 import { trpc } from '@/lib/trpc/client';
 import { PatientForm } from '@/components/pacientes/PatientForm';
-import type { Paciente } from '@/lib/db/schema';
+import { formatarData } from '@/lib/utils';
+import type { RouterOutputs } from '@/lib/trpc/types';
 
 // ── Types ──
 
+type PacienteListItem = RouterOutputs['pacientes']['listar'][number];
 type PacienteStatus = 'Ativo' | 'Inativo' | 'Alerta';
 type OrderKey = 'recentes' | 'nome' | 'idade_desc';
 
@@ -38,12 +40,7 @@ function getInitials(nome: string): string {
     .toUpperCase();
 }
 
-function formatarData(d?: string | Date | null): string {
-  if (!d) return '—';
-  const date = typeof d === 'string' ? new Date(d) : d;
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleDateString('pt-BR');
-}
+// ── AGA score helpers ──
 
 function calcularIdade(dataNascimento?: string | Date | null): number {
   if (!dataNascimento) return 0;
@@ -71,7 +68,7 @@ const statusConfig: Record<PacienteStatus, { bg: string; text: string; dot: stri
 };
 
 // Mapeia Paciente (tRPC/DB) → linha da tabela, derivando idade/status
-function paraLinha(p: Paciente): PacienteLinha {
+function paraLinha(p: PacienteListItem): PacienteLinha {
   return {
     id: p.id,
     nome: p.nome,
@@ -96,7 +93,7 @@ const quickFilters = [
 // ── Page ──
 
 export default function PacientesPage() {
-  const { role } = useDevRole();
+  const { role } = useUserRole();
   const router = useRouter();
   const utils = trpc.useUtils();
   const canCreate = role === 'admin' || role === 'profissional';
@@ -146,7 +143,7 @@ export default function PacientesPage() {
   const paginaAtual = Math.min(page, totalPages);
 
   return (
-    <div className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-8 flex flex-col gap-6">
+    <div className="grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop py-8 flex flex-col gap-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-3">
@@ -166,7 +163,7 @@ export default function PacientesPage() {
             onClick={() => setFormAberto(true)}
             className="gap-2 text-sm font-medium bg-teal-600 text-white hover:bg-teal-700 shadow-sm transition-all"
           >
-            <Plus className="h-[18px] w-[18px]" /> Novo Paciente
+            <Plus className="h-4.5 w-4.5" /> Novo Paciente
           </Button>
         ) : (
           <span className="text-sm text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg">
@@ -240,7 +237,7 @@ export default function PacientesPage() {
       {/* Data Table */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm transition-shadow hover:shadow-md">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[750px]">
+          <table className="w-full text-left border-collapse min-w-187.5">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-xs font-semibold uppercase tracking-wider text-slate-500">
                 <th className="py-4 px-5">Nome</th>
@@ -276,7 +273,7 @@ export default function PacientesPage() {
                     >
                       <td className="py-4 px-5">
                         <div className="flex items-center gap-3">
-                          <div className="h-9 w-9 shrink-0 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 text-white flex items-center justify-center text-xs font-bold shadow-sm">
+                          <div className="h-9 w-9 shrink-0 rounded-full bg-linear-to-br from-teal-500 to-teal-700 text-white flex items-center justify-center text-xs font-bold shadow-sm">
                             {getInitials(p.nome)}
                           </div>
                           <div>
@@ -376,7 +373,7 @@ export default function PacientesPage() {
       </div>
 
       {/* Modal Novo Paciente */}
-      <PatientForm open={formAberto} onClose={() => setFormAberto(false)} />
+      <PatientForm open={formAberto} onCloseAction={() => setFormAberto(false)} />
     </div>
   );
 }

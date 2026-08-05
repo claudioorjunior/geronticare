@@ -1,7 +1,6 @@
-import { createTRPCRouter, protectedProcedure } from '../server';
+import { createTRPCRouter, readClinicalProcedure } from '../server';
 import {
   pacientes,
-  avaliacoesGeriatricas,
   registros,
   sinaisVitais,
 } from '@/lib/db/schema';
@@ -9,7 +8,7 @@ import { count, eq, and, desc, asc, gte, sql } from 'drizzle-orm';
 
 export const dashboardRouter = createTRPCRouter({
   // Resumo do dashboard — contagens agregadas + pacientes recentes
-  resumo: protectedProcedure.query(async ({ ctx }) => {
+  resumo: readClinicalProcedure.query(async ({ ctx }) => {
     const [totalRow] = await ctx.db
       .select({ value: count() })
       .from(pacientes)
@@ -29,7 +28,8 @@ export const dashboardRouter = createTRPCRouter({
         )
       );
 
-    // Pacientes ativos sem nenhuma AGA associada
+    // Pacientes ativos sem nenhuma AGA concluída no modelo novo (tabela `agas`).
+    // Rascunhos continuam contando como pendente — só sai da fila com AGA concluída.
     const [pendentesRow] = await ctx.db
       .select({ value: count() })
       .from(pacientes)
@@ -37,7 +37,7 @@ export const dashboardRouter = createTRPCRouter({
         and(
           eq(pacientes.instituicaoId, ctx.instituicaoId),
           eq(pacientes.ativo, true),
-          sql`NOT EXISTS (SELECT 1 FROM avaliacoes_geriatricas ag WHERE ag.paciente_id = ${pacientes.id})`
+          sql`NOT EXISTS (SELECT 1 FROM agas a WHERE a.paciente_id = ${pacientes.id} AND a.status = 'concluida')`
         )
       );
 
@@ -56,7 +56,7 @@ export const dashboardRouter = createTRPCRouter({
   }),
 
   // Registros clínicos do dia atual (filtrados pela instituição)
-  registrosHoje: protectedProcedure.query(async ({ ctx }) => {
+  registrosHoje: readClinicalProcedure.query(async ({ ctx }) => {
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
 
@@ -86,7 +86,7 @@ export const dashboardRouter = createTRPCRouter({
 
   // Último sinal vital de cada paciente ativo da instituição
   // ponytail: subquery IN com (pacienteId, MAX(dataAfericao)); trocar por DISTINCT ON se perfilar lentidão
-  ultimosSinaisVitais: protectedProcedure.query(async ({ ctx }) => {
+  ultimosSinaisVitais: readClinicalProcedure.query(async ({ ctx }) => {
     return ctx.db
       .select({
         id: sinaisVitais.id,
@@ -121,34 +121,25 @@ export const dashboardRouter = createTRPCRouter({
       );
   }),
 
-  // Próximas 5 avaliações geriátricas agendadas
-  agasProximas: protectedProcedure.query(async ({ ctx }) => {
-    const agora = new Date();
-
+  // Próximas AGAs a realizar: pacientes ativos ainda sem AGA concluída no
+  // modelo novo (não existe agendamento; a fila é ordenada pela admissão,
+  // quem espera há mais tempo primeiro).
+  agasProximas: readClinicalProcedure.query(async ({ ctx }) => {
     return ctx.db
       .select({
-        id: avaliacoesGeriatricas.id,
-        pacienteId: avaliacoesGeriatricas.pacienteId,
-        profissionalId: avaliacoesGeriatricas.profissionalId,
-        dataAvaliacao: avaliacoesGeriatricas.dataAvaliacao,
-        katzScore: avaliacoesGeriatricas.katzScore,
-        lawtonScore: avaliacoesGeriatricas.lawtonScore,
-        meemScore: avaliacoesGeriatricas.meemScore,
-        gds15Score: avaliacoesGeriatricas.gds15Score,
-        manScore: avaliacoesGeriatricas.manScore,
-        tugSegundos: avaliacoesGeriatricas.tugSegundos,
-        observacoes: avaliacoesGeriatricas.observacoes,
+        pacienteId: pacientes.id,
         pacienteNome: pacientes.nome,
+        dataAdmissao: pacientes.dataAdmissao,
       })
-      .from(avaliacoesGeriatricas)
-      .innerJoin(pacientes, eq(avaliacoesGeriatricas.pacienteId, pacientes.id))
+      .from(pacientes)
       .where(
         and(
           eq(pacientes.instituicaoId, ctx.instituicaoId),
-          gte(avaliacoesGeriatricas.dataAvaliacao, agora)
+          eq(pacientes.ativo, true),
+          sql`NOT EXISTS (SELECT 1 FROM agas a WHERE a.paciente_id = ${pacientes.id} AND a.status = 'concluida')`
         )
       )
-      .orderBy(asc(avaliacoesGeriatricas.dataAvaliacao))
+      .orderBy(asc(pacientes.dataAdmissao))
       .limit(5);
   }),
 });

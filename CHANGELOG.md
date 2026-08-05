@@ -5,6 +5,63 @@ Todos os mudanças notáveis deste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [0.3.0] - Não lançado
+
+### Adicionado
+
+- **Perfil de usuário**
+  - Página de perfil com avatar, nome e troca de senha
+  - Card de usuário com dropdown (Meu Perfil / Deslogar)
+  - Validação de upload de avatar (GIF bloqueado)
+
+- **AGA completa (Avaliação Geriátrica Ampla)**
+  - Lista de AGAs + formulário interativo com scoring em tempo real
+  - Classificação RDC 502/2021 e resumo clínico na página do paciente
+  - Relatórios imprimíveis e comparação automática entre avaliações
+  - TUG alinhado a segundos (antes ordinal 0-9)
+
+- **RBAC**
+  - Papéis persistidos no banco controlam acesso a pacientes
+  - Papel `usuario` ganha acesso de leitura a dados clínicos
+
+### Segurança
+
+- Escores da AGA calculados exclusivamente no servidor (cliente não envia escores)
+- DTOs mínimos: queries com colunas explícitas, mutations devolvem apenas `{ id }`
+- `Cache-Control: private, no-store` em todas as respostas de `/api/auth/*` e `/api/trpc/*`
+- Logout limpa o cache do React Query (estado clínico não persiste no navegador)
+- Contexto tRPC exige `usuario.ativo` (fail-closed, inclusive no dev bypass)
+- `DEV_AUTH_BYPASS` explícito e desabilitado em produção
+- Decisão documentada em `docs/decisions/0001-protecao-dados-clinicos.md`
+
+### Corrigido
+
+- Formatação de datas timezone-safe na AGA
+- Migrations unificadas em uma única `0000_curious_naoko` + loader dinâmico
+- Guard para dados `undefined` em `buscar` e páginas de paciente
+
+## [0.2.0] - 2026-07-24
+
+### Adicionado
+
+- **M3/M4: Interface do prontuário**
+  - Dashboard com design tokens + TopNav persistente
+  - Navegação híbrida TopNav + tabs no prontuário do paciente
+  - Formulário editável de dados do paciente com controle por papel
+  - Lista de pacientes com status
+  - Formulário completo de AGA com 6 escalas + interpretação automática
+  - Sinais vitais com formulário + gráfico Recharts
+  - Timeline clínica unificada com 5 tipos de registro
+  - shadcn/ui inicializado + role switcher para desenvolvimento
+
+- **Papéis de usuário**
+  - Enum `role` (admin/profissional/usuario) + `adminProcedure`
+
+### Segurança
+
+- Auditoria: correção de vazamentos cross-tenant, path traversal no S3, validação de input
+- Brechas de autorização fechadas em routers tRPC + guards
+
 ## [0.1.0] - 2026-07-23
 
 ### Adicionado

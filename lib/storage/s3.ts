@@ -46,8 +46,7 @@ function sanitizarNomeArquivo(nome: string): string {
  */
 export async function gerarUrlUpload(
   chave: string,
-  tipoMime: string,
-  tamanhoMaxBytes = 10 * 1024 * 1024
+  tipoMime: string
 ): Promise<{ url: string; chave: string }> {
   if (!MIME_PERMITIDOS.has(tipoMime)) {
     throw new Error(`Tipo MIME não permitido: ${tipoMime}`);
@@ -57,7 +56,6 @@ export async function gerarUrlUpload(
     Bucket: bucket,
     Key: chave,
     ContentType: tipoMime,
-    ContentLength: tamanhoMaxBytes,
   });
 
   const url = await getSignedUrl(s3Client, comando, { expiresIn: 300 });
@@ -109,6 +107,24 @@ export function gerarChaveAnexo(
   const uuid = randomUUID();
   const nomeSeguro = sanitizarNomeArquivo(nomeArquivo);
   return `instituicoes/${instituicaoId}/pacientes/${pacienteId}/${uuid}-${nomeSeguro}`;
+}
+
+/**
+ * Gera uma chave isolada para o avatar de um usuário.
+ */
+export function gerarChaveAvatar(
+  instituicaoId: string,
+  usuarioId: string,
+  nomeArquivo: string
+): string {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(instituicaoId) || !uuidRegex.test(usuarioId)) {
+    throw new Error('IDs devem ser UUIDs válidos');
+  }
+
+  const uuid = randomUUID();
+  const nomeSeguro = sanitizarNomeArquivo(nomeArquivo);
+  return `instituicoes/${instituicaoId}/usuarios/${usuarioId}/avatar/${uuid}-${nomeSeguro}`;
 }
 
 export { s3Client };

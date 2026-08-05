@@ -6,6 +6,8 @@ import { avaliacoesGeriatricasRouter } from './routers/avaliacoesGeriatricas';
 import { registrosRouter } from './routers/registros';
 import { sinaisVitaisRouter } from './routers/sinaisVitais';
 import { dashboardRouter } from './routers/dashboard';
+import { aplicacoesInstrumentosRouter } from './routers/aplicacoesInstrumentos';
+import { agasRouter } from './routers/agas';
 
 export const appRouter = createTRPCRouter({
   pacientes: pacientesRouter,
@@ -15,6 +17,8 @@ export const appRouter = createTRPCRouter({
   registros: registrosRouter,
   sinaisVitais: sinaisVitaisRouter,
   dashboard: dashboardRouter,
+  aplicacoesInstrumentos: aplicacoesInstrumentosRouter,
+  agas: agasRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -1,10 +1,28 @@
 import { z } from 'zod';
 import { createTRPCRouter, protectedProcedure, adminProcedure } from '../server';
 import { usuarios } from '@/lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, or, isNotNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 
 export const usuariosRouter = createTRPCRouter({
+  listarProfissionaisAtivos: protectedProcedure.query(async ({ ctx }) => {
+    return ctx.db.query.usuarios.findMany({
+      where: and(
+        eq(usuarios.instituicaoId, ctx.instituicaoId),
+        eq(usuarios.ativo, true),
+        or(eq(usuarios.role, 'admin'), eq(usuarios.role, 'profissional')),
+        isNotNull(usuarios.especialidade),
+      ),
+      orderBy: (usuarios, { asc }) => [asc(usuarios.nome)],
+      columns: {
+        id: true,
+        nome: true,
+        especialidade: true,
+        registroProfissional: true,
+      },
+    });
+  }),
+
   listar: adminProcedure.query(async ({ ctx }) => {
     return ctx.db.query.usuarios.findMany({
       where: eq(usuarios.instituicaoId, ctx.instituicaoId),
@@ -114,6 +132,7 @@ export const usuariosRouter = createTRPCRouter({
         especialidade: true,
         registroProfissional: true,
         role: true,
+        image: true,
       },
     });
   }),
@@ -123,6 +142,7 @@ export const usuariosRouter = createTRPCRouter({
       z.object({
         nome: z.string().min(3).optional(),
         registroProfissional: z.string().optional(),
+        image: z.string().url().optional().nullable(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -134,6 +154,7 @@ export const usuariosRouter = createTRPCRouter({
           id: usuarios.id,
           nome: usuarios.nome,
           email: usuarios.email,
+          image: usuarios.image,
         });
       return usuario;
     }),

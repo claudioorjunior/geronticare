@@ -1,4 +1,7 @@
-import { pgTable, text, timestamp, uuid, integer, boolean, jsonb, pgEnum, index } from 'drizzle-orm/pg-core';
+import { relations } from 'drizzle-orm';
+import { pgTable, text, timestamp, uuid, integer, boolean, jsonb, pgEnum, index, unique } from 'drizzle-orm/pg-core';
+import type { AgaAnswers } from '@/lib/validations/aga-form';
+import type { InstrumentoSlug } from '@/lib/instrumentos/instrumentos';
 
 // Enums
 export const sexoEnum = pgEnum('sexo', ['masculino', 'feminino', 'outro']);
@@ -38,6 +41,7 @@ export const usuarios = pgTable('usuarios', {
   especialidade: especialidadeEnum('especialidade'),
   role: roleEnum('role').default('profissional').notNull(),
   registroProfissional: text('registro_profissional'), // CRM, COREN, CREFITO, etc
+  image: text('image'), // avatar URL (Better-Auth updateUser)
   ativo: boolean('ativo').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -125,13 +129,16 @@ export const avaliacoesGeriatricas = pgTable('avaliacoes_geriatricas', {
   profissionalId: uuid('profissional_id').references(() => usuarios.id).notNull(),
   dataAvaliacao: timestamp('data_avaliacao').defaultNow().notNull(),
   
-  // Escalas funcionais
-  katzScore: integer('katz_score'), // 0-6 (independência em AVD)
-  lawtonScore: integer('lawton_score'), // 0-8 (AIVD)
+  // Escalas funcionais. Katz segue a direção validada no Brasil: 0 = independente.
+  katzScore: integer('katz_score'), // 0-6 (número de ABVD com dependência)
+  lawtonScore: integer('lawton_score'), // 0-8 (AIVD: 0 = dependente, 8 = independente)
+  rdc502Autocuidado: text('rdc502_autocuidado'), // nenhuma, ate_tres ou todas
+  rdc502Cognicao: text('rdc502_cognicao'), // sem_comprometimento, alteracao_controlada ou comprometimento
   meemScore: integer('meem_score'), // 0-30 (Mini-Exame do Estado Mental)
   gds15Score: integer('gds15_score'), // 0-15 (Escala de Depressão Geriátrica)
   manScore: integer('man_score'), // Mini Avaliação Nutricional
   tugSegundos: integer('tug_segundos'), // Timed Up and Go (segundos)
+  respostas: jsonb('respostas').$type<AgaAnswers>(),
   
   // Comorbidades
   comorbidades: jsonb('comorbidades').$type<string[]>(),
@@ -153,6 +160,99 @@ export const avaliacoesGeriatricas = pgTable('avaliacoes_geriatricas', {
 }, (table) => ({
   pacienteIdx: index('avaliacoes_paciente_idx').on(table.pacienteId),
   profissionalIdx: index('avaliacoes_profissional_idx').on(table.profissionalId),
+}));
+
+// Aplicações independentes de instrumentos clínicos são imutáveis. Correções
+// geram uma nova aplicação em vez de alterar o registro original.
+export const aplicacoesInstrumentos = pgTable('aplicacoes_instrumentos', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  pacienteId: uuid('paciente_id').references(() => pacientes.id).notNull(),
+  instrumento: text('instrumento').$type<InstrumentoSlug>().notNull(),
+  profissionalId: uuid('profissional_id').references(() => usuarios.id).notNull(),
+  registradoPorId: uuid('registrado_por_id').references(() => usuarios.id).notNull(),
+  dataAplicacao: timestamp('data_aplicacao').notNull(),
+  respostas: jsonb('respostas').$type<Record<string, unknown>>().notNull(),
+  escore: integer('escore'),
+  classificacao: text('classificacao').notNull(),
+  descricaoClassificacao: text('descricao_classificacao').notNull(),
+  versaoInstrumento: text('versao_instrumento').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  pacienteInstrumentoDataIdx: index('aplicacoes_paciente_instrumento_data_idx').on(
+    table.pacienteId,
+    table.instrumento,
+    table.dataAplicacao,
+  ),
+  profissionalIdx: index('aplicacoes_profissional_idx').on(table.profissionalId),
+  registradoPorIdx: index('aplicacoes_registrado_por_idx').on(table.registradoPorId),
+}));
+
+export const aplicacoesInstrumentosRelations = relations(
+  aplicacoesInstrumentos,
+  ({ one }) => ({
+    profissional: one(usuarios, {
+      fields: [aplicacoesInstrumentos.profissionalId],
+      references: [usuarios.id],
+      relationName: 'aplicacao_profissional',
+    }),
+    registradoPor: one(usuarios, {
+      fields: [aplicacoesInstrumentos.registradoPorId],
+      references: [usuarios.id],
+      relationName: 'aplicacao_registrado_por',
+    }),
+  }),
+);
+
+export const agaStatusEnum = pgEnum('aga_status', ['rascunho', 'concluida']);
+
+export const agas = pgTable('agas', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  pacienteId: uuid('paciente_id').references(() => pacientes.id).notNull(),
+  criadoPorId: uuid('criado_por_id').references(() => usuarios.id).notNull(),
+  status: agaStatusEnum('status').default('rascunho').notNull(),
+  dataAvaliacao: timestamp('data_avaliacao').defaultNow().notNull(),
+  observacoes: text('observacoes'),
+  resultado: text('resultado'),
+  classificacao: text('classificacao'),
+  descricaoClassificacao: text('descricao_classificacao'),
+  concluidaEm: timestamp('concluida_em'),
+  concluidaPorId: uuid('concluida_por_id').references(() => usuarios.id),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({ pacienteIdx: index('agas_paciente_idx').on(table.pacienteId) }));
+
+export const agaAplicacoes = pgTable('aga_aplicacoes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  agaId: uuid('aga_id').references(() => agas.id).notNull(),
+  aplicacaoInstrumentoId: uuid('aplicacao_instrumento_id').references(() => aplicacoesInstrumentos.id).notNull(),
+  instrumento: text('instrumento').$type<InstrumentoSlug>().notNull(),
+  profissionalId: uuid('profissional_id').references(() => usuarios.id).notNull(),
+  registradoPorId: uuid('registrado_por_id').references(() => usuarios.id).notNull(),
+  dataAplicacao: timestamp('data_aplicacao').notNull(),
+  respostas: jsonb('respostas').$type<Record<string, unknown>>().notNull(),
+  escore: integer('escore'),
+  classificacao: text('classificacao').notNull(),
+  descricaoClassificacao: text('descricao_classificacao').notNull(),
+  versaoInstrumento: text('versao_instrumento').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  agaInstrumentoUnique: unique('aga_aplicacoes_aga_instrumento_unique').on(table.agaId, table.instrumento),
+  agaAplicacaoUnique: unique('aga_aplicacoes_aga_aplicacao_unique').on(table.agaId, table.aplicacaoInstrumentoId),
+  agaIdx: index('aga_aplicacoes_aga_idx').on(table.agaId),
+}));
+
+export const agasRelations = relations(agas, ({ one, many }) => ({
+  paciente: one(pacientes, { fields: [agas.pacienteId], references: [pacientes.id] }),
+  criadoPor: one(usuarios, { fields: [agas.criadoPorId], references: [usuarios.id], relationName: 'aga_criado_por' }),
+  concluidaPor: one(usuarios, { fields: [agas.concluidaPorId], references: [usuarios.id], relationName: 'aga_concluida_por' }),
+  aplicacoes: many(agaAplicacoes),
+}));
+
+export const agaAplicacoesRelations = relations(agaAplicacoes, ({ one }) => ({
+  aga: one(agas, { fields: [agaAplicacoes.agaId], references: [agas.id] }),
+  aplicacaoInstrumento: one(aplicacoesInstrumentos, { fields: [agaAplicacoes.aplicacaoInstrumentoId], references: [aplicacoesInstrumentos.id] }),
+  profissional: one(usuarios, { fields: [agaAplicacoes.profissionalId], references: [usuarios.id], relationName: 'aga_aplicacao_profissional' }),
+  registradoPor: one(usuarios, { fields: [agaAplicacoes.registradoPorId], references: [usuarios.id], relationName: 'aga_aplicacao_registrado_por' }),
 }));
 
 // Tabela: Prontuário (registros clínicos)
@@ -208,6 +308,12 @@ export type Paciente = typeof pacientes.$inferSelect;
 export type NovoPaciente = typeof pacientes.$inferInsert;
 export type AvaliacaoGeriatrica = typeof avaliacoesGeriatricas.$inferSelect;
 export type NovaAvaliacaoGeriatrica = typeof avaliacoesGeriatricas.$inferInsert;
+export type AplicacaoInstrumento = typeof aplicacoesInstrumentos.$inferSelect;
+export type NovaAplicacaoInstrumento = typeof aplicacoesInstrumentos.$inferInsert;
+export type Aga = typeof agas.$inferSelect;
+export type NovaAga = typeof agas.$inferInsert;
+export type AgaAplicacao = typeof agaAplicacoes.$inferSelect;
+export type NovaAgaAplicacao = typeof agaAplicacoes.$inferInsert;
 export type Registro = typeof registros.$inferSelect;
 export type NovoRegistro = typeof registros.$inferInsert;
 export type SinaisVitais = typeof sinaisVitais.$inferSelect;

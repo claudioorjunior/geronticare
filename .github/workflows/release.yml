@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup env
+        run: |
+          echo 'DATABASE_URL="postgresql://ci:***@localhost:5432/ci-mock"' > .env.local
+          echo 'AUTH_SECRET="ci-mock-secret-do-not-use"' >> .env.local
+          echo 'AUTH_URL="http://localhost:3000"' >> .env.local
+          echo 'NEXT_PUBLIC_APP_URL="http://localhost:3000"' >> .env.local
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Extract changelog section
+        id: changelog
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          # Extrai a seção do CHANGELOG entre "## [X.Y.Z]" e o próximo "## ["
+          awk -v ver="$VERSION" '
+            $0 ~ "^## \\[" ver "\\]" { found=1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if [[ ! -s release-notes.md ]]; then
+            echo "Seção do CHANGELOG não encontrada para $VERSION; usando mensagem padrão." >&2
+            echo "Veja o CHANGELOG.md para detalhes." > release-notes.md
+          fi
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "GerontiCare $GITHUB_REF_NAME" \
+            --notes-file release-notes.md

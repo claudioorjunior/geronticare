@@ -24,6 +24,19 @@ VALUES (
   '2025-01-01 00:00:00'
 );
 
+-- Usuário leitura (papel usuario)
+INSERT INTO usuarios (id, instituicao_id, nome, email, role, ativo, created_at, updated_at)
+VALUES (
+  'b8a2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+  'ae6c72cc-c72e-4b20-9686-7d015efe9b24',
+  'Leitor Mock',
+  'leitor@mock.ilpi',
+  'usuario',
+  true,
+  '2025-01-01 00:00:00',
+  '2025-01-01 00:00:00'
+);
+
 -- Usuário profissional
 INSERT INTO usuarios (id, instituicao_id, nome, email, role, especialidade, registro_profissional, ativo, created_at, updated_at)
 VALUES (
@@ -34,6 +47,46 @@ VALUES (
   'profissional',
   'medicina',
   'CRM-SP 123456',
+  true,
+  '2025-01-01 00:00:00',
+  '2025-01-01 00:00:00'
+);
+
+-- Equipe multiprofissional mock usada nos seletores de aplicação
+INSERT INTO usuarios (id, instituicao_id, nome, email, role, especialidade, registro_profissional, ativo, created_at, updated_at)
+VALUES
+(
+  '6fb4c4d5-1e9a-4f27-8c33-5e8b6a3d1f20',
+  'ae6c72cc-c72e-4b20-9686-7d015efe9b24',
+  'Nutri. Marina Alves',
+  'nutricao@mock.ilpi',
+  'profissional',
+  'nutricao',
+  'CRN-3 12345',
+  true,
+  '2025-01-01 00:00:00',
+  '2025-01-01 00:00:00'
+),
+(
+  '9d56ee72-6a18-46a9-9c27-01fb457ab4a8',
+  'ae6c72cc-c72e-4b20-9686-7d015efe9b24',
+  'Fisiot. Paulo Santos',
+  'fisioterapia@mock.ilpi',
+  'profissional',
+  'fisioterapia',
+  'CREFITO-3 123456-F',
+  true,
+  '2025-01-01 00:00:00',
+  '2025-01-01 00:00:00'
+),
+(
+  'b3a21970-3fbc-4dee-a6dc-51ff4ed6912d',
+  'ae6c72cc-c72e-4b20-9686-7d015efe9b24',
+  'Psic. Renata Costa',
+  'psicologia@mock.ilpi',
+  'profissional',
+  'psicologia',
+  'CRP 06/123456',
   true,
   '2025-01-01 00:00:00',
   '2025-01-01 00:00:00'

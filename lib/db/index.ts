@@ -1,4 +1,5 @@
 import * as schema from './schema';
+import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import type { PgDatabase } from 'drizzle-orm/pg-core';
 import type { PgQueryResultHKT } from 'drizzle-orm/pg-core';
 import type { ExtractTablesWithRelations } from 'drizzle-orm';
@@ -15,15 +16,31 @@ async function init() {
   const { join } = await import('node:path');
   const cwd = process.cwd();
 
-  if (isDev) {
+  // PGlite in-memory é apenas fallback de dev sem Postgres configurado
+  // (ex.: testes/CI, que não carregam .env.local). Com DATABASE_URL
+  // presente (dev com Postgres local OU produção) usamos Postgres real —
+  // persistente e idêntico ao ambiente de produção.
+  const usePgLite = isDev && !process.env.DATABASE_URL;
+
+  if (usePgLite) {
     const { PGlite } = await import('@electric-sql/pglite');
     const { drizzle } = await import('drizzle-orm/pglite');
     const client = await PGlite.create();
-    const migrationSql = readFileSync(
-      join(cwd, 'lib', 'db', 'migrations', '0000_smooth_doomsday.sql'),
-      'utf-8',
-    );
-    await client.exec(migrationSql);
+    const journal = JSON.parse(
+      readFileSync(
+        join(cwd, 'lib', 'db', 'migrations', 'meta', '_journal.json'),
+        'utf-8',
+      ),
+    ) as { entries: Array<{ tag: string }> };
+
+    for (const entry of journal.entries) {
+      const migrationSql = readFileSync(
+        join(cwd, 'lib', 'db', 'migrations', `${entry.tag}.sql`),
+        'utf-8',
+      );
+      await client.exec(migrationSql);
+    }
+
     const seedSql = readFileSync(
       join(cwd, 'lib', 'db', 'seed-data.sql'),
       'utf-8',
@@ -35,7 +52,11 @@ async function init() {
     const postgres = await import('postgres');
     const { env } = await import('@/lib/env');
     const client = postgres.default(env.DATABASE_URL, { prepare: false });
-    _db = drizzle(client, { schema });
+    const db = drizzle(client, { schema });
+    _db = db;
+    await migrate(db, {
+      migrationsFolder: join(cwd, 'lib', 'db', 'migrations'),
+    });
   }
 }
 

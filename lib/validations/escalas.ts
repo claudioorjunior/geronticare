@@ -1,25 +1,14 @@
 import { z } from 'zod';
+import { agaAnswersSchema, calcularAgaScores, type AgaAnswers } from './aga-form';
 
-// Schema para validação de escalas geriátricas
-export const escalasGeriatricasSchema = z.object({
-  katzScore: z.number().int().min(0).max(6).optional(),
-  lawtonScore: z.number().int().min(0).max(8).optional(),
-  meemScore: z.number().int().min(0).max(30).optional(),
-  gds15Score: z.number().int().min(0).max(15).optional(),
-  manScore: z.number().int().min(0).max(14).optional(),
-  tugSegundos: z.number().int().min(0).max(300).optional(), // max ~5min, acima disso é erro de registro
-});
-
-// Schema para criação de AGA
-export const criarAvaliacaoSchema = z.object({
+// Schema para criação de AGA — preenchida EXCLUSIVAMENTE pelo formulário de
+// múltipla escolha (agaAnswersSchema). Os escores são derivados no servidor
+// por calcularAgaScores; campos de escore manual NÃO são aceitos
+// (strictObject rejeita qualquer chave fora do schema).
+export const criarAvaliacaoSchema = z.strictObject({
   pacienteId: z.string().uuid(),
   dataAvaliacao: z.coerce.date().optional(),
-  katzScore: z.number().int().min(0).max(6).optional(),
-  lawtonScore: z.number().int().min(0).max(8).optional(),
-  meemScore: z.number().int().min(0).max(30).optional(),
-  gds15Score: z.number().int().min(0).max(15).optional(),
-  manScore: z.number().int().min(0).max(14).optional(),
-  tugSegundos: z.number().int().min(0).max(300).optional(),
+  respostas: agaAnswersSchema,
   comorbidades: z.array(z.string().max(200)).max(50).optional(),
   medicamentos: z.array(
     z.object({
@@ -32,6 +21,9 @@ export const criarAvaliacaoSchema = z.object({
   moradia: z.string().max(500).optional(),
   observacoes: z.string().max(5000).optional(),
 });
+
+export { agaAnswersSchema, calcularAgaScores };
+export type { AgaAnswers };
 
 // Schema para sinais vitais
 export const sinalVitalSchema = z.object({
@@ -55,21 +47,21 @@ export function interpretarEscala(nome: string, score: number | null | undefined
 
   switch (nome) {
     case 'katz':
-      if (score === 6) return 'Independência total';
-      if (score >= 3) return 'Dependência parcial';
-      return 'Dependência total';
+      if (score === 0) return 'Independente em ABVD';
+      if (score === 6) return 'Dependência em todas as ABVD';
+      return `Dependência em ${score} de 6 ABVD`;
     case 'lawton':
-      if (score === 8) return 'Independência total (AIVD)';
-      if (score >= 4) return 'Dependência parcial (AIVD)';
-      return 'Dependência total (AIVD)';
+      if (score === 0) return 'Dependência em AIVD';
+      if (score === 8) return 'Independência em AIVD';
+      return `Necessita de assistência em ${8 - score} de 8 AIVD`;
     case 'meem':
       if (score >= 24) return 'Normal';
       if (score >= 18) return 'Déficit cognitivo leve';
       return 'Déficit cognitivo moderado a grave';
     case 'gds15':
       if (score <= 5) return 'Sem depressão';
-      if (score <= 9) return 'Depressão leve';
-      return 'Depressão moderada a grave';
+      if (score <= 10) return 'Depressão leve';
+      return 'Depressão severa';
     case 'man':
       if (score >= 12) return 'Nutrição adequada';
       if (score >= 8) return 'Risco de desnutrição';
@@ -81,4 +73,108 @@ export function interpretarEscala(nome: string, score: number | null | undefined
     default:
       return null;
   }
+}
+
+export type GrauDependenciaRdc502 = {
+  grau: 'I' | 'II' | 'III';
+  label: 'Grau I' | 'Grau II' | 'Grau III';
+  tone: 'ok' | 'warn' | 'risk';
+  fundamento: string;
+  requerConfirmacao: boolean;
+};
+
+// Grau de dependência sugerido pela RDC 502/2021 a partir das escalas já
+// aplicadas: Katz (autocuidado/ABVD) e MEEM (rastreio cognitivo). A RDC não
+// prescreve um formulário — define dois eixos (autocuidado + cognição) e
+// exige avaliação auditável. O MEEM é rastreio, não diagnóstico: escore
+// abaixo do corte (24) sugere comprometimento e exige confirmação clínica de
+// profissional habilitado (orientação ANVISA). A confirmação final é sempre
+// do profissional; esta função apenas deriva a sugestão.
+export function derivarGrauDependenciaRdc502(input: {
+  katzScore: number | null | undefined;
+  meemScore?: number | null | undefined;
+}): GrauDependenciaRdc502 | null {
+  const { katzScore, meemScore } = input;
+  if (katzScore === null || katzScore === undefined) return null;
+  if (!Number.isInteger(katzScore) || katzScore < 0 || katzScore > 6) return null;
+
+  let grau: 'I' | 'II' | 'III';
+  let base: string;
+
+  if (katzScore === 0) {
+    grau = 'I';
+    base = 'Independente nas atividades básicas de autocuidado (Katz 0 de 6).';
+  } else if (katzScore <= 3) {
+    grau = 'II';
+    base = `Dependência em ${katzScore} de 6 atividades de autocuidado (Katz), dentro do limite de três atividades exigido para o grau II.`;
+  } else {
+    grau = 'III';
+    base = `Dependência em ${katzScore} de 6 atividades de autocuidado (Katz), exigindo assistência em todas as atividades.`;
+  }
+
+  let fundamento = base;
+  let requerConfirmacao = false;
+
+  if (meemScore !== null && meemScore !== undefined) {
+    if (meemScore < 24) {
+      grau = 'III';
+      fundamento = `${base} Rastreio cognitivo alterado (MEEM ${meemScore}/30, abaixo do corte de 24) — sugestão de comprometimento cognitivo, requer confirmação clínica.`;
+      requerConfirmacao = true;
+    } else {
+      fundamento = `${base} Rastreio cognitivo preservado (MEEM ${meemScore}/30).`;
+    }
+  } else {
+    fundamento = `${base} Cognição não avaliada — requer confirmação clínica.`;
+    requerConfirmacao = true;
+  }
+
+  const tone = grau === 'I' ? 'ok' : grau === 'II' ? 'warn' : 'risk';
+  return { grau, label: `Grau ${grau}` as const, tone, fundamento, requerConfirmacao };
+}
+
+// ── Fluxo legado (AGA monolítica, /avaliacoes) ─────────────────────────────
+// A classificação por 2 perguntas foi descontinuada no modelo novo (a AGA
+// consolida as escalas e deriva o grau por derivarGrauDependenciaRdc502), mas
+// o formulário legado AgaForm ainda grava avaliacoesGeriatricas com esses
+// campos. Mantidos apenas para retrocompat até o A6 (legado só leitura).
+export type Rdc502Autocuidado = 'nenhuma' | 'ate_tres' | 'todas';
+export type Rdc502Cognicao = 'sem_comprometimento' | 'alteracao_controlada' | 'comprometimento';
+
+export type GrauDependenciaAnvisa = {
+  grau: 'I' | 'II' | 'III';
+  label: 'Grau I' | 'Grau II' | 'Grau III';
+  tone: 'ok' | 'warn' | 'risk';
+  fundamento: string;
+};
+
+export function classificarGrauDependenciaRdc502(
+  autocuidado: Rdc502Autocuidado | null | undefined,
+  cognicao: Rdc502Cognicao | null | undefined,
+): GrauDependenciaAnvisa | null {
+  if (!autocuidado || !cognicao) return null;
+
+  if (autocuidado === 'todas' || cognicao === 'comprometimento') {
+    return {
+      grau: 'III',
+      label: 'Grau III',
+      tone: 'risk',
+      fundamento: 'Assistência em todas as atividades de autocuidado e/ou comprometimento cognitivo.',
+    };
+  }
+
+  if (autocuidado === 'ate_tres') {
+    return {
+      grau: 'II',
+      label: 'Grau II',
+      tone: 'warn',
+      fundamento: 'Dependência em até três atividades de autocuidado, sem comprometimento cognitivo não controlado.',
+    };
+  }
+
+  return {
+    grau: 'I',
+    label: 'Grau I',
+    tone: 'ok',
+    fundamento: 'Pessoa idosa independente, ainda que utilize equipamentos de autoajuda.',
+  };
 }

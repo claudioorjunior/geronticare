@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useDevRole } from '@/lib/dev/use-dev-role';
+import Link from 'next/link';
+import { useUserRole } from '@/lib/auth/use-user-role';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
-import { Activity, Heart, Calendar, User, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Activity, Heart, Calendar, Thermometer, User, Loader2, AlertCircle, CheckCircle2, ClipboardList, ChevronRight, FileText, BarChart3 } from 'lucide-react';
 import { trpc } from '@/lib/trpc/client';
 import {
   atualizarPacienteSchema,
@@ -13,7 +14,16 @@ import {
   toDateInput,
   mascaraCPF,
 } from '@/lib/validations/pacientes';
-import type { Paciente } from '@/lib/db/schema';
+import type { RouterOutputs } from '@/lib/trpc/types';
+import { podeAcessarClinico, podeLerClinico } from '@/lib/trpc/autorizacao';
+import { formatarData } from '@/lib/utils';
+import { getInstrumentDefinition } from '@/lib/instrumentos/instrumentos';
+import {
+  montarRelatorioAga,
+  type AgaDetail,
+} from '@/lib/relatorios/aga-relatorio';
+
+type PacienteDetails = RouterOutputs['pacientes']['buscar'];
 
 function Kpi({ icon: Icon, label, value, unit }: { icon: typeof Activity; label: string; value: string; unit: string }) {
   return (
@@ -31,6 +41,9 @@ function Kpi({ icon: Icon, label, value, unit }: { icon: typeof Activity; label:
 
 export default function PatientDadosPage() {
   const params = useParams<{ id: string }>();
+  const { role } = useUserRole();
+  const canViewClinical = podeLerClinico(role);
+  const canEditClinical = podeAcessarClinico(role);
   const pacienteQ = trpc.pacientes.buscar.useQuery(
     { id: params.id },
     { enabled: Boolean(params.id) },
@@ -39,10 +52,23 @@ export default function PatientDadosPage() {
   // Último sinal vital registrado para o paciente
   const { data: ultimoSV } = trpc.sinaisVitais.ultimo.useQuery(
     { pacienteId: params.id },
-    { enabled: !!params.id },
+    { enabled: !!params.id && canViewClinical },
   );
 
   const [agora] = useState(() => Date.now());
+
+  // Última AGA concluída do modelo novo (consolidação de aplicações).
+  const agasQuery = trpc.agas.listar.useQuery(
+    { pacienteId: params.id },
+    { enabled: Boolean(params.id) && canViewClinical },
+  );
+  const ultimaConcluidaId = (agasQuery.data ?? []).find(
+    (aga) => aga.status === 'concluida',
+  )?.id;
+  const agaDetalheQuery = trpc.agas.buscar.useQuery(
+    { pacienteId: params.id, agaId: ultimaConcluidaId! },
+    { enabled: Boolean(params.id && ultimaConcluidaId) && canViewClinical },
+  );
 
   if (pacienteQ.isError) {
     return (
@@ -66,14 +92,7 @@ export default function PatientDadosPage() {
   }
 
   const paciente = pacienteQ.data;
-  if (!paciente) {
-    return (
-      <div className="py-12 text-center">
-        <AlertCircle className="mx-auto h-8 w-8 text-amber-500 mb-3" />
-        <p className="text-sm font-medium text-slate-700">Paciente não encontrado</p>
-      </div>
-    );
-  }
+
   const adm = new Date(paciente.dataAdmissao);
   const diasInternado = Number.isNaN(adm.getTime()) ? null : Math.max(0, Math.floor((agora - adm.getTime()) / 86400000));
 
@@ -102,6 +121,12 @@ export default function PatientDadosPage() {
       unit: '%',
     },
     {
+      icon: Thermometer,
+      label: 'Temp',
+      value: ultimoSV?.temperatura != null ? (ultimoSV.temperatura / 10).toFixed(1) : '—',
+      unit: '°C',
+    },
+    {
       icon: Calendar,
       label: 'Internado',
       value: diasInternado?.toString() ?? '—',
@@ -111,14 +136,47 @@ export default function PatientDadosPage() {
 
   return (
     <>
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {kpis.map((kpi) => (
           <Kpi key={kpi.label} icon={kpi.icon} label={kpi.label} value={kpi.value} unit={kpi.unit} />
         ))}
       </div>
 
+      {/* ── Resumo Clínico AGA ── */}
+      <AGASummaryCard
+        pacienteId={params.id}
+        aga={agaDetalheQuery.data}
+        isLoading={
+          agasQuery.isPending ||
+          (ultimaConcluidaId ? agaDetalheQuery.isPending : false)
+        }
+        isError={agasQuery.isError || agaDetalheQuery.isError}
+        canViewClinical={canViewClinical}
+        canEditClinical={canEditClinical}
+      />
+
+      {/* ── Quick-links para seções clínicas ── */}
+      <div className="mb-6 flex flex-wrap gap-3">
+        {[
+          { href: `/pacientes/${params.id}/aga`, icon: ClipboardList, label: 'AGA' },
+          { href: `/pacientes/${params.id}/avaliacoes`, icon: FileText, label: 'Avaliações' },
+          { href: `/pacientes/${params.id}/registros`, icon: BarChart3, label: 'Registros' },
+          { href: `/pacientes/${params.id}/sinais`, icon: Activity, label: 'Sinais Vitais' },
+        ].map((link) => (
+          <Link
+            key={link.label}
+            href={link.href}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-teal-700"
+          >
+            <link.icon className="h-4 w-4 text-slate-400" />
+            {link.label}
+            <ChevronRight className="h-3.5 w-3.5 text-slate-300" />
+          </Link>
+        ))}
+      </div>
+
       {/* Keyed pelo id para recriar estado do form na navegação entre pacientes */}
-      <EditForm key={paciente.id} paciente={paciente} />
+      <EditForm key={paciente.id} paciente={paciente} canEditClinical={canEditClinical} />
     </>
   );
 }
@@ -127,11 +185,11 @@ export default function PatientDadosPage() {
 // Componente-filho com estado local de edição. Keyed pelo id do paciente no pai,
 // então recria estado do zero quando navega para outro paciente — sem useEffect.
 
-function EditForm({ paciente }: { paciente: Paciente }) {
-  const { role } = useDevRole();
+function EditForm({ paciente, canEditClinical: canEditClinicalProp }: { paciente: PacienteDetails; canEditClinical: boolean }) {
+  const { role } = useUserRole();
   const utils = trpc.useUtils();
   const params = useParams<{ id: string }>();
-  const canEditClinical = role === 'admin' || role === 'profissional';
+  const canEditClinical = canEditClinicalProp;
   const canEditStatus = role === 'admin';
 
   const [form, setForm] = useState(() => ({
@@ -222,8 +280,8 @@ function EditForm({ paciente }: { paciente: Paciente }) {
             <Field id="pt-nome" htmlFor="pt-nome" label="Nome completo" value={paciente.nome} disabled />
             <Field id="pt-cpf" htmlFor="pt-cpf" label="CPF" value={mascaraCPF(form.cpf) || '—'} disabled hint="CPF não é editável após admissão" />
             <Field id="pt-nascimento" htmlFor="pt-nascimento" label="Data de nascimento" type="date" value={toDateInput(paciente.dataNascimento)} disabled />
-            <Field id="pt-telefone" htmlFor="pt-telefone" label="Telefone" type="tel" inputMode="tel" value={form.telefone} onChange={(e) => setCampo('telefone', e.target.value)} />
-            <Field id="pt-email" htmlFor="pt-email" label="E-mail" type="email" inputMode="email" value={form.email} onChange={(e) => setCampo('email', e.target.value)} />
+            <Field id="pt-telefone" htmlFor="pt-telefone" label="Telefone" type="tel" inputMode="tel" value={form.telefone} disabled={!canEditClinical} hint={canEditClinical ? undefined : 'Apenas profissionais podem alterar'} onChange={(e) => setCampo('telefone', e.target.value)} />
+            <Field id="pt-email" htmlFor="pt-email" label="E-mail" type="email" inputMode="email" value={form.email} disabled={!canEditClinical} hint={canEditClinical ? undefined : 'Apenas profissionais podem alterar'} onChange={(e) => setCampo('email', e.target.value)} />
             <Field
               id="pt-admissao" htmlFor="pt-admissao" label="Data de admissão" type="date"
               value={form.dataAdmissao} disabled={!canEditClinical}
@@ -290,17 +348,195 @@ function EditForm({ paciente }: { paciente: Paciente }) {
             <h3 className="text-sm font-semibold text-slate-900">Contato de emergência</h3>
           </div>
           <div className="space-y-3">
-            <Field id="pt-emerg-nome" htmlFor="pt-emerg-nome" label="Nome" value={form.contatoEmergencia.nome} onChange={(e) => setEmerg('nome', e.target.value)} />
-            <Field id="pt-emerg-parentesco" htmlFor="pt-emerg-parentesco" label="Parentesco" value={form.contatoEmergencia.parentesco} onChange={(e) => setEmerg('parentesco', e.target.value)} />
-            <Field id="pt-emerg-tel" htmlFor="pt-emerg-tel" label="Telefone" type="tel" inputMode="tel" value={form.contatoEmergencia.telefone} onChange={(e) => setEmerg('telefone', e.target.value)} />
+            <Field id="pt-emerg-nome" htmlFor="pt-emerg-nome" label="Nome" value={form.contatoEmergencia.nome} disabled={!canEditClinical} onChange={(e) => setEmerg('nome', e.target.value)} />
+            <Field id="pt-emerg-parentesco" htmlFor="pt-emerg-parentesco" label="Parentesco" value={form.contatoEmergencia.parentesco} disabled={!canEditClinical} onChange={(e) => setEmerg('parentesco', e.target.value)} />
+            <Field id="pt-emerg-tel" htmlFor="pt-emerg-tel" label="Telefone" type="tel" inputMode="tel" value={form.contatoEmergencia.telefone} disabled={!canEditClinical} onChange={(e) => setEmerg('telefone', e.target.value)} />
           </div>
         </div>
-
-        <div className="rounded-xl border border-slate-100 bg-slate-50 p-5">
-          <h3 className="mb-3 text-sm font-semibold text-slate-900">Alergias</h3>
-          <p className="text-xs text-slate-400">Nenhuma alergia registrada.</p>
-        </div>
       </aside>
+    </div>
+  );
+}
+
+// ── AGA scale helpers ──
+
+const toneForScale = (key: string, score: number | null | undefined): 'ok' | 'warn' | 'risk' => {
+  if (score == null) return 'ok';
+  switch (key) {
+    case 'katz': return score === 0 ? 'ok' : score === 6 ? 'risk' : 'warn';
+    case 'lawton': return score === 8 ? 'ok' : score === 0 ? 'risk' : 'warn';
+    case 'meem': return score >= 24 ? 'ok' : score >= 18 ? 'warn' : 'risk';
+    case 'gds15': return score >= 10 ? 'risk' : score >= 6 ? 'warn' : 'ok';
+    case 'man': return score < 8 ? 'risk' : score < 12 ? 'warn' : 'ok';
+    case 'tug': return score >= 20 ? 'risk' : score >= 10 ? 'warn' : 'ok';
+    default: return 'ok';
+  }
+};
+
+const toneBgClass: Record<string, string> = {
+  ok: 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200',
+  warn: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200',
+  risk: 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200',
+  muted: 'bg-slate-50 text-slate-500 ring-1 ring-inset ring-slate-200',
+};
+
+const toneForRdc = (label: string | null | undefined): 'ok' | 'warn' | 'risk' | 'muted' => {
+  if (!label) return 'muted';
+  if (label.includes('I') && !label.includes('II') && !label.includes('III')) return 'ok';
+  if (label.includes('III')) return 'risk';
+  if (label.includes('II')) return 'warn';
+  return 'muted';
+};
+
+// ── AGASummaryCard ──
+// Resumo clínico da última AGA concluída (modelo novo), exibido no primeiro
+// acesso ao paciente. Estados: loading, erro, ausência (com CTA) e dados
+// preenchidos. Fonte: agas.buscar (snapshot de aplicações).
+
+function AGASummaryCard({
+  pacienteId,
+  aga,
+  isLoading,
+  isError,
+  canViewClinical,
+  canEditClinical,
+}: {
+  pacienteId: string;
+  aga: AgaDetail | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  canViewClinical: boolean;
+  canEditClinical: boolean;
+}) {
+  if (!canViewClinical) {
+    return (
+      <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center gap-2">
+          <ClipboardList className="h-5 w-5 text-slate-400" />
+          <h3 className="text-sm font-semibold text-slate-900">Resumo Clínico da AGA</h3>
+        </div>
+        <p className="mt-3 text-sm text-slate-500">
+          Informações clínicas disponíveis apenas para profissionais.
+        </p>
+      </div>
+    );
+  }
+
+  const canEdit = canEditClinical;
+
+  if (isLoading) {
+    return (
+      <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center gap-2 text-slate-400">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="text-sm">Carregando AGA...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-6">
+        <div className="flex items-center gap-2 text-red-600">
+          <AlertCircle className="h-4 w-4" />
+          <span className="text-sm font-medium">Erro ao carregar AGA</span>
+        </div>
+        <p className="mt-1 text-xs text-red-500">Não foi possível carregar o resumo clínico.</p>
+      </div>
+    );
+  }
+
+  if (!aga) {
+    return (
+      <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ClipboardList className="h-5 w-5 text-slate-400" />
+            <h3 className="text-sm font-semibold text-slate-900">Resumo Clínico — AGA</h3>
+          </div>
+          {canEdit && (
+            <Link
+              href={`/pacientes/${pacienteId}/aga`}
+              className="inline-flex items-center gap-1 text-sm font-medium text-teal-600 hover:text-teal-700 transition-colors"
+            >
+              Iniciar AGA
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          )}
+        </div>
+        <p className="mt-3 text-sm text-slate-500">
+          Nenhuma Avaliação Geriátrica Ampla concluída para este paciente.
+        </p>
+        {!canEdit && (
+          <p className="mt-1 text-xs text-slate-400">
+            Apenas profissionais podem realizar AGAs.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  const report = montarRelatorioAga(aga);
+  const rdcTone = toneForRdc(aga.classificacao);
+
+  return (
+    <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <ClipboardList className="h-5 w-5 text-teal-600" />
+          <h3 className="text-sm font-semibold text-slate-900">Resumo Clínico — AGA</h3>
+          {aga.classificacao && (
+            <span
+              className={`rounded-full px-2 py-1 text-[11px] font-semibold ${toneBgClass[rdcTone]}`}
+            >
+              {aga.classificacao}
+            </span>
+          )}
+        </div>
+        <time className="text-xs text-slate-400">
+          {formatarData(report.dataAvaliacao)}
+        </time>
+      </div>
+
+      {report.profissional && (
+        <div className="mb-4 flex items-center gap-2 text-xs text-slate-500">
+          <User className="h-3.5 w-3.5" />
+          <span>{report.profissional}</span>
+          {report.especialidade && <span className="text-slate-400">· {report.especialidade}</span>}
+          <Link
+            href={`/pacientes/${pacienteId}/aga`}
+            className="ml-auto inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 font-medium transition-colors"
+          >
+            Ver avaliação completa
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+        {report.escalas.map((escala) => {
+          const def = getInstrumentDefinition(escala.key);
+          const unit = escala.unit === 'segundos' ? 's' : undefined;
+          const tone = toneForScale(escala.key, escala.score);
+          return (
+            <div key={escala.key} className={`rounded-lg border p-3 text-center ${toneBgClass[tone]}`}>
+              <div className="text-[11px] font-medium tracking-wider uppercase">{def.nomeCurto}</div>
+              <div className="mt-1 text-lg font-semibold tabular-nums">
+                {escala.score ?? '—'}
+                {unit ? (
+                  <span className="text-xs font-normal opacity-60">{unit}</span>
+                ) : (
+                  <span className="text-xs font-normal opacity-60">/{escala.max}</span>
+                )}
+              </div>
+              {escala.interpretation && (
+                <div className="mt-1 text-[10px] leading-tight opacity-80">{escala.interpretation}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
