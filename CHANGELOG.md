@@ -24,6 +24,26 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   - Papéis persistidos no banco controlam acesso a pacientes
   - Papel `usuario` ganha acesso de leitura a dados clínicos
 
+- **AGA consolidada pela equipe (modelo novo)**
+  - Cada profissional preenche seus instrumentos em Avaliações; a página da AGA consolida as aplicações concluídas
+  - Timeline de evolução da AGA + relatório imprimível da consolidação
+  - Grau de dependência RDC 502/2021 **derivado de Katz + MEEM** e confirmado pelo profissional na conclusão (justificativa obrigatória ao divergir)
+
+- **Ficha do residente**
+  - 5 KPIs de sinais vitais (Temperatura adicionada)
+  - Atalhos para AGA, Avaliações, Registros e Sinais Vitais
+  - Resumo da última AGA concluída
+
+- **RBAC na ficha**: papel `usuario` vê dados clínicos sem editar; campos clínicos e contato de emergência desabilitados
+
+- **Suíte de testes**: 108 testes, incluindo integração ponta a ponta com banco real (migrations + FKs + seed via PGlite)
+
+### Alterado
+
+- Legado `avaliacoesGeriatricas` agora é **somente leitura** (dados antigos preservados; escritas só pelo modelo novo)
+- Ambiente de desenvolvimento usa **Postgres real** quando `DATABASE_URL` está definida; PGlite in-memory apenas como fallback para testes/CI
+- CI e release alinhados para Node 22
+
 ### Segurança
 
 - Escores da AGA calculados exclusivamente no servidor (cliente não envia escores)
