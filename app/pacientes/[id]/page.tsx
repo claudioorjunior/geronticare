@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useUserRole } from '@/lib/auth/use-user-role';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
-import { Activity, Heart, Calendar, User, Loader2, AlertCircle, CheckCircle2, ClipboardList, ChevronRight } from 'lucide-react';
+import { Activity, Heart, Calendar, Thermometer, User, Loader2, AlertCircle, CheckCircle2, ClipboardList, ChevronRight, FileText, BarChart3 } from 'lucide-react';
 import { trpc } from '@/lib/trpc/client';
 import {
   atualizarPacienteSchema,
@@ -121,6 +121,12 @@ export default function PatientDadosPage() {
       unit: '%',
     },
     {
+      icon: Thermometer,
+      label: 'Temp',
+      value: ultimoSV?.temperatura != null ? (ultimoSV.temperatura / 10).toFixed(1) : '—',
+      unit: '°C',
+    },
+    {
       icon: Calendar,
       label: 'Internado',
       value: diasInternado?.toString() ?? '—',
@@ -130,7 +136,7 @@ export default function PatientDadosPage() {
 
   return (
     <>
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {kpis.map((kpi) => (
           <Kpi key={kpi.label} icon={kpi.icon} label={kpi.label} value={kpi.value} unit={kpi.unit} />
         ))}
@@ -149,8 +155,28 @@ export default function PatientDadosPage() {
         canEditClinical={canEditClinical}
       />
 
+      {/* ── Quick-links para seções clínicas ── */}
+      <div className="mb-6 flex flex-wrap gap-3">
+        {[
+          { href: `/pacientes/${params.id}/aga`, icon: ClipboardList, label: 'AGA' },
+          { href: `/pacientes/${params.id}/avaliacoes`, icon: FileText, label: 'Avaliações' },
+          { href: `/pacientes/${params.id}/registros`, icon: BarChart3, label: 'Registros' },
+          { href: `/pacientes/${params.id}/sinais`, icon: Activity, label: 'Sinais Vitais' },
+        ].map((link) => (
+          <Link
+            key={link.label}
+            href={link.href}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-teal-700"
+          >
+            <link.icon className="h-4 w-4 text-slate-400" />
+            {link.label}
+            <ChevronRight className="h-3.5 w-3.5 text-slate-300" />
+          </Link>
+        ))}
+      </div>
+
       {/* Keyed pelo id para recriar estado do form na navegação entre pacientes */}
-      <EditForm key={paciente.id} paciente={paciente} />
+      <EditForm key={paciente.id} paciente={paciente} canEditClinical={canEditClinical} />
     </>
   );
 }
@@ -159,11 +185,11 @@ export default function PatientDadosPage() {
 // Componente-filho com estado local de edição. Keyed pelo id do paciente no pai,
 // então recria estado do zero quando navega para outro paciente — sem useEffect.
 
-function EditForm({ paciente }: { paciente: PacienteDetails }) {
+function EditForm({ paciente, canEditClinical: canEditClinicalProp }: { paciente: PacienteDetails; canEditClinical: boolean }) {
   const { role } = useUserRole();
   const utils = trpc.useUtils();
   const params = useParams<{ id: string }>();
-  const canEditClinical = role === 'admin' || role === 'profissional';
+  const canEditClinical = canEditClinicalProp;
   const canEditStatus = role === 'admin';
 
   const [form, setForm] = useState(() => ({
@@ -254,8 +280,8 @@ function EditForm({ paciente }: { paciente: PacienteDetails }) {
             <Field id="pt-nome" htmlFor="pt-nome" label="Nome completo" value={paciente.nome} disabled />
             <Field id="pt-cpf" htmlFor="pt-cpf" label="CPF" value={mascaraCPF(form.cpf) || '—'} disabled hint="CPF não é editável após admissão" />
             <Field id="pt-nascimento" htmlFor="pt-nascimento" label="Data de nascimento" type="date" value={toDateInput(paciente.dataNascimento)} disabled />
-            <Field id="pt-telefone" htmlFor="pt-telefone" label="Telefone" type="tel" inputMode="tel" value={form.telefone} onChange={(e) => setCampo('telefone', e.target.value)} />
-            <Field id="pt-email" htmlFor="pt-email" label="E-mail" type="email" inputMode="email" value={form.email} onChange={(e) => setCampo('email', e.target.value)} />
+            <Field id="pt-telefone" htmlFor="pt-telefone" label="Telefone" type="tel" inputMode="tel" value={form.telefone} disabled={!canEditClinical} hint={canEditClinical ? undefined : 'Apenas profissionais podem alterar'} onChange={(e) => setCampo('telefone', e.target.value)} />
+            <Field id="pt-email" htmlFor="pt-email" label="E-mail" type="email" inputMode="email" value={form.email} disabled={!canEditClinical} hint={canEditClinical ? undefined : 'Apenas profissionais podem alterar'} onChange={(e) => setCampo('email', e.target.value)} />
             <Field
               id="pt-admissao" htmlFor="pt-admissao" label="Data de admissão" type="date"
               value={form.dataAdmissao} disabled={!canEditClinical}
@@ -322,15 +348,10 @@ function EditForm({ paciente }: { paciente: PacienteDetails }) {
             <h3 className="text-sm font-semibold text-slate-900">Contato de emergência</h3>
           </div>
           <div className="space-y-3">
-            <Field id="pt-emerg-nome" htmlFor="pt-emerg-nome" label="Nome" value={form.contatoEmergencia.nome} onChange={(e) => setEmerg('nome', e.target.value)} />
-            <Field id="pt-emerg-parentesco" htmlFor="pt-emerg-parentesco" label="Parentesco" value={form.contatoEmergencia.parentesco} onChange={(e) => setEmerg('parentesco', e.target.value)} />
-            <Field id="pt-emerg-tel" htmlFor="pt-emerg-tel" label="Telefone" type="tel" inputMode="tel" value={form.contatoEmergencia.telefone} onChange={(e) => setEmerg('telefone', e.target.value)} />
+            <Field id="pt-emerg-nome" htmlFor="pt-emerg-nome" label="Nome" value={form.contatoEmergencia.nome} disabled={!canEditClinical} onChange={(e) => setEmerg('nome', e.target.value)} />
+            <Field id="pt-emerg-parentesco" htmlFor="pt-emerg-parentesco" label="Parentesco" value={form.contatoEmergencia.parentesco} disabled={!canEditClinical} onChange={(e) => setEmerg('parentesco', e.target.value)} />
+            <Field id="pt-emerg-tel" htmlFor="pt-emerg-tel" label="Telefone" type="tel" inputMode="tel" value={form.contatoEmergencia.telefone} disabled={!canEditClinical} onChange={(e) => setEmerg('telefone', e.target.value)} />
           </div>
-        </div>
-
-        <div className="rounded-xl border border-slate-100 bg-slate-50 p-5">
-          <h3 className="mb-3 text-sm font-semibold text-slate-900">Alergias</h3>
-          <p className="text-xs text-slate-400">Nenhuma alergia registrada.</p>
         </div>
       </aside>
     </div>

@@ -24,6 +24,19 @@ VALUES (
   '2025-01-01 00:00:00'
 );
 
+-- Usuário leitura (papel usuario)
+INSERT INTO usuarios (id, instituicao_id, nome, email, role, ativo, created_at, updated_at)
+VALUES (
+  'b8a2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+  'ae6c72cc-c72e-4b20-9686-7d015efe9b24',
+  'Leitor Mock',
+  'leitor@mock.ilpi',
+  'usuario',
+  true,
+  '2025-01-01 00:00:00',
+  '2025-01-01 00:00:00'
+);
+
 -- Usuário profissional
 INSERT INTO usuarios (id, instituicao_id, nome, email, role, especialidade, registro_profissional, ativo, created_at, updated_at)
 VALUES (
