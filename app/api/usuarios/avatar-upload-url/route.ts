@@ -32,11 +32,16 @@ export async function POST(request: NextRequest) {
 
     const usuario = await db.query.usuarios.findFirst({
       where: eq(usuarios.id, session.user.id),
-      columns: { instituicaoId: true },
+      columns: { instituicaoId: true, ativo: true },
     });
 
     if (!usuario?.instituicaoId) {
       return NextResponse.json({ error: 'Usuário sem instituição' }, { status: 403 });
+    }
+
+    // SEGURANÇA: usuário desativado não gera URL de upload (revogação imediata).
+    if (!usuario.ativo) {
+      return NextResponse.json({ error: 'Usuário inativo' }, { status: 403 });
     }
 
     const { nomeArquivo, tipoMime } = parsed.data;

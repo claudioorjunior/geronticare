@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Db } from '@/lib/db';
 import type { Context } from '../server';
 import { appRouter } from '../root';
+import { permissaoEfetiva } from '../autorizacao';
 
 function makeCaller() {
   const findMany = vi.fn(async () => [
@@ -22,6 +23,7 @@ function makeCaller() {
     userId: 'user-1',
     instituicaoId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     userRole: 'usuario',
+    permissoes: permissaoEfetiva('usuario'),
   } as unknown as Context;
 
   return { caller: appRouter.createCaller(ctx), findMany };

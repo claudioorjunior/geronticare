@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db';
 import { pacientes, usuarios } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { gerarUrlUpload, gerarUrlPublica, gerarChaveAnexo } from '@/lib/storage/s3';
+import { permissaoEfetiva } from '@/lib/trpc/autorizacao';
 import { z } from 'zod';
 
 const bodySchema = z.object({
@@ -35,11 +36,35 @@ export async function POST(request: NextRequest) {
 
     const usuario = await db.query.usuarios.findFirst({
       where: eq(usuarios.id, session.user.id),
-      columns: { instituicaoId: true },
+      columns: { instituicaoId: true, role: true, ativo: true },
+      with: {
+        cargo: {
+          // SEGURANÇA: cargo inativo não concede permissões (mesmo contrato do tRPC).
+          columns: { permissoes: true, ativo: true },
+        },
+      },
     });
 
     if (!usuario?.instituicaoId) {
       return NextResponse.json({ error: 'Usuário sem instituição' }, { status: 403 });
+    }
+
+    // SEGURANÇA: anexo clínico é ESCRITA clínica — exige `clinico:editar`
+    // (admin/profissional, ou cargo que conceda). Antes, o papel `usuario`
+    // (leitura) conseguia gerar URL de upload para qualquer paciente da
+    // instituição, gravando anexos sem permissão de escrita.
+    if (!usuario.ativo) {
+      return NextResponse.json({ error: 'Usuário inativo' }, { status: 403 });
+    }
+    const permissoes = permissaoEfetiva(
+      usuario.role,
+      usuario.cargo?.ativo ? usuario.cargo.permissoes : undefined,
+    );
+    if (!permissoes.includes('clinico:editar')) {
+      return NextResponse.json(
+        { error: 'Permissão de escrita clínica necessária' },
+        { status: 403 },
+      );
     }
 
     const paciente = await db.query.pacientes.findFirst({

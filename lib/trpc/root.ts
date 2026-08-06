@@ -8,11 +8,13 @@ import { sinaisVitaisRouter } from './routers/sinaisVitais';
 import { dashboardRouter } from './routers/dashboard';
 import { aplicacoesInstrumentosRouter } from './routers/aplicacoesInstrumentos';
 import { agasRouter } from './routers/agas';
+import { cargosRouter } from './routers/cargos';
 
 export const appRouter = createTRPCRouter({
   pacientes: pacientesRouter,
   instituicoes: instituicoesRouter,
   usuarios: usuariosRouter,
+  cargos: cargosRouter,
   avaliacoesGeriatricas: avaliacoesGeriatricasRouter,
   registros: registrosRouter,
   sinaisVitais: sinaisVitaisRouter,

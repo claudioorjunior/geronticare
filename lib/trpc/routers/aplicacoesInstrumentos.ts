@@ -121,7 +121,8 @@ export const aplicacoesInstrumentosRouter = createTRPCRouter({
         ctx.instituicaoId,
       );
 
-      return ctx.db.query.aplicacoesInstrumentos.findFirst({
+      // React Query rejeita `undefined`; findFirst sem match vira null.
+      return (await ctx.db.query.aplicacoesInstrumentos.findFirst({
         where: and(
           eq(aplicacoesInstrumentos.id, input.id),
           eq(aplicacoesInstrumentos.pacienteId, input.pacienteId),
@@ -155,7 +156,7 @@ export const aplicacoesInstrumentosRouter = createTRPCRouter({
             },
           },
         },
-      });
+      })) ?? null;
     }),
 
   criar: clinicalProcedure

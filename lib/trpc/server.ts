@@ -4,7 +4,12 @@ import { getAuth } from '@/lib/auth';
 import { usuarios } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import superjson from 'superjson';
-import { podeLerClinico, podeAcessarClinico, podeAdministrar, devBypassAtivo } from './autorizacao';
+import {
+  permissaoEfetiva,
+  temPermissao,
+  devBypassAtivo,
+} from './autorizacao';
+import type { Permissao } from '@/lib/permissoes';
 
 /**
  * Bypass de autenticação para desenvolvimento local.
@@ -16,12 +21,27 @@ const devAuthBypass = devBypassAtivo();
 // Usuário admin do seed usado como padrão no bypass local.
 const DEV_USER_ID = '320471aa-5994-4886-9ee6-1cee8e7aa810';
 
-/** Resolve instituição e papel do usuário no banco (sessão real ou bypass). */
+/** Resolve instituição, papel e permissões do usuário no banco (sessão real ou bypass). */
 async function resolverUsuario(db: Db, userId: string) {
-  return db.query.usuarios.findFirst({
+  const user = await db.query.usuarios.findFirst({
     where: eq(usuarios.id, userId),
     columns: { instituicaoId: true, role: true, ativo: true },
+    with: {
+      cargo: {
+        // SEGURANÇA: busca também `ativo` do cargo; cargo inativo NÃO concede
+        // permissões (revogação imediata ao desativar). Sem isso, desativar
+        // um cargo deixava quem o tinha com acesso por tempo indeterminado.
+        columns: { permissoes: true, ativo: true },
+      },
+    },
   });
+  if (!user) return null;
+  return {
+    ...user,
+    // Cargo inativo é tratado como ausente: permissões efetivas caem para as
+    // do papel (PERMISSOES_BASE), nunca as do cargo desativado.
+    permissoes: permissaoEfetiva(user.role, user.cargo?.ativo ? user.cargo.permissoes : undefined),
+  };
 }
 
 export const createTRPCContext = async (opts: { headers: Headers }) => {
@@ -40,6 +60,7 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
   let instituicaoId: string | null = null;
   let userRole: string | null = null;
   let userId: string | null = null;
+  let permissoes: Permissao[] = [];
 
   if (session?.user?.id) {
     const user = await resolverUsuario(db, session.user.id);
@@ -47,6 +68,7 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
       userId = session.user.id;
       instituicaoId = user.instituicaoId;
       userRole = user.role;
+      permissoes = user.permissoes;
     }
   } else if (devAuthBypass) {
     // Desenvolvimento: impersona um usuário do seed (ou DEV_OVERRIDE_USER_ID).
@@ -58,6 +80,7 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
       userId = overrideUserId;
       instituicaoId = user.instituicaoId;
       userRole = user.role;
+      permissoes = user.permissoes;
     }
   }
 
@@ -67,6 +90,7 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
     userId,
     instituicaoId,
     userRole,
+    permissoes,
     ...opts,
   };
 };
@@ -89,29 +113,31 @@ const isAuthed = t.middleware(({ ctx, next }) => {
       userId: ctx.userId,
       instituicaoId: ctx.instituicaoId,
       userRole: ctx.userRole,
+      permissoes: ctx.permissoes,
     },
   });
 });
 
 export const protectedProcedure = t.procedure.use(isAuthed);
 
-export const readClinicalProcedure = t.procedure.use(isAuthed).use(({ ctx, next }) => {
-  if (!podeLerClinico(ctx.userRole)) {
-    throw new TRPCError({ code: 'FORBIDDEN' });
-  }
-  return next();
-});
+/**
+ * Factory de gate por permissão (`modulo:acao`). Routers futuros de módulos
+ * (financeiro, juridico, logistica) usam direto:
+ *   `exigirPermissao('financeiro:editar')`
+ * O catálogo de permissões é fechado em `lib/permissoes.ts` (fonte canônica).
+ */
+export function exigirPermissao(permissao: Permissao) {
+  return t.procedure.use(isAuthed).use(({ ctx, next }) => {
+    if (!temPermissao(ctx.permissoes, permissao)) {
+      throw new TRPCError({ code: 'FORBIDDEN' });
+    }
+    return next();
+  });
+}
 
-export const adminProcedure = t.procedure.use(isAuthed).use(({ ctx, next }) => {
-  if (!podeAdministrar(ctx.userRole)) {
-    throw new TRPCError({ code: 'FORBIDDEN' });
-  }
-  return next();
-});
+// Gates legadas (nomes históricos preservados para compatibilidade dos callers).
+export const readClinicalProcedure = exigirPermissao('clinico:ler');
 
-export const clinicalProcedure = t.procedure.use(isAuthed).use(({ ctx, next }) => {
-  if (!podeAcessarClinico(ctx.userRole)) {
-    throw new TRPCError({ code: 'FORBIDDEN' });
-  }
-  return next();
-});
+export const adminProcedure = exigirPermissao('admin:administrar');
+
+export const clinicalProcedure = exigirPermissao('clinico:editar');

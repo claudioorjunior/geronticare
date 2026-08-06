@@ -1,8 +1,10 @@
-import { createTRPCRouter, readClinicalProcedure } from '../server';
+import { createTRPCRouter, readClinicalProcedure, adminProcedure } from '../server';
 import {
+  agas,
   pacientes,
   registros,
   sinaisVitais,
+  usuarios,
 } from '@/lib/db/schema';
 import { count, eq, and, desc, asc, gte, sql } from 'drizzle-orm';
 
@@ -41,8 +43,21 @@ export const dashboardRouter = createTRPCRouter({
         )
       );
 
+    // SEGURANÇA: projeção mínima explícita — a UI (DashboardUsuario) só usa
+    // id/nome/cpf/dataNascimento/dataAdmissao/ativo. Sem `columns:`, o Drizzle
+    // devolve TODAS as colunas (RG, endereço completo, contato de emergência,
+    // telefone, e-mail, foto) para qualquer papel com leitura clínica.
     const pacientesRecentes = await ctx.db.query.pacientes.findMany({
       where: and(eq(pacientes.instituicaoId, ctx.instituicaoId), eq(pacientes.ativo, true)),
+      columns: {
+        id: true,
+        nome: true,
+        cpf: true,
+        dataNascimento: true,
+        dataAdmissao: true,
+        ativo: true,
+        createdAt: true,
+      },
       orderBy: desc(pacientes.createdAt),
       limit: 5,
     });
@@ -141,5 +156,86 @@ export const dashboardRouter = createTRPCRouter({
       )
       .orderBy(asc(pacientes.dataAdmissao))
       .limit(5);
+  }),
+
+  /**
+   * Métricas institucionais (WAYFINDER T-49): visão operacional do admin.
+   * Período fixo "mês corrente" — sem parâmetro de intervalo (YAGNI).
+   */
+  metricasInstituicao: adminProcedure.query(async ({ ctx }) => {
+    const inicioMes = new Date();
+    inicioMes.setDate(1);
+    inicioMes.setHours(0, 0, 0, 0);
+
+    const [
+      pacientesAtivos,
+      agasConcluidas,
+      agasPendentes,
+      usuariosPorPapel,
+      sinaisNoMes,
+    ] = await Promise.all([
+      ctx.db
+        .select({ value: count() })
+        .from(pacientes)
+        .where(
+          and(
+            eq(pacientes.instituicaoId, ctx.instituicaoId),
+            eq(pacientes.ativo, true)
+          )
+        ),
+      ctx.db
+        .select({ value: count() })
+        .from(agas)
+        .innerJoin(pacientes, eq(agas.pacienteId, pacientes.id))
+        .where(
+          and(
+            eq(pacientes.instituicaoId, ctx.instituicaoId),
+            eq(agas.status, 'concluida')
+          )
+        ),
+      ctx.db
+        .select({ value: count() })
+        .from(pacientes)
+        .where(
+          and(
+            eq(pacientes.instituicaoId, ctx.instituicaoId),
+            eq(pacientes.ativo, true),
+            sql`NOT EXISTS (SELECT 1 FROM agas a WHERE a.paciente_id = ${pacientes.id} AND a.status = 'concluida')`
+          )
+        ),
+      ctx.db
+        .select({ role: usuarios.role, value: count() })
+        .from(usuarios)
+        .where(
+          and(
+            eq(usuarios.instituicaoId, ctx.instituicaoId),
+            eq(usuarios.ativo, true)
+          )
+        )
+        .groupBy(usuarios.role),
+      ctx.db
+        .select({ value: count() })
+        .from(sinaisVitais)
+        .innerJoin(pacientes, eq(sinaisVitais.pacienteId, pacientes.id))
+        .where(
+          and(
+            eq(pacientes.instituicaoId, ctx.instituicaoId),
+            gte(sinaisVitais.dataAfericao, inicioMes)
+          )
+        ),
+    ]);
+
+    const porPapel: Record<string, number> = {};
+    for (const linha of usuariosPorPapel) {
+      porPapel[linha.role] = Number(linha.value);
+    }
+
+    return {
+      pacientesAtivos: Number(pacientesAtivos[0]?.value ?? 0),
+      agasConcluidas: Number(agasConcluidas[0]?.value ?? 0),
+      agasPendentes: Number(agasPendentes[0]?.value ?? 0),
+      usuariosAtivosPorPapel: porPapel,
+      sinaisVitaisNoMes: Number(sinaisNoMes[0]?.value ?? 0),
+    };
   }),
 });

@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useUserRole } from '@/lib/auth/use-user-role';
 import { trpc } from '@/lib/trpc/client';
+import { mascaraCPF } from '@/lib/validations/pacientes';
 
 // === Mock Data (ocupação e atividades não têm query no DB — permanecem mock) ===
 
@@ -282,12 +283,67 @@ function DashboardAdmin() {
         />
       </section>
 
+      {/* Visão institucional — métricas operacionais do admin (T-49) */}
+      <MetricasInstitucionais />
+
       {/* Chart + Activity — adaptive blocks */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-gutter flex-1 min-h-0">
         <OccupancyChart />
         <ActivityList />
       </section>
     </div>
+  );
+}
+
+// Métricas institucionais (mês corrente): equipe, AGAs e sinais vitais.
+function MetricasInstitucionais() {
+  const metricasQ = trpc.dashboard.metricasInstituicao.useQuery();
+  const m = metricasQ.data;
+
+  if (metricasQ.isPending || !m) return null;
+
+  const porPapel = m.usuariosAtivosPorPapel;
+  const totalEquipe = Object.values(porPapel).reduce((a, b) => a + b, 0);
+
+  const cards = [
+    {
+      label: 'Equipe ativa',
+      value: totalEquipe,
+      subtitle: `Admin ${porPapel['admin'] ?? 0} · Profissionais ${porPapel['profissional'] ?? 0} · Leitura ${porPapel['usuario'] ?? 0}`,
+    },
+    {
+      label: 'AGAs concluídas',
+      value: m.agasConcluidas,
+      subtitle: 'Consolidações no modelo novo',
+    },
+    {
+      label: 'AGAs pendentes',
+      value: m.agasPendentes,
+      subtitle: 'Pacientes ativos sem AGA concluída',
+    },
+    {
+      label: 'Sinais vitais no mês',
+      value: m.sinaisVitaisNoMes,
+      subtitle: 'Aferições registradas',
+    },
+  ];
+
+  return (
+    <section aria-label="Métricas institucionais" className="shrink-0">
+      <h2 className="mb-2 text-label-md text-m3-secondary">Visão Institucional — mês corrente</h2>
+      <div className="grid grid-cols-1 gap-gutter sm:grid-cols-2 lg:grid-cols-4">
+        {cards.map((card) => (
+          <div
+            key={card.label}
+            className="rounded-xl bg-m3-surface-container-low px-4 py-3"
+          >
+            <p className="text-label-md text-m3-secondary">{card.label}</p>
+            <p className="mt-1 text-headline-md text-m3-on-surface">{card.value}</p>
+            <p className="mt-0.5 text-body-sm text-m3-outline">{card.subtitle}</p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -648,7 +704,7 @@ function DashboardUsuario() {
               pacientesRecentes.map((p, i) => (
                 <tr key={p.id ?? i} className="hover:bg-m3-surface-container-lowest transition-colors">
                   <td className="py-4 px-6 text-body-md text-m3-on-surface font-medium">{p.nome}</td>
-                  <td className="py-4 px-6 text-body-md text-m3-secondary tabular-nums">{p.cpf ?? '—'}</td>
+                  <td className="py-4 px-6 text-body-md text-m3-secondary tabular-nums">{mascaraCPF(p.cpf ?? '') || '—'}</td>
                   <td className="py-4 px-6 text-body-md text-m3-on-surface tabular-nums">
                     {p.dataNascimento instanceof Date ? p.dataNascimento.toLocaleDateString('pt-BR') : '—'}
                   </td>

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Db } from '@/lib/db';
 import type { Context } from '../server';
 import { appRouter } from '../root';
+import { permissaoEfetiva } from '../autorizacao';
 
 const PATIENT = '11111111-1111-4111-8111-111111111111';
 const AGA = '22222222-2222-4222-8222-222222222222';
@@ -59,6 +60,7 @@ function caller(db: Db, institutionId = INSTITUTION) {
     userId: USER,
     instituicaoId: institutionId,
     userRole: 'profissional',
+    permissoes: permissaoEfetiva('profissional'),
   } as unknown as Context);
 }
 

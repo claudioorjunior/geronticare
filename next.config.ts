@@ -1,5 +1,16 @@
 import type { NextConfig } from "next";
 
+// SEGURANÇA: headers de proteção para instalações self-hosted (Vercel aplica
+// alguns por padrão; o deploy próprio precisa deles explícitos).
+// CSP completa não entra aqui porque quebra scripts/fontes inline do Next;
+// ver ONDE-PAREI (hardening futuro).
+const securityHeaders = [
+  { key: "X-Frame-Options", value: "DENY" },                    // anti-clickjacking
+  { key: "X-Content-Type-Options", value: "nosniff" },          // MIME sniffing
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+];
+
 const nextConfig: NextConfig = {
   // Empty turbopack config: Next 16 enables Turbopack by default for `next build`.
   // Without this, a custom `webpack` config triggers a build error.
@@ -12,6 +23,14 @@ const nextConfig: NextConfig = {
       config.externals.push('@electric-sql/pglite');
     }
     return config;
+  },
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: securityHeaders,
+      },
+    ];
   },
 };
 

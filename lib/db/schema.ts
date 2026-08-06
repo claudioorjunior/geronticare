@@ -2,6 +2,7 @@ import { relations } from 'drizzle-orm';
 import { pgTable, text, timestamp, uuid, integer, boolean, jsonb, pgEnum, index, unique } from 'drizzle-orm/pg-core';
 import type { AgaAnswers } from '@/lib/validations/aga-form';
 import type { InstrumentoSlug } from '@/lib/instrumentos/instrumentos';
+import type { Permissao } from '@/lib/permissoes';
 
 // Enums
 export const sexoEnum = pgEnum('sexo', ['masculino', 'feminino', 'outro']);
@@ -29,12 +30,39 @@ export const instituicoes = pgTable('instituicoes', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+/**
+ * Cargos customizados criados pelo gestor (RBAC dinâmico).
+ *
+ * O papel (`usuarios.role`) continua sendo a base fixa — o cargo ADICIONA
+ * permissões por cima (nunca remove). Ex.: um usuário com role `usuario`
+ * (leitura) pode receber o cargo "Jurídico" com permissão `editar_clinico`
+ * para editar registros sem virar profissional.
+ */
+export const cargos = pgTable('cargos', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  instituicaoId: uuid('instituicao_id').references(() => instituicoes.id).notNull(),
+  nome: text('nome').notNull(),
+  descricao: text('descricao'),
+  permissoes: jsonb('permissoes').$type<Permissao[]>().notNull(),
+  ativo: boolean('ativo').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  instituicaoNomeUnique: unique('cargos_instituicao_nome_unique').on(table.instituicaoId, table.nome),
+}));
+
+export const cargosRelations = relations(cargos, ({ one, many }) => ({
+  instituicao: one(instituicoes, { fields: [cargos.instituicaoId], references: [instituicoes.id] }),
+  usuarios: many(usuarios),
+}));
+
 // Tabela: Usuários (profissionais)
 // Better-Auth usa esta tabela como user. Campos senha, especialidade e instituicaoId
 // são específicos do domínio e não mapeados pelo adapter.
 export const usuarios = pgTable('usuarios', {
   id: uuid('id').primaryKey().defaultRandom(),
   instituicaoId: uuid('instituicao_id').references(() => instituicoes.id).notNull(),
+  cargoId: uuid('cargo_id').references(() => cargos.id),
   nome: text('nome').notNull(),
   email: text('email').unique().notNull(),
   senha: text('senha'), // usado apenas se migrar para auth própria; Better-Auth gerencia hash
@@ -47,6 +75,10 @@ export const usuarios = pgTable('usuarios', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   instituicaoIdx: index('usuarios_instituicao_idx').on(table.instituicaoId),
+}));
+
+export const usuariosRelations = relations(usuarios, ({ one }) => ({
+  cargo: one(cargos, { fields: [usuarios.cargoId], references: [cargos.id] }),
 }));
 
 // Tabelas do Better-Auth
@@ -302,6 +334,7 @@ export const sinaisVitais = pgTable('sinais_vitais', {
 
 export type Instituicao = typeof instituicoes.$inferSelect;
 export type NovaInstituicao = typeof instituicoes.$inferInsert;
+export type Cargo = typeof cargos.$inferSelect;
 export type Usuario = typeof usuarios.$inferSelect;
 export type NovoUsuario = typeof usuarios.$inferInsert;
 export type Paciente = typeof pacientes.$inferSelect;
