@@ -14,22 +14,34 @@ interface MakeDbOpts {
   alvo?: { role: string; ativo: boolean } | null;
   /** Total de admins ativos da instituição (guard do último admin). */
   adminCount?: number;
+  /** Falha simulada no insert do usuário dentro da transação. */
+  userInsertError?: unknown;
+  /** Falha simulada no insert da credential account dentro da transação. */
+  accountInsertError?: unknown;
 }
 
 function makeDb(opts: MakeDbOpts = {}) {
   const inserts: { ordem: number; values: Record<string, unknown> }[] = [];
-  let chamada = 0;
+  const transaction = vi.fn(async (callback: (tx: Db) => Promise<unknown>) => {
+    const staged: { ordem: number; values: Record<string, unknown> }[] = [];
+    let chamada = 0;
+    const insert = vi.fn(() => {
+      const ordem = chamada++;
+      return {
+        values: (values: Record<string, unknown>) => {
+          const error = ordem === 0 ? opts.userInsertError : opts.accountInsertError;
+          if (error) throw error;
+          staged.push({ ordem, values });
+          return {
+            returning: async () => [{ id: NOVO_USUARIO_ID }],
+          };
+        },
+      };
+    });
 
-  const insert = vi.fn(() => {
-    const ordem = chamada++;
-    return {
-      values: (values: Record<string, unknown>) => {
-        inserts.push({ ordem, values });
-        return {
-          returning: async () => [{ id: NOVO_USUARIO_ID }],
-        };
-      },
-    };
+    const result = await callback({ insert } as unknown as Db);
+    inserts.push(...staged);
+    return result;
   });
 
   const db = {
@@ -42,7 +54,7 @@ function makeDb(opts: MakeDbOpts = {}) {
         findFirst: vi.fn(async () => undefined),
       },
     },
-    insert,
+    transaction,
     select: vi.fn(() => ({
       from: vi.fn(() => ({
         where: vi.fn(async () => [{ value: opts.adminCount ?? 2 }]),
@@ -159,11 +171,14 @@ describe('usuarios.criar — provisionamento', () => {
     expect(inserts[0].values.email).toBe('novo@mock.ilpi');
   });
 
-  it('profissional sem especialidade é rejeitado (BAD_REQUEST)', async () => {
-    const caller = makeCaller(makeDb().db, 'admin');
+  it('especialidade é opcional e não altera as permissões do profissional', async () => {
+    const { db, inserts } = makeDb();
+    const caller = makeCaller(db, 'admin');
+
     await expect(
       caller.usuarios.criar({ ...INPUT_VALIDO, especialidade: undefined }),
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    ).resolves.toEqual({ id: NOVO_USUARIO_ID });
+    expect(inserts[0].values.especialidade).toBeUndefined();
   });
 
   it('senha curta é rejeitada (BAD_REQUEST)', async () => {
@@ -180,21 +195,31 @@ describe('usuarios.criar — provisionamento', () => {
     const caller = makeCaller(db, 'admin');
     await expect(caller.usuarios.criar(INPUT_VALIDO)).rejects.toMatchObject({
       code: 'CONFLICT',
+      message: 'Não foi possível cadastrar este e-mail',
     });
   });
 
-  it('SEGURANÇA: e-mail de outra instituição NÃO bloqueia criação (sem oráculo cross-tenant)', async () => {
-    const { db } = makeDb();
-    const findFirstMock = db.query.usuarios.findFirst as unknown as ReturnType<typeof vi.fn>;
-    // E-mail existe, mas em OUTRA instituição — o dup-check scoped por
-    // instituição não o enxerga, então a criação prossegue. Antes do fix,
-    // a consulta era global e o CONFLICT revelava existência cross-tenant.
-    findFirstMock.mockResolvedValue(null);
-
-    const caller = makeCaller(db, 'admin');
-    await expect(caller.usuarios.criar(INPUT_VALIDO)).resolves.toEqual({
-      id: NOVO_USUARIO_ID,
+  it('SEGURANÇA: colisão global de e-mail retorna conflito genérico', async () => {
+    const { db } = makeDb({
+      userInsertError: { code: '23505', constraint: 'usuarios_email_unique' },
     });
+    const caller = makeCaller(db, 'admin');
+    await expect(caller.usuarios.criar(INPUT_VALIDO)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'Não foi possível cadastrar este e-mail',
+    });
+  });
+
+  it('faz rollback do usuário quando a credential account falha', async () => {
+    const { db, inserts } = makeDb({
+      accountInsertError: new Error('falha ao inserir credential account'),
+    });
+    const caller = makeCaller(db, 'admin');
+
+    await expect(caller.usuarios.criar(INPUT_VALIDO)).rejects.toThrow(
+      'falha ao inserir credential account',
+    );
+    expect(inserts).toHaveLength(0);
   });
 });
 

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { createTRPCRouter, adminProcedure } from '../server';
 import { cargos } from '@/lib/db/schema';
-import { PERMISSOES } from '@/lib/permissoes';
+import { PERMISSOES_ATRIBUIVEIS } from '@/lib/permissoes';
 import { eq, and } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 
@@ -9,7 +9,8 @@ import { TRPCError } from '@trpc/server';
  * Cargos customizados (RBAC dinâmico).
  *
  * O gestor cria cargos e escolhe permissões do catálogo fechado
- * (`clinico:ler`, `clinico:editar`, `admin:administrar` — ver `lib/permissoes.ts`).
+ * (`clinico:ler`, `clinico:editar` — ver `lib/permissoes.ts`). A permissão
+ * administrativa total pertence somente ao papel `admin` e não é atribuível.
  * Formato `modulo:acao` escala para módulos futuros do ERP (financeiro,
  * juridico, logistica...). Um cargo NUNCA remove permissões do papel — ele só
  * adiciona permissões ao usuário que o recebe. Ex.: usuário com papel
@@ -29,7 +30,7 @@ export const cargosRouter = createTRPCRouter({
       z.object({
         nome: z.string().min(3).max(60),
         descricao: z.string().max(240).optional(),
-        permissoes: z.array(z.enum(PERMISSOES)).min(1, 'Selecione ao menos uma permissão'),
+        permissoes: z.array(z.enum(PERMISSOES_ATRIBUIVEIS)).min(1, 'Selecione ao menos uma permissão'),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -67,7 +68,7 @@ export const cargosRouter = createTRPCRouter({
         id: z.string().uuid(),
         nome: z.string().min(3).max(60).optional(),
         descricao: z.string().max(240).nullable().optional(),
-        permissoes: z.array(z.enum(PERMISSOES)).min(1).optional(),
+        permissoes: z.array(z.enum(PERMISSOES_ATRIBUIVEIS)).min(1).optional(),
         ativo: z.boolean().optional(),
       })
     )

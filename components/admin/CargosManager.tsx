@@ -7,8 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
 import { trpc } from '@/lib/trpc/client';
 import type { RouterOutputs } from '@/lib/trpc/types';
-import { MODULOS, PERMISSAO_INFO } from '@/lib/permissoes';
-import type { Permissao } from '@/lib/permissoes';
+import {
+  MODULOS,
+  PERMISSAO_INFO,
+  PERMISSOES_ATRIBUIVEIS,
+} from '@/lib/permissoes';
+import type { PermissaoAtribuivel } from '@/lib/permissoes';
 
 type Cargo = RouterOutputs['cargos']['listar'][number];
 
@@ -163,7 +167,11 @@ function CargoFormDialogInner({
 
   const [nome, setNome] = React.useState(cargo?.nome ?? '');
   const [descricao, setDescricao] = React.useState(cargo?.descricao ?? '');
-  const [permissoes, setPermissoes] = React.useState<Permissao[]>(cargo?.permissoes ?? []);
+  const [permissoes, setPermissoes] = React.useState<PermissaoAtribuivel[]>(() =>
+    (cargo?.permissoes ?? []).filter((permissao): permissao is PermissaoAtribuivel =>
+      PERMISSOES_ATRIBUIVEIS.includes(permissao as never),
+    ),
+  );
   const [erro, setErro] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -204,7 +212,7 @@ function CargoFormDialogInner({
 
   const salvando = criar.isPending || atualizar.isPending || desativar.isPending;
 
-  const togglePermissao = (p: Permissao) => {
+  const togglePermissao = (p: PermissaoAtribuivel) => {
     setPermissoes((prev) =>
       prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p],
     );
@@ -290,7 +298,7 @@ function CargoFormDialogInner({
                 <p className="mt-0.5 text-xs text-slate-500">{modulo.descricao}</p>
                 <div className="mt-2 space-y-2">
                   {modulo.acoes.map((acao) => {
-                    const permissao = `${modulo.id}:${acao.id}` as Permissao;
+                    const permissao = `${modulo.id}:${acao.id}` as PermissaoAtribuivel;
                     const marcada = permissoes.includes(permissao);
                     return (
                       <label

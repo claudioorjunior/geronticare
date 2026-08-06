@@ -51,6 +51,10 @@ describe('integração dashboard (PGlite real) — A3 AGA nova', () => {
   it('baseline: todos os pacientes ativos do seed estão pendentes, em fila por admissão', async () => {
     const resumo = await caller.dashboard.resumo();
     expect(resumo.agasPendentes).toBe(4);
+    expect(resumo.pacientesRecentes).not.toHaveLength(0);
+    for (const paciente of resumo.pacientesRecentes) {
+      expect(paciente).not.toHaveProperty('cpf');
+    }
 
     const proximas = await caller.dashboard.agasProximas();
     expect(proximas).toHaveLength(4);

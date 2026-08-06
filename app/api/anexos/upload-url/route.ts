@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuth } from '@/lib/auth';
+import { resolverUsuarioAutorizacao } from '@/lib/auth/resolver-usuario';
 import { getDb } from '@/lib/db';
-import { pacientes, usuarios } from '@/lib/db/schema';
+import { pacientes } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { gerarUrlUpload, gerarUrlPublica, gerarChaveAnexo } from '@/lib/storage/s3';
-import { permissaoEfetiva } from '@/lib/trpc/autorizacao';
 import { z } from 'zod';
 
 const bodySchema = z.object({
@@ -34,16 +34,7 @@ export async function POST(request: NextRequest) {
 
     const { pacienteId, nomeArquivo, tipoMime } = parsed.data;
 
-    const usuario = await db.query.usuarios.findFirst({
-      where: eq(usuarios.id, session.user.id),
-      columns: { instituicaoId: true, role: true, ativo: true },
-      with: {
-        cargo: {
-          // SEGURANÇA: cargo inativo não concede permissões (mesmo contrato do tRPC).
-          columns: { permissoes: true, ativo: true },
-        },
-      },
-    });
+    const usuario = await resolverUsuarioAutorizacao(db, session.user.id);
 
     if (!usuario?.instituicaoId) {
       return NextResponse.json({ error: 'Usuário sem instituição' }, { status: 403 });
@@ -56,11 +47,7 @@ export async function POST(request: NextRequest) {
     if (!usuario.ativo) {
       return NextResponse.json({ error: 'Usuário inativo' }, { status: 403 });
     }
-    const permissoes = permissaoEfetiva(
-      usuario.role,
-      usuario.cargo?.ativo ? usuario.cargo.permissoes : undefined,
-    );
-    if (!permissoes.includes('clinico:editar')) {
+    if (!usuario.permissoes.includes('clinico:editar')) {
       return NextResponse.json(
         { error: 'Permissão de escrita clínica necessária' },
         { status: 403 },

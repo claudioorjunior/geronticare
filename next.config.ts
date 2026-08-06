@@ -1,14 +1,14 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from 'next';
 
 // SEGURANÇA: headers de proteção para instalações self-hosted (Vercel aplica
 // alguns por padrão; o deploy próprio precisa deles explícitos).
 // CSP completa não entra aqui porque quebra scripts/fontes inline do Next;
 // ver ONDE-PAREI (hardening futuro).
 const securityHeaders = [
-  { key: "X-Frame-Options", value: "DENY" },                    // anti-clickjacking
-  { key: "X-Content-Type-Options", value: "nosniff" },          // MIME sniffing
-  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  { key: 'X-Frame-Options', value: 'DENY' },
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
 ];
 
 const nextConfig: NextConfig = {
@@ -27,7 +27,7 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: "/(.*)",
+        source: '/(.*)',
         headers: securityHeaders,
       },
     ];

@@ -10,7 +10,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { useUserRole } from '@/lib/auth/use-user-role';
 import { trpc } from '@/lib/trpc/client';
-import { mascaraCPF } from '@/lib/validations/pacientes';
 
 // === Mock Data (ocupação e atividades não têm query no DB — permanecem mock) ===
 
@@ -646,7 +645,6 @@ function DashboardUsuario() {
   const pacientesRecentes = (resumo?.pacientesRecentes ?? []) as {
     id: string;
     nome: string;
-    cpf: string | null;
     dataNascimento: Date;
     dataAdmissao: Date;
     ativo: boolean;
@@ -689,7 +687,6 @@ function DashboardUsuario() {
           <thead>
             <tr className="border-b border-m3-outline-variant bg-m3-surface-container-low">
               <th className="py-4 px-6 text-label-md text-m3-secondary text-left">Nome</th>
-              <th className="py-4 px-6 text-label-md text-m3-secondary text-left">CPF</th>
               <th className="py-4 px-6 text-label-md text-m3-secondary text-left">Data Nascimento</th>
               <th className="py-4 px-6 text-label-md text-m3-secondary text-left">Data Admissão</th>
               <th className="py-4 px-6 text-label-md text-m3-secondary text-left">Status</th>
@@ -698,13 +695,12 @@ function DashboardUsuario() {
           <tbody className="divide-y divide-m3-outline-variant/50 bg-m3-surface-container-lowest">
             {pacientesRecentes.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-8 px-6 text-body-md text-m3-secondary text-center">Nenhum paciente cadastrado.</td>
+                <td colSpan={4} className="py-8 px-6 text-body-md text-m3-secondary text-center">Nenhum paciente cadastrado.</td>
               </tr>
             ) : (
               pacientesRecentes.map((p, i) => (
                 <tr key={p.id ?? i} className="hover:bg-m3-surface-container-lowest transition-colors">
                   <td className="py-4 px-6 text-body-md text-m3-on-surface font-medium">{p.nome}</td>
-                  <td className="py-4 px-6 text-body-md text-m3-secondary tabular-nums">{mascaraCPF(p.cpf ?? '') || '—'}</td>
                   <td className="py-4 px-6 text-body-md text-m3-on-surface tabular-nums">
                     {p.dataNascimento instanceof Date ? p.dataNascimento.toLocaleDateString('pt-BR') : '—'}
                   </td>

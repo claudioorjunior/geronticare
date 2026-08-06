@@ -9,6 +9,12 @@ import { urlHttpSchema } from '@/lib/validations/url';
 
 const ESPECIALIDADES = ['medicina', 'enfermagem', 'fisioterapia', 'terapia_ocupacional', 'fonoaudiologia', 'nutricao', 'psicologia', 'servico_social'] as const;
 
+function isUniqueViolation(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  if ('code' in error && error.code === '23505') return true;
+  return 'cause' in error && isUniqueViolation(error.cause);
+}
+
 /**
  * Valida que o cargo existe e pertence à instituição do contexto.
  * Retorna null quando cargoId é undefined (campo opcional); lança FORBIDDEN
@@ -138,20 +144,15 @@ export const usuariosRouter = createTRPCRouter({
    */
   criar: adminProcedure
     .input(
-      z
-        .object({
-          nome: z.string().min(3),
-          email: z.string().email(),
-          senha: z.string().min(8),
-          role: z.enum(['admin', 'profissional', 'usuario']).default('profissional'),
-          cargoId: z.string().uuid().nullable().optional(),
-          especialidade: z.enum(ESPECIALIDADES).optional(),
-          registroProfissional: z.string().optional(),
-        })
-        .refine(
-          (i) => i.role !== 'profissional' || !!i.especialidade,
-          { message: 'Especialidade é obrigatória para o papel profissional', path: ['especialidade'] }
-        )
+      z.object({
+        nome: z.string().min(3),
+        email: z.string().email(),
+        senha: z.string().min(8),
+        role: z.enum(['admin', 'profissional', 'usuario']).default('profissional'),
+        cargoId: z.string().uuid().nullable().optional(),
+        especialidade: z.enum(ESPECIALIDADES).optional(),
+        registroProfissional: z.string().optional(),
+      })
     )
     .mutation(async ({ ctx, input }) => {
       const { senha, role, especialidade, registroProfissional } = input;
@@ -171,35 +172,51 @@ export const usuariosRouter = createTRPCRouter({
       if (existente) {
         throw new TRPCError({
           code: 'CONFLICT',
-          message: 'Já existe um usuário com este e-mail nesta instituição',
+          message: 'Não foi possível cadastrar este e-mail',
         });
       }
 
       const senhaHash = await hashPassword(senha);
       await validarCargoDaInstituicao(ctx.db, ctx.instituicaoId, input.cargoId);
 
-      const [usuario] = await ctx.db
-        .insert(usuarios)
-        .values({
-          instituicaoId: ctx.instituicaoId,
-          nome: input.nome,
-          email: input.email.toLowerCase(),
-          role,
-          cargoId: input.cargoId ?? null,
-          especialidade,
-          registroProfissional,
-        })
-        .returning({ id: usuarios.id });
+      try {
+        return await ctx.db.transaction(async (tx) => {
+          const [usuario] = await tx
+            .insert(usuarios)
+            .values({
+              instituicaoId: ctx.instituicaoId,
+              nome: input.nome,
+              email: input.email.toLowerCase(),
+              role,
+              cargoId: input.cargoId ?? null,
+              especialidade,
+              registroProfissional,
+            })
+            .returning({ id: usuarios.id });
 
-      // Credential account do Better-Auth — mesmo shape do signUp interno.
-      await ctx.db.insert(accounts).values({
-        userId: usuario.id,
-        providerId: 'credential',
-        accountId: usuario.id,
-        password: senhaHash,
-      });
+          // Credential account do Better-Auth — mesmo shape do signUp interno.
+          // Os dois inserts ficam na mesma transação: sem credencial, o usuário
+          // também é revertido e o e-mail não fica reservado.
+          await tx.insert(accounts).values({
+            userId: usuario.id,
+            providerId: 'credential',
+            accountId: usuario.id,
+            password: senhaHash,
+          });
 
-      return { id: usuario.id };
+          return { id: usuario.id };
+        });
+      } catch (error) {
+        // O e-mail é uma identidade global no sistema. A mesma resposta para
+        // qualquer colisão evita revelar em qual instituição ele já existe.
+        if (isUniqueViolation(error)) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Não foi possível cadastrar este e-mail',
+          });
+        }
+        throw error;
+      }
     }),
 
   atualizar: adminProcedure

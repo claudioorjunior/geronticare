@@ -69,3 +69,6 @@ ISSUES.md
 WAYFINDER.md
 .env*
 __pycache__/
+playwright-report/
+test-results/
+blob-report/

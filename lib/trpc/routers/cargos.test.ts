@@ -3,7 +3,7 @@ import type { Db } from '@/lib/db';
 import type { Context } from '../server';
 import { appRouter } from '../root';
 import { permissaoEfetiva } from '../autorizacao';
-import type { Permissao } from '@/lib/permissoes';
+import type { PermissaoAtribuivel } from '@/lib/permissoes';
 
 const INSTITUICAO_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const ADMIN_ID = '320471aa-5994-4886-9ee6-1cee8e7aa810';
@@ -21,7 +21,7 @@ function makeDb(opts: MakeDbOpts = {}) {
   const inserts: { values: Record<string, unknown> }[] = [];
   const updates: { values: Record<string, unknown> }[] = [];
 
-  const db = {
+  const dbMock = {
     query: {
       cargos: {
         findFirst: vi.fn(async () => opts.cargo ?? null),
@@ -52,7 +52,12 @@ function makeDb(opts: MakeDbOpts = {}) {
         };
       },
     })),
-  } as unknown as Db;
+    transaction: vi.fn(),
+  };
+  dbMock.transaction.mockImplementation(async (callback: (tx: Db) => Promise<unknown>) =>
+    callback(dbMock as unknown as Db),
+  );
+  const db = dbMock as unknown as Db;
 
   return { db, inserts, updates };
 }
@@ -73,7 +78,7 @@ function makeCaller(db: Db, role: string | null, userId: string | null = ADMIN_I
 const INPUT_VALIDO = {
   nome: 'Jurídico',
   descricao: 'Acesso do setor jurídico',
-  permissoes: ['clinico:editar'] as Permissao[],
+  permissoes: ['clinico:editar'] as PermissaoAtribuivel[],
 };
 
 describe('cargos.criar — RBAC', () => {
@@ -117,6 +122,17 @@ describe('cargos.criar — validação', () => {
     const caller = makeCaller(db, 'admin');
     await expect(
       caller.cargos.criar({ ...INPUT_VALIDO, permissoes: ['apagar_tudo'] as never }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  it('rejeita permissão administrativa exclusiva do papel admin', async () => {
+    const { db } = makeDb();
+    const caller = makeCaller(db, 'admin');
+    await expect(
+      caller.cargos.criar({
+        ...INPUT_VALIDO,
+        permissoes: ['admin:administrar'] as never,
+      }),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 

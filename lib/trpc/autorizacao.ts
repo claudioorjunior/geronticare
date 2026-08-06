@@ -15,13 +15,14 @@
  * Funções puras e sem dependências para serem testadas isoladamente.
  */
 import type { Permissao } from '@/lib/permissoes';
-import { PERMISSOES } from '@/lib/permissoes';
+import { PERMISSOES, PERMISSOES_ATRIBUIVEIS } from '@/lib/permissoes';
 
 export type UserRole = 'admin' | 'profissional' | 'usuario';
 
 /** Permissões base por papel — sem cargo, é exatamente esta matriz. */
 export const PERMISSOES_BASE: Record<UserRole, Permissao[]> = {
-  admin: ['clinico:ler', 'clinico:editar', 'admin:administrar'],
+  // Admin acompanha automaticamente todo o catálogo, inclusive módulos futuros.
+  admin: [...PERMISSOES],
   profissional: ['clinico:ler', 'clinico:editar'],
   usuario: ['clinico:ler'],
 };
@@ -51,9 +52,10 @@ export function permissaoEfetiva(
   cargoPermissoes?: Permissao[] | null,
 ): Permissao[] {
   const base = (role && PERMISSOES_BASE[role as UserRole]) ?? [];
-  // Fail-closed: só entram permissões do catálogo canônico (nunca strings soltas).
+  // Fail-closed: só entram permissões atribuíveis a cargos. A administração
+  // total é exclusiva do papel admin e nunca pode ser elevada por um cargo.
   const cargo = (cargoPermissoes ?? []).filter((p): p is Permissao =>
-    PERMISSOES.includes(p as Permissao),
+    PERMISSOES_ATRIBUIVEIS.includes(p as never),
   );
   return [...new Set([...base, ...cargo])] as Permissao[];
 }

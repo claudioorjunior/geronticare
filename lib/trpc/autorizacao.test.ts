@@ -284,6 +284,12 @@ describe('permissaoEfetiva (RBAC dinâmico — cargo adiciona, nunca remove)', (
     ]);
   });
 
+  it('cargo não concede administração total a um não-admin', () => {
+    expect(permissaoEfetiva('usuario', ['admin:administrar'])).toEqual([
+      'clinico:ler',
+    ]);
+  });
+
   it('ignora permissões fora do catálogo canônico (fail-closed)', () => {
     const resultado = permissaoEfetiva('usuario', [
       'clinico:editar',

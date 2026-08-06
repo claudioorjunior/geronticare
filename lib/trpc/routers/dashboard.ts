@@ -44,7 +44,9 @@ export const dashboardRouter = createTRPCRouter({
       );
 
     // SEGURANÇA: projeção mínima explícita — a UI (DashboardUsuario) só usa
-    // id/nome/cpf/dataNascimento/dataAdmissao/ativo. Sem `columns:`, o Drizzle
+    // id/nome/dataNascimento/dataAdmissao/ativo. O CPF não pertence a este
+    // resumo: permanece disponível apenas nas telas autorizadas de busca e
+    // detalhe do paciente. Sem `columns:`, o Drizzle
     // devolve TODAS as colunas (RG, endereço completo, contato de emergência,
     // telefone, e-mail, foto) para qualquer papel com leitura clínica.
     const pacientesRecentes = await ctx.db.query.pacientes.findMany({
@@ -52,7 +54,6 @@ export const dashboardRouter = createTRPCRouter({
       columns: {
         id: true,
         nome: true,
-        cpf: true,
         dataNascimento: true,
         dataAdmissao: true,
         ativo: true,

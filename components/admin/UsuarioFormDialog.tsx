@@ -131,11 +131,6 @@ function UsuarioFormDialogInner({
     e.preventDefault();
     setErro(null);
 
-    if (role === 'profissional' && !especialidade) {
-      setErro('Especialidade é obrigatória para o papel profissional.');
-      return;
-    }
-
     if (modo === 'criar') {
       if (senha.length < 8) {
         setErro('A senha inicial precisa de pelo menos 8 caracteres.');
@@ -281,9 +276,9 @@ function UsuarioFormDialogInner({
               </option>
             ))}
           </select>
-          {role === 'profissional' && (
-            <p className="mt-1 text-xs text-slate-400">Obrigatória para o papel profissional.</p>
-          )}
+          <p className="mt-1 text-xs text-slate-400">
+            Identificação profissional opcional; não altera permissões de acesso.
+          </p>
         </div>
 
         <Field

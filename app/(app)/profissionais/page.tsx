@@ -54,7 +54,7 @@ export default function ProfissionaisPage() {
   // Dialog: null = fechado; 'novo' = modo criar; Usuario = modo editar.
   const [dialog, setDialog] = useState<'novo' | Usuario | null>(null);
 
-  const usuarios = usuariosQ.data ?? [];
+  const usuarios = useMemo(() => usuariosQ.data ?? [], [usuariosQ.data]);
 
   const filtrados = useMemo(() => {
     const termo = busca.trim().toLowerCase();

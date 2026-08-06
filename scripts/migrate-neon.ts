@@ -6,7 +6,7 @@ async function main() {
   const db = await getDb();
   // getDb() já roda migrate() no caminho Postgres real.
   const tables = await db.execute(
-    "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name",
+    'SELECT table_name FROM information_schema.tables WHERE table_schema = \'public\' ORDER BY table_name',
   );
   const rows = (tables as { rows: Array<{ table_name: string }> }).rows ?? [];
   console.log('Tabelas:', rows.map((r) => r.table_name).join(', '));
