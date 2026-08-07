@@ -3,7 +3,7 @@ import { appRouter } from './root';
 import type { Db } from '@/lib/db';
 import type { Context } from './server';
 import * as autorizacao from './autorizacao';
-import { devBypassAtivo } from './autorizacao';
+import { devBypassAtivo, permissaoEfetiva } from './autorizacao';
 
 /**
  * Testes de autorização por papel — invocam as procedures reais com um
@@ -61,6 +61,7 @@ function makeCaller(userRole: string | null, db: Db = makeDb().db) {
     userId: userRole ? 'user-1' : null,
     instituicaoId: userRole ? 'inst-1' : null,
     userRole,
+    permissoes: userRole ? permissaoEfetiva(userRole) : [],
   } as unknown as Context;
   return appRouter.createCaller(ctx);
 }
@@ -257,5 +258,110 @@ describe('autorização — escrita clínica (clinicalProcedure)', () => {
     await expect(
       caller.aplicacoesInstrumentos.criar(input),
     ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+  });
+});
+
+describe('permissaoEfetiva (RBAC dinâmico — cargo adiciona, nunca remove)', () => {
+  it('papel sem cargo mantém a matriz base', () => {
+    expect(permissaoEfetiva('admin')).toEqual(['clinico:ler', 'clinico:editar', 'admin:administrar']);
+    expect(permissaoEfetiva('profissional')).toEqual(['clinico:ler', 'clinico:editar']);
+    expect(permissaoEfetiva('usuario')).toEqual(['clinico:ler']);
+  });
+
+  it('cargo adiciona permissão ao papel usuario (caso jurídico com edição)', () => {
+    expect(permissaoEfetiva('usuario', ['clinico:editar'])).toEqual([
+      'clinico:ler',
+      'clinico:editar',
+    ]);
+  });
+
+  it('cargo não remove permissões do papel base', () => {
+    // admin continua com tudo, mesmo com cargo "restrito"
+    expect(permissaoEfetiva('admin', ['clinico:ler'])).toEqual([
+      'clinico:ler',
+      'clinico:editar',
+      'admin:administrar',
+    ]);
+  });
+
+  it('cargo não concede administração total a um não-admin', () => {
+    expect(permissaoEfetiva('usuario', ['admin:administrar'])).toEqual([
+      'clinico:ler',
+    ]);
+  });
+
+  it('ignora permissões fora do catálogo canônico (fail-closed)', () => {
+    const resultado = permissaoEfetiva('usuario', [
+      'clinico:editar',
+      'permissao-inventada' as never,
+    ]);
+    expect(resultado).toEqual(['clinico:ler', 'clinico:editar']);
+  });
+
+  it('deduplica permissões repetidas', () => {
+    expect(permissaoEfetiva('usuario', ['clinico:ler', 'clinico:ler'])).toEqual(['clinico:ler']);
+  });
+});
+
+describe('permissões futuras de módulos (escalabilidade ERP)', () => {
+  it('permissão de módulo futuro não quebra o filtro fail-closed', () => {
+    // financeiro:editar ainda não existe no catálogo — deve ser descartada
+    const resultado = permissaoEfetiva('usuario', ['financeiro:editar' as never]);
+    expect(resultado).toEqual(['clinico:ler']);
+  });
+
+  it('gate parametrizada exige a permissão exata (exigirPermissao)', async () => {
+    // usuario não tem financeiro:editar — a permissão efetiva nega
+    expect(permissaoEfetiva('usuario').includes('financeiro:editar' as never)).toBe(false);
+    // a factory é exercitada pelas 3 gates existentes (readClinical/admin/clinical),
+    // que agora delegam para exigirPermissao — cobertura real nos testes de RBAC.
+    expect(permissaoEfetiva('usuario', ['financeiro:editar' as never])).toEqual(['clinico:ler']);
+  });
+});
+
+describe('autorização — cargo eleva permissões do papel (usuário leitura + cargo edição)', () => {
+  const input = {
+    pacienteId: PACIENTE_ID,
+    instrumento: 'katz',
+    profissionalId: 'dddddddd-4444-4444-8444-444444444444',
+    dataAplicacao: new Date('2026-08-01T12:00:00.000Z'),
+    respostas: {
+      banho: 'independente',
+      vestir: 'independente',
+      banheiro: 'independente',
+      transferencia: 'independente',
+      continencia: 'controle_completo',
+      alimentacao: 'independente',
+    },
+  } as const;
+
+  it('usuario SEM cargo é bloqueado na escrita clínica (FORBIDDEN)', async () => {
+    const ctx = {
+      db: makeDb().db,
+      session: null,
+      headers: new Headers(),
+      userId: 'user-1',
+      instituicaoId: 'inst-1',
+      userRole: 'usuario',
+      permissoes: permissaoEfetiva('usuario'),
+    } as unknown as Context;
+    await expect(appRouter.createCaller(ctx).aplicacoesInstrumentos.criar(input)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+  });
+
+  it('usuario COM cargo de edição consegue registrar aplicação', async () => {
+    const ctx = {
+      db: makeDb().db,
+      session: null,
+      headers: new Headers(),
+      userId: 'user-1',
+      instituicaoId: 'inst-1',
+      userRole: 'usuario',
+      permissoes: permissaoEfetiva('usuario', ['clinico:editar']),
+    } as unknown as Context;
+    await expect(
+      appRouter.createCaller(ctx).aplicacoesInstrumentos.criar(input),
+    ).resolves.toMatchObject({ id: 'aga-nova' });
   });
 });

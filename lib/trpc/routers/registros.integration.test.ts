@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { Db } from '@/lib/db';
 import type { Context } from '../server';
 import { agas, instituicoes, pacientes, usuarios } from '@/lib/db/schema';
+import { permissaoEfetiva } from '../autorizacao';
 
 type Caller = ReturnType<import('@/lib/trpc/root').AppRouter['createCaller']>;
 
@@ -27,6 +28,7 @@ beforeAll(async () => {
     userId: MEDICO,
     instituicaoId: INSTITUICAO,
     userRole: 'profissional',
+    permissoes: permissaoEfetiva('profissional'),
   } as unknown as Context);
 });
 

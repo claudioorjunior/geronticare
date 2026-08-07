@@ -4,6 +4,14 @@ import { registros, agas, sinaisVitais, usuarios } from '@/lib/db/schema';
 import { eq, and, gte, lte, inArray } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { verificarOwnershipPaciente } from '../ownership';
+import { urlHttpSchema } from '@/lib/validations/url';
+
+const anexoSchema = z.object({
+  nome: z.string(),
+  // SEGURANÇA: http/https apenas — `z.string().url()` aceita javascript:/file:
+  url: urlHttpSchema,
+  tipo: z.string(),
+});
 
 export const registrosRouter = createTRPCRouter({
   listar: readClinicalProcedure
@@ -39,13 +47,23 @@ export const registrosRouter = createTRPCRouter({
   buscar: readClinicalProcedure
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
+      // SEGURANÇA: mesmo comportamento para registro inexistente E para registro
+      // de outra instituição (null) — evita oráculo de existência cross-tenant.
+      // O findFirst SEM filtro de instituição é intencional: o ownership do
+      // paciente é verificado depois; se o paciente não pertence à instituição,
+      // retorna null igual a não-encontrado.
       const registro = await ctx.db.query.registros.findFirst({
         where: eq(registros.id, input.id),
       });
 
       if (!registro) return null;
 
-      await verificarOwnershipPaciente(ctx.db, registro.pacienteId, ctx.instituicaoId);
+      try {
+        await verificarOwnershipPaciente(ctx.db, registro.pacienteId, ctx.instituicaoId);
+      } catch (error) {
+        if (error instanceof TRPCError && error.code === 'NOT_FOUND') return null;
+        throw error;
+      }
 
       return registro;
     }),
@@ -59,13 +77,7 @@ export const registrosRouter = createTRPCRouter({
         titulo: z.string().min(3),
         conteudo: z.string().min(1),
         dataRegistro: z.coerce.date().optional(),
-        anexos: z.array(
-          z.object({
-            nome: z.string(),
-            url: z.string().url(),
-            tipo: z.string(),
-          })
-        ).optional(),
+        anexos: z.array(anexoSchema).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -215,13 +227,7 @@ export const registrosRouter = createTRPCRouter({
     .input(
       z.object({
         registroId: z.string().uuid(),
-        anexos: z.array(
-          z.object({
-            nome: z.string(),
-            url: z.string().url(),
-            tipo: z.string(),
-          })
-        ),
+        anexos: z.array(anexoSchema),
       })
     )
     .mutation(async ({ ctx, input }) => {

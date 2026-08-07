@@ -2,6 +2,12 @@ import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { env } from '@/lib/env';
 import { getDb } from '@/lib/db';
+import {
+  usuarios,
+  sessions,
+  accounts,
+  verifications,
+} from '@/lib/db/schema';
 
 let _auth: ReturnType<typeof betterAuth> | null = null;
 let _authPromise: Promise<ReturnType<typeof betterAuth>> | null = null;
@@ -15,68 +21,70 @@ export async function getAuth(): Promise<ReturnType<typeof betterAuth>> {
         database: drizzleAdapter(db, {
           provider: 'pg',
           schema: {
-            user: {
-              tableName: 'usuarios',
-              fields: {
-                id: 'id',
-                email: 'email',
-                name: 'nome',
-                image: 'image',
-                createdAt: 'createdAt',
-                updatedAt: 'updatedAt',
-              },
-            },
-            session: {
-              tableName: 'sessions',
-              fields: {
-                id: 'id',
-                userId: 'userId',
-                expiresAt: 'expiresAt',
-                token: 'token',
-                createdAt: 'createdAt',
-                updatedAt: 'updatedAt',
-                ipAddress: 'ipAddress',
-                userAgent: 'userAgent',
-              },
-            },
-            account: {
-              tableName: 'accounts',
-              fields: {
-                id: 'id',
-                userId: 'userId',
-                accountId: 'accountId',
-                providerId: 'providerId',
-                accessToken: 'accessToken',
-                refreshToken: 'refreshToken',
-                idToken: 'idToken',
-                accessTokenExpiresAt: 'accessTokenExpiresAt',
-                refreshTokenExpiresAt: 'refreshTokenExpiresAt',
-                scope: 'scope',
-                password: 'password',
-                createdAt: 'createdAt',
-                updatedAt: 'updatedAt',
-              },
-            },
-            verification: {
-              tableName: 'verifications',
-              fields: {
-                id: 'id',
-                identifier: 'identifier',
-                value: 'value',
-                expiresAt: 'expiresAt',
-                createdAt: 'createdAt',
-                updatedAt: 'updatedAt',
-              },
-            },
+            user: usuarios,
+            session: sessions,
+            account: accounts,
+            verification: verifications,
           },
         }),
+        user: {
+          modelName: 'user',
+          fields: {
+            name: 'nome',
+            email: 'email',
+            image: 'image',
+          },
+          additionalFields: {
+            role: {
+              type: 'string',
+              required: false,
+              defaultValue: 'profissional',
+            },
+          },
+        },
+        session: {
+          modelName: 'session',
+          fields: {
+            expiresAt: 'expiresAt',
+            token: 'token',
+            ipAddress: 'ipAddress',
+            userAgent: 'userAgent',
+          },
+          expiresIn: 60 * 60 * 24 * 7,
+          updateAge: 60 * 60 * 24,
+        },
+        account: {
+          modelName: 'account',
+          fields: {
+            accountId: 'accountId',
+            providerId: 'providerId',
+            accessToken: 'accessToken',
+            refreshToken: 'refreshToken',
+            idToken: 'idToken',
+            accessTokenExpiresAt: 'accessTokenExpiresAt',
+            refreshTokenExpiresAt: 'refreshTokenExpiresAt',
+            scope: 'scope',
+            password: 'password',
+          },
+        },
+        verification: {
+          modelName: 'verification',
+          fields: {
+            identifier: 'identifier',
+            value: 'value',
+            expiresAt: 'expiresAt',
+          },
+        },
         emailAndPassword: {
           enabled: true,
           requireEmailVerification: false,
         },
-        session: {
-          expiresIn: 60 * 60 * 24 * 7,
-          updateAge: 60 * 60 * 24,
+        advanced: {
+          database: {
+            // Colunas id são uuid() com defaultRandom no schema — o Better Auth
+            // precisa gerar UUID, não strings aleatórias de 30 chars.
+            generateId: 'uuid',
+          },
         },
         secret: env.AUTH_SECRET,
         baseURL: env.AUTH_URL,

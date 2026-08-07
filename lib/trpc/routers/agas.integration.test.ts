@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { Db } from '@/lib/db';
 import type { Context } from '../server';
 import { montarRelatorioAga } from '@/lib/relatorios/aga-relatorio';
+import { permissaoEfetiva } from '../autorizacao';
 
 /**
  * Integration test: real PGlite in-memory database (migrations 0000-0003 +
@@ -70,6 +71,7 @@ beforeAll(async () => {
     userId: MEDICO,
     instituicaoId: INSTITUICAO,
     userRole: 'profissional',
+    permissoes: permissaoEfetiva('profissional'),
   } as unknown as Context);
 });
 

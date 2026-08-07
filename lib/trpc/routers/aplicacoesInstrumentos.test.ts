@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Db } from '@/lib/db';
 import type { Context } from '../server';
 import { appRouter } from '../root';
+import { permissaoEfetiva } from '../autorizacao';
 
 const PACIENTE_ID = '1b2a3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d';
 const PROFISSIONAL_ID = 'dddddddd-4444-4444-8444-444444444444';
@@ -82,6 +83,7 @@ function makeCaller(db: Db, role = 'profissional') {
     userId: 'ffffffff-6666-4666-8666-666666666666',
     instituicaoId: INSTITUICAO_ID,
     userRole: role,
+    permissoes: permissaoEfetiva(role),
   } as unknown as Context;
 
   return appRouter.createCaller(ctx);

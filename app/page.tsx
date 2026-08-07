@@ -28,5 +28,5 @@ export default async function Home() {
     }
   }
 
-  redirect('/api/auth/sign-in');
+  redirect('/login');
 }

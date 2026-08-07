@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuth } from '@/lib/auth';
+import { resolverUsuarioAutorizacao } from '@/lib/auth/resolver-usuario';
 import { getDb } from '@/lib/db';
-import { pacientes, usuarios } from '@/lib/db/schema';
+import { pacientes } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { gerarUrlUpload, gerarUrlPublica, gerarChaveAnexo } from '@/lib/storage/s3';
 import { z } from 'zod';
@@ -33,13 +34,24 @@ export async function POST(request: NextRequest) {
 
     const { pacienteId, nomeArquivo, tipoMime } = parsed.data;
 
-    const usuario = await db.query.usuarios.findFirst({
-      where: eq(usuarios.id, session.user.id),
-      columns: { instituicaoId: true },
-    });
+    const usuario = await resolverUsuarioAutorizacao(db, session.user.id);
 
     if (!usuario?.instituicaoId) {
       return NextResponse.json({ error: 'Usuário sem instituição' }, { status: 403 });
+    }
+
+    // SEGURANÇA: anexo clínico é ESCRITA clínica — exige `clinico:editar`
+    // (admin/profissional, ou cargo que conceda). Antes, o papel `usuario`
+    // (leitura) conseguia gerar URL de upload para qualquer paciente da
+    // instituição, gravando anexos sem permissão de escrita.
+    if (!usuario.ativo) {
+      return NextResponse.json({ error: 'Usuário inativo' }, { status: 403 });
+    }
+    if (!usuario.permissoes.includes('clinico:editar')) {
+      return NextResponse.json(
+        { error: 'Permissão de escrita clínica necessária' },
+        { status: 403 },
+      );
     }
 
     const paciente = await db.query.pacientes.findFirst({

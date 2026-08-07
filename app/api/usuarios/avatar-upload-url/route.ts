@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuth } from '@/lib/auth';
+import { resolverUsuarioAutorizacao } from '@/lib/auth/resolver-usuario';
 import { getDb } from '@/lib/db';
-import { usuarios } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
 import { gerarChaveAvatar, gerarUrlPublica, gerarUrlUpload } from '@/lib/storage/s3';
 import { z } from 'zod';
 
@@ -30,13 +29,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Imagem inválida' }, { status: 400 });
     }
 
-    const usuario = await db.query.usuarios.findFirst({
-      where: eq(usuarios.id, session.user.id),
-      columns: { instituicaoId: true },
-    });
+    const usuario = await resolverUsuarioAutorizacao(db, session.user.id);
 
     if (!usuario?.instituicaoId) {
       return NextResponse.json({ error: 'Usuário sem instituição' }, { status: 403 });
+    }
+
+    // SEGURANÇA: usuário desativado não gera URL de upload (revogação imediata).
+    if (!usuario.ativo) {
+      return NextResponse.json({ error: 'Usuário inativo' }, { status: 403 });
     }
 
     const { nomeArquivo, tipoMime } = parsed.data;

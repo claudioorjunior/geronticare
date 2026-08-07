@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { Db } from '@/lib/db';
 import type { Context } from '../server';
 import { agas, instituicoes, pacientes } from '@/lib/db/schema';
+import { permissaoEfetiva } from '../autorizacao';
 
 /**
  * Integration test: real PGlite in-memory database (migrations 0000-0003 +
@@ -42,6 +43,7 @@ beforeAll(async () => {
     userId: MEDICO,
     instituicaoId: INSTITUICAO,
     userRole: 'profissional',
+    permissoes: permissaoEfetiva('profissional'),
   } as unknown as Context);
 });
 
@@ -49,6 +51,10 @@ describe('integração dashboard (PGlite real) — A3 AGA nova', () => {
   it('baseline: todos os pacientes ativos do seed estão pendentes, em fila por admissão', async () => {
     const resumo = await caller.dashboard.resumo();
     expect(resumo.agasPendentes).toBe(4);
+    expect(resumo.pacientesRecentes).not.toHaveLength(0);
+    for (const paciente of resumo.pacientesRecentes) {
+      expect(paciente).not.toHaveProperty('cpf');
+    }
 
     const proximas = await caller.dashboard.agasProximas();
     expect(proximas).toHaveLength(4);

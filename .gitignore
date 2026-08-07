@@ -33,6 +33,10 @@ yarn-error.log*
 .env*.local
 .env.production
 
+# local tool configs (MCP for editors, commandcode scratch)
+.mcp.json
+.commandcode/
+
 # vercel
 .vercel
 
@@ -62,3 +66,9 @@ Dev Geronticare*.md
 ROADMAP.md
 PRD.md
 ISSUES.md
+WAYFINDER.md
+.env*
+__pycache__/
+playwright-report/
+test-results/
+blob-report/
