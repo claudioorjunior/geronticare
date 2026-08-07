@@ -30,6 +30,13 @@ export const instituicoes = pgTable('instituicoes', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+// One-row installation marker. Its primary key is the concurrency guard for
+// first-run bootstrap; the row and initial tenant are committed together.
+export const instalacao = pgTable('instalacao', {
+  id: text('id').primaryKey(),
+  concluidaAt: timestamp('concluida_at').defaultNow().notNull(),
+});
+
 /**
  * Cargos customizados criados pelo gestor (RBAC dinâmico).
  *

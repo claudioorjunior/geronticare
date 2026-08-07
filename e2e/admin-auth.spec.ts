@@ -19,6 +19,17 @@ test('rota autenticada redireciona para login e preserva o destino', async ({ pa
   await expect(page.getByRole('button', { name: 'Entrar' })).toBeVisible();
 });
 
+test('setup copiado sem handoff não revela o formulário', async ({ page }) => {
+  await page.goto('/setup');
+
+  await expect(page.getByRole('alert')).toContainText(
+    'Configuração não autorizada',
+  );
+  await expect(page.getByRole('button', {
+    name: 'Concluir configuração',
+  })).toBeHidden();
+});
+
 test('usuário com cookie não permanece na tela de login', async ({ context, page }) => {
   await autenticarComoAdminDev(context);
   await page.goto('/login');

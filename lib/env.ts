@@ -37,13 +37,42 @@ function optionalVar(key: string, fallback: string): () => string {
   return () => process.env[key] || fallback;
 }
 
+export function authUrlValida(
+  value: string | undefined,
+  nodeEnv = process.env.NODE_ENV,
+): boolean {
+  if (!value) return false;
+
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
+    return nodeEnv !== 'production'
+      || url.protocol === 'https:'
+      || url.hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
+}
+
+function requireAuthUrl(): () => string {
+  return () => {
+    const value = requireVar('AUTH_URL')();
+    if (!authUrlValida(value)) {
+      throw new Error(
+        '[GerontiCare] AUTH_URL deve usar HTTPS em produção, exceto no loopback 127.0.0.1.',
+      );
+    }
+    return value;
+  };
+}
+
 export const env = defineEnv({
   // Database (obrigatório em produção, opcional em dev com PGLite)
   DATABASE_URL: requireVar('DATABASE_URL'),
 
   // Better-Auth
   AUTH_SECRET: requireVar('AUTH_SECRET'),
-  AUTH_URL: requireVar('AUTH_URL'),
+  AUTH_URL: requireAuthUrl(),
   NEXT_PUBLIC_APP_URL: optionalVar('NEXT_PUBLIC_APP_URL', 'http://localhost:3000'),
 
   // S3 (opcional — só valida no primeiro uso de upload)
