@@ -54,6 +54,33 @@ export function authUrlValida(
   }
 }
 
+const AUTH_SECRET_PLACEHOLDERS = new Set([
+  'dev-secret-nao-usar-em-producao',
+  'your-secret-key-here-change-in-production',
+  'troque-por-um-segredo-forte',
+]);
+
+export function authSecretValido(
+  value: string | undefined,
+  nodeEnv = process.env.NODE_ENV,
+): boolean {
+  if (!value) return false;
+  if (nodeEnv !== 'production') return true;
+  return value.length >= 32 && !AUTH_SECRET_PLACEHOLDERS.has(value);
+}
+
+function requireAuthSecret(): () => string {
+  return () => {
+    const value = requireVar('AUTH_SECRET')();
+    if (!authSecretValido(value)) {
+      throw new Error(
+        '[GerontiCare] AUTH_SECRET deve ter pelo menos 32 caracteres e não pode usar um valor de exemplo em produção.',
+      );
+    }
+    return value;
+  };
+}
+
 function requireAuthUrl(): () => string {
   return () => {
     const value = requireVar('AUTH_URL')();
@@ -71,7 +98,7 @@ export const env = defineEnv({
   DATABASE_URL: requireVar('DATABASE_URL'),
 
   // Better-Auth
-  AUTH_SECRET: requireVar('AUTH_SECRET'),
+  AUTH_SECRET: requireAuthSecret(),
   AUTH_URL: requireAuthUrl(),
   NEXT_PUBLIC_APP_URL: optionalVar('NEXT_PUBLIC_APP_URL', 'http://localhost:3000'),
 

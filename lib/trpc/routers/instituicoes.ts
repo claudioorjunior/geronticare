@@ -1,11 +1,11 @@
 import { z } from 'zod';
-import { createTRPCRouter, protectedProcedure, adminProcedure } from '../server';
+import { createTRPCRouter, adminProcedure } from '../server';
 import { instituicoes } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 
 export const instituicoesRouter = createTRPCRouter({
-  buscar: protectedProcedure.query(async ({ ctx }) => {
+  buscar: adminProcedure.query(async ({ ctx }) => {
     // React Query rejeita `undefined`; findFirst sem match vira null.
     return (await ctx.db.query.instituicoes.findFirst({
       where: eq(instituicoes.id, ctx.instituicaoId),

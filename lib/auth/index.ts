@@ -39,6 +39,7 @@ export async function getAuth(): Promise<ReturnType<typeof betterAuth>> {
               type: 'string',
               required: false,
               defaultValue: 'profissional',
+              input: false,
             },
           },
         },

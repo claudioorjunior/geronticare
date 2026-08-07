@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authClient } from '@/lib/auth/client';
+import { callbackUrlSeguro, DEFAULT_CALLBACK_URL } from '@/lib/auth/callback-url';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,16 +21,12 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   // callbackUrl lido só no client (lazy init, sem effect): destino original
-  // antes do redirect de login. Validação anti open-redirect: só path interno.
+  // antes do redirect de login. A validação exige a mesma origem, inclusive
+  // contra variantes com barra invertida.
   const [callbackUrl] = useState(() => {
-    if (typeof window === 'undefined') return '/dashboard';
-    try {
-      const cb = new URLSearchParams(window.location.search).get('callbackUrl');
-      if (cb && cb.startsWith('/') && !cb.startsWith('//')) return cb;
-    } catch {
-      // mantém /dashboard
-    }
-    return '/dashboard';
+    if (typeof window === 'undefined') return DEFAULT_CALLBACK_URL;
+    const cb = new URLSearchParams(window.location.search).get('callbackUrl');
+    return callbackUrlSeguro(cb, window.location.origin);
   });
 
   const handleSubmit = async (e: React.FormEvent) => {

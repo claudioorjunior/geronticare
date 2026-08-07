@@ -139,6 +139,13 @@ export const pacientesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
 
+      if (data.ativo !== undefined && ctx.userRole !== 'admin') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Somente administrador pode alterar o status do paciente',
+        });
+      }
+
       // Valida unicidade de CPF (mesmo padrão de pacientes.criar)
       if (data.cpf) {
         const cpfExistente = await ctx.db.query.pacientes.findFirst({

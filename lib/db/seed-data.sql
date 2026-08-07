@@ -92,17 +92,6 @@ VALUES
   '2025-01-01 00:00:00'
 );
 
--- Sessão mock (token válido)
-INSERT INTO sessions (id, user_id, token, expires_at, created_at, updated_at)
-VALUES (
-  '5a62b1b5-f24d-4002-b059-ada0efbcaa72',
-  '320471aa-5994-4886-9ee6-1cee8e7aa810',
-  'mock-session-token-dev',
-  '2030-12-31 23:59:59',
-  '2025-01-01 00:00:00',
-  '2025-01-01 00:00:00'
-);
-
 -- Pacientes mock (v4 UUIDs válidos para Zod v4)
 INSERT INTO pacientes (id, instituicao_id, nome, data_nascimento, cpf, rg, sexo, estado_civil, telefone, email, data_admissao, ativo, created_at, updated_at)
 VALUES

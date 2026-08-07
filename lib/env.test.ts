@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { authUrlValida } from './env';
+import { authSecretValido, authUrlValida } from './env';
 
 describe('AUTH_URL validation', () => {
   it('accepts local HTTP during development', () => {
@@ -18,5 +18,17 @@ describe('AUTH_URL validation', () => {
 
   it('rejects unsupported schemes', () => {
     expect(authUrlValida('javascript:alert(1)', 'production')).toBe(false);
+  });
+});
+
+describe('AUTH_SECRET validation', () => {
+  it('requires a strong non-placeholder secret in production', () => {
+    expect(authSecretValido('short', 'production')).toBe(false);
+    expect(authSecretValido('troque-por-um-segredo-forte', 'production')).toBe(false);
+    expect(authSecretValido('a'.repeat(32), 'production')).toBe(true);
+  });
+
+  it('keeps local development fixtures compatible', () => {
+    expect(authSecretValido('dev-secret', 'development')).toBe(true);
   });
 });

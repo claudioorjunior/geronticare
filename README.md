@@ -85,7 +85,7 @@ npm install
 
 # 3. Configure (development — embedded PGlite DB, no PostgreSQL needed)
 cp .env.development.example .env.local
-# DEV_AUTH_BYPASS=true already grants a seed admin session with no login
+# DEV_AUTH_BYPASS=true grants local access to the seed admin without login
 
 # 4. Run
 npm run dev
@@ -110,7 +110,7 @@ The process exposes `GET /api/health` as a cache-free liveness check for monitor
 #### How the environment separation works
 
 - **`NODE_ENV` is always set by Next.js**: `npm run dev` → `development`, `npm run build`/`npm run start` → `production`. You never set it manually.
-- **Dev access bypass** (`lib/trpc/server.ts`): the seed admin session only activates when **both** `NODE_ENV=development` and `DEV_AUTH_BYPASS=true` are present — it is *fail-closed* by construction and can never activate in a production build, even if the variable leaks into production env.
+- **Dev access bypass** (`lib/trpc/server.ts`): seed admin access only activates when **both** `NODE_ENV=development` and `DEV_AUTH_BYPASS=true` are present — it is *fail-closed* by construction and can never activate in a production build, even if the variable leaks into production env.
 - **Developer convenience**: set `DEV_OVERRIDE_USER_ID` to impersonate any seed user (e.g. a `usuario` read-only account) to test role behavior.
 - **Production**: real login via Better-Auth (email/password). A missing or misconfigured `AUTH_*` variable makes auth fail closed — the app never falls back to anonymous access.
 
