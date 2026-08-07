@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuth } from '@/lib/auth';
 import { resolverUsuarioAutorizacao } from '@/lib/auth/resolver-usuario';
 import { getDb } from '@/lib/db';
-import { gerarChaveAvatar, gerarUrlPublica, gerarUrlUpload } from '@/lib/storage/s3';
+import {
+  gerarChaveAvatar,
+  gerarUrlPublica,
+  gerarUrlUpload,
+} from '@/lib/storage/s3';
+import { lerJsonBodyLimitado, RequestBodyTooLargeError } from '@/lib/http/body';
 import { z } from 'zod';
 
 const TIPOS_MIME_IMAGEM = ['image/jpeg', 'image/png', 'image/webp'] as const;
@@ -24,7 +29,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    const parsed = bodySchema.safeParse(await request.json());
+    const parsed = bodySchema.safeParse(await lerJsonBodyLimitado(request));
     if (!parsed.success) {
       return NextResponse.json({ error: 'Imagem inválida' }, { status: 400 });
     }
@@ -40,15 +45,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Usuário inativo' }, { status: 403 });
     }
 
-    const { nomeArquivo, tipoMime } = parsed.data;
+    const { nomeArquivo, tipoMime, tamanhoBytes } = parsed.data;
     const chave = gerarChaveAvatar(usuario.instituicaoId, session.user.id, nomeArquivo);
-    const { url: uploadUrl } = await gerarUrlUpload(chave, tipoMime);
+    const { url: uploadUrl } = await gerarUrlUpload(chave, tipoMime, tamanhoBytes);
 
     return NextResponse.json({
       uploadUrl,
       urlPublica: gerarUrlPublica(chave),
     });
   } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return NextResponse.json(
+        { error: 'Corpo da requisição excede o limite permitido' },
+        { status: 413 },
+      );
+    }
     console.error('Erro ao gerar URL do avatar:', error);
     return NextResponse.json({ error: 'Erro interno ao preparar o upload' }, { status: 500 });
   }

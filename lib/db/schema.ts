@@ -306,7 +306,10 @@ export const registros = pgTable('registros', {
   dataRegistro: timestamp('data_registro').defaultNow().notNull(),
   anexos: jsonb('anexos').$type<Array<{
     nome: string;
-    url: string;
+    /** Legacy public URL; new clinical attachments use chave. */
+    url?: string;
+    /** Private storage key issued by /api/anexos/upload-url. */
+    chave?: string;
     tipo: string;
   }>>(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
