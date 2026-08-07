@@ -7,6 +7,8 @@ import { getDb } from '@/lib/db';
 import { TopNav } from '@/components/layout/TopNav';
 import { devBypassAtivo } from '@/lib/trpc/autorizacao';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Layout das rotas autenticadas (route group (app)).
  *
