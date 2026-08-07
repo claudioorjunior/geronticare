@@ -5,10 +5,14 @@ const mocks = vi.hoisted(() => ({
   getAuth: vi.fn(),
   getSession: vi.fn(),
   findUsuario: vi.fn(),
+  obterEstadoBootstrap: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({ getDb: mocks.getDb }));
 vi.mock('@/lib/auth', () => ({ getAuth: mocks.getAuth }));
+vi.mock('@/lib/bootstrap', () => ({
+  obterEstadoBootstrap: mocks.obterEstadoBootstrap,
+}));
 
 import { createTRPCContext } from './server';
 import { permissaoEfetiva } from './autorizacao';
@@ -22,6 +26,7 @@ beforeEach(() => {
     api: { getSession: mocks.getSession },
   });
   mocks.getSession.mockResolvedValue({ user: { id: 'user-1' } });
+  mocks.obterEstadoBootstrap.mockResolvedValue({ necessario: false });
 });
 
 describe('resolução da sessão tRPC', () => {
@@ -59,6 +64,22 @@ describe('resolução da sessão tRPC', () => {
       instituicaoId: null,
       userRole: null,
     });
+  });
+
+  it('trata sessão existente como não autenticada em instalação inconsistente', async () => {
+    mocks.obterEstadoBootstrap.mockResolvedValue({
+      necessario: false,
+      inconsistente: true,
+    });
+
+    const context = await createTRPCContext({ headers: new Headers() });
+
+    expect(context).toMatchObject({
+      userId: null,
+      instituicaoId: null,
+      userRole: null,
+    });
+    expect(mocks.findUsuario).not.toHaveBeenCalled();
   });
 });
 

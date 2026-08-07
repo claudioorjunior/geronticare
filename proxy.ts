@@ -12,6 +12,10 @@ export function proxy(request: NextRequest) {
     request.cookies.get('better-auth.session_token') ??
     request.cookies.get('__Secure-better-auth.session_token');
 
+  if (pathname === '/' || pathname === '/setup') {
+    return NextResponse.next();
+  }
+
   if (pathname === '/login') {
     return sessionCookie
       ? NextResponse.redirect(new URL('/dashboard', request.url))

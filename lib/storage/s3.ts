@@ -1,4 +1,9 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 import { env } from '@/lib/env';
@@ -14,6 +19,9 @@ const s3Client = new S3Client({
 });
 
 const bucket = env.S3_BUCKET;
+
+// Limite de defesa no servidor; cada rota pode aplicar um limite mais baixo.
+export const TAMANHO_MAXIMO_UPLOAD_BYTES = 50 * 1024 * 1024;
 
 // Tipos MIME permitidos para upload
 const MIME_PERMITIDOS = new Set([
@@ -46,24 +54,57 @@ function sanitizarNomeArquivo(nome: string): string {
  */
 export async function gerarUrlUpload(
   chave: string,
-  tipoMime: string
+  tipoMime: string,
+  tamanhoBytes: number,
 ): Promise<{ url: string; chave: string }> {
   if (!MIME_PERMITIDOS.has(tipoMime)) {
     throw new Error(`Tipo MIME não permitido: ${tipoMime}`);
+  }
+  if (
+    !Number.isSafeInteger(tamanhoBytes) ||
+    tamanhoBytes <= 0 ||
+    tamanhoBytes > TAMANHO_MAXIMO_UPLOAD_BYTES
+  ) {
+    throw new Error(
+      `Tamanho de upload deve estar entre 1 byte e ${TAMANHO_MAXIMO_UPLOAD_BYTES} bytes`,
+    );
   }
 
   const comando = new PutObjectCommand({
     Bucket: bucket,
     Key: chave,
     ContentType: tipoMime,
+    ContentLength: tamanhoBytes,
   });
 
-  const url = await getSignedUrl(s3Client, comando, { expiresIn: 300 });
+  const url = await getSignedUrl(s3Client, comando, {
+    expiresIn: 300,
+    // O Content-Length assinado impede trocar o tamanho no PUT direto para o S3.
+    signableHeaders: new Set(['content-length']),
+  });
   return { url, chave };
 }
 
 /**
- * Gera a URL pública para acessar um anexo.
+ * Gera uma URL temporária para leitura de um objeto privado.
+ * A autorização do recurso deve ser feita antes desta função.
+ */
+export async function gerarUrlDownload(chave: string): Promise<string> {
+  if (!chave || chave.includes('..') || chave.startsWith('/')) {
+    throw new Error('Chave de armazenamento inválida');
+  }
+
+  const comando = new GetObjectCommand({
+    Bucket: bucket,
+    Key: chave,
+  });
+
+  return getSignedUrl(s3Client, comando, { expiresIn: 300 });
+}
+
+/**
+ * Gera a URL pública de um avatar. Avatares continuam separados dos anexos
+ * clínicos para não quebrar o perfil enquanto a política de storage é migrada.
  */
 export function gerarUrlPublica(chave: string): string {
   if (env.S3_PUBLIC_URL) {
@@ -73,6 +114,25 @@ export function gerarUrlPublica(chave: string): string {
     return `${env.S3_ENDPOINT}/${bucket}/${chave}`;
   }
   return `https://${bucket}.s3.${env.S3_REGION}.amazonaws.com/${chave}`;
+}
+
+const UUID_PATTERN = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+const CHAVE_ANEXO_PATTERN = new RegExp(
+  `^instituicoes/(${UUID_PATTERN})/pacientes/(${UUID_PATTERN})/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[a-zA-Z0-9._-]{1,200}$`,
+  'i',
+);
+
+/**
+ * Extrai o tenant e o paciente de uma chave gerada por gerarChaveAnexo.
+ * Retorna null para chaves externas ou com traversal, antes de qualquer
+ * chamada ao storage.
+ */
+export function extrairContextoChaveAnexo(
+  chave: string,
+): { instituicaoId: string; pacienteId: string } | null {
+  const match = CHAVE_ANEXO_PATTERN.exec(chave);
+  if (!match) return null;
+  return { instituicaoId: match[1], pacienteId: match[2] };
 }
 
 /**

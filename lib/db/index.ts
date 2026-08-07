@@ -1,5 +1,4 @@
 import * as schema from './schema';
-import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import type { PgDatabase } from 'drizzle-orm/pg-core';
 import type { PgQueryResultHKT } from 'drizzle-orm/pg-core';
 import type { ExtractTablesWithRelations } from 'drizzle-orm';
@@ -12,10 +11,6 @@ let _db: AnyDb | null = null;
 let _dbPromise: Promise<void> | null = null;
 
 async function init() {
-  const { readFileSync } = await import('node:fs');
-  const { join } = await import('node:path');
-  const cwd = process.cwd();
-
   // PGlite in-memory é apenas fallback de dev sem Postgres configurado
   // (ex.: testes/CI, que não carregam .env.local). Com DATABASE_URL
   // presente (dev com Postgres local OU produção) usamos Postgres real —
@@ -23,6 +18,9 @@ async function init() {
   const usePgLite = isDev && !process.env.DATABASE_URL;
 
   if (usePgLite) {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const cwd = process.cwd();
     const { PGlite } = await import('@electric-sql/pglite');
     const { drizzle } = await import('drizzle-orm/pglite');
     const client = await PGlite.create();
@@ -54,9 +52,6 @@ async function init() {
     const client = postgres.default(env.DATABASE_URL, { prepare: false });
     const db = drizzle(client, { schema });
     _db = db;
-    await migrate(db, {
-      migrationsFolder: join(cwd, 'lib', 'db', 'migrations'),
-    });
   }
 }
 

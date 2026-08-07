@@ -368,8 +368,15 @@ describe('buscar/meuPerfil — null em vez de undefined (T-48)', () => {
     ).resolves.toBeNull();
   });
 
-  it('instituicoes.buscar retorna null sem match', async () => {
+  it('instituicoes.buscar exige admin', async () => {
     const caller = makeCaller(makeDb().db, 'usuario');
+    await expect(caller.instituicoes.buscar()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+  });
+
+  it('instituicoes.buscar retorna null sem match para admin', async () => {
+    const caller = makeCaller(makeDb().db, 'admin');
     await expect(caller.instituicoes.buscar()).resolves.toBeNull();
   });
 });

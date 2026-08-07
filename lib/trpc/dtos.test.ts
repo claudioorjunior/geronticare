@@ -159,6 +159,19 @@ const AGA_LIST_DTO = {
 };
 
 describe('DTOs mínimos de pacientes', () => {
+  it('profissional não altera o status do paciente', async () => {
+    const { db } = makeDb();
+
+    await expect(
+      makeCaller(db, 'profissional').pacientes.atualizar({
+        id: PACIENTE_ID,
+        ativo: false,
+      }),
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+  });
+
   it('listar seleciona e retorna somente os campos usados na listagem', async () => {
     const { db, pacienteFindMany } = makeDb();
     const resultado = await makeCaller(db).pacientes.listar();

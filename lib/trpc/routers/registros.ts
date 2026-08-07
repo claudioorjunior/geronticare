@@ -9,9 +9,14 @@ import { urlHttpSchema } from '@/lib/validations/url';
 const anexoSchema = z.object({
   nome: z.string(),
   // SEGURANÇA: http/https apenas — `z.string().url()` aceita javascript:/file:
-  url: urlHttpSchema,
+  url: urlHttpSchema.optional(),
+  // Novos anexos clínicos persistem a chave privada e usam download-url para leitura.
+  chave: z.string().min(1).max(1024).optional(),
   tipo: z.string(),
-});
+}).refine(
+  ({ url, chave }) => (url !== undefined) !== (chave !== undefined),
+  { message: 'Anexo deve informar URL legada ou chave privada, mas não ambas' },
+);
 
 export const registrosRouter = createTRPCRouter({
   listar: readClinicalProcedure

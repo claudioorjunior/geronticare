@@ -1,17 +1,15 @@
 // Seed de usuários dev no Neon via Better Auth (hash correto de senha).
-// Uso: DATABASE_URL="postgresql://..." npx tsx scripts/seed-neon.ts
+// Uso: SEED_DEV_USERS=true SEED_ADMIN_PASSWORD="..." \
+//      SEED_PROFISSIONAL_PASSWORD="..." SEED_LEITOR_PASSWORD="..." \
+//      DATABASE_URL="postgresql://..." npx tsx scripts/seed-neon.ts
 import { hashPassword } from 'better-auth/crypto';
 import { getDb } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 import { instituicoes, usuarios, accounts } from '@/lib/db/schema';
-
-const SEED_USERS = [
-  { email: 'admin@mock.ilpi', password: 'Admin123!', name: 'Admin Mock', role: 'admin' },
-  { email: 'profissional@mock.ilpi', password: 'Prof123!', name: 'Dr. Mock', role: 'profissional' },
-  { email: 'leitor@mock.ilpi', password: 'Leitor123!', name: 'Leitor Mock', role: 'usuario' },
-] as const;
+import { loadDevSeedUsers } from '@/lib/db/seed-credentials';
 
 async function main() {
+  const seedUsers = loadDevSeedUsers();
   const db = await getDb();
 
   // 1. Instituição (obrigatória: usuarios.instituicao_id NOT NULL)
@@ -28,7 +26,7 @@ async function main() {
   }
 
   // 2. Usuários + conta credential (hash de senha compatível com Better Auth)
-  for (const u of SEED_USERS) {
+  for (const u of seedUsers) {
     const existing = await db.query.usuarios.findFirst({
       where: eq(usuarios.email, u.email),
     });

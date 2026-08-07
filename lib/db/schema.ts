@@ -30,6 +30,13 @@ export const instituicoes = pgTable('instituicoes', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+// One-row installation marker. Its primary key is the concurrency guard for
+// first-run bootstrap; the row and initial tenant are committed together.
+export const instalacao = pgTable('instalacao', {
+  id: text('id').primaryKey(),
+  concluidaAt: timestamp('concluida_at').defaultNow().notNull(),
+});
+
 /**
  * Cargos customizados criados pelo gestor (RBAC dinâmico).
  *
@@ -299,7 +306,10 @@ export const registros = pgTable('registros', {
   dataRegistro: timestamp('data_registro').defaultNow().notNull(),
   anexos: jsonb('anexos').$type<Array<{
     nome: string;
-    url: string;
+    /** Legacy public URL; new clinical attachments use chave. */
+    url?: string;
+    /** Private storage key issued by /api/anexos/upload-url. */
+    chave?: string;
     tipo: string;
   }>>(),
   createdAt: timestamp('created_at').defaultNow().notNull(),

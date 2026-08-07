@@ -1,8 +1,13 @@
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { getAuth } from '@/lib/auth';
+import { BootstrapInconsistente } from '@/components/bootstrap-inconsistente';
+import { obterEstadoBootstrap } from '@/lib/bootstrap';
+import { getDb } from '@/lib/db';
 import { TopNav } from '@/components/layout/TopNav';
 import { devBypassAtivo } from '@/lib/trpc/autorizacao';
+
+export const dynamic = 'force-dynamic';
 
 /**
  * Layout das rotas autenticadas (route group (app)).
@@ -17,6 +22,10 @@ export default async function AppLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const estadoBootstrap = await obterEstadoBootstrap(await getDb());
+  if (estadoBootstrap.necessario) return redirect('/setup');
+  if (estadoBootstrap.inconsistente) return <BootstrapInconsistente />;
+
   const devBypass = devBypassAtivo();
 
   let autenticado = false;
