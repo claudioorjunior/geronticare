@@ -265,6 +265,66 @@ describe('usuarios.atualizar — guards do último admin (T-47)', () => {
   });
 });
 
+describe('usuarios.atualizar/desativar — guard do último admin é tenant-safe (SEGURANÇA)', () => {
+  // Simula o banco real: o alvo pertence a OUTRA instituição (o id existe como
+  // admin ativo globalmente, mas a linha não pertence à instituição do contexto).
+  // Busca por id puro o encontra; busca tenant-scoped (com instituicao_id) não.
+  function refsInstituicaoId(where: unknown): boolean {
+    const names: string[] = [];
+    const walk = (c: unknown): void => {
+      if (!c || typeof c !== 'object') return;
+      const obj = c as Record<string, unknown>;
+      if (typeof obj.name === 'string') names.push(obj.name);
+      if (Array.isArray(obj.queryChunks)) (obj.queryChunks as unknown[]).forEach(walk);
+    };
+    walk(where);
+    return names.includes('instituicao_id');
+  }
+
+  function makeDbComAlvoDeOutraInstituicao() {
+    const db = {
+      query: {
+        usuarios: {
+          findFirst: vi.fn(async ({ where }: { where?: unknown } = {}) =>
+            refsInstituicaoId(where) ? null : { role: 'admin', ativo: true },
+          ),
+          findMany: vi.fn(async () => []),
+        },
+        instituicoes: { findFirst: vi.fn(async () => undefined) },
+      },
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(async () => [{ value: 1 }]),
+        })),
+      })),
+      update: vi.fn(() => ({
+        set: vi.fn(() => ({
+          where: vi.fn(() => ({
+            returning: vi.fn(async () => []),
+          })),
+        })),
+      })),
+    } as unknown as Db;
+    return { db };
+  }
+
+  it('alvo de outra instituição: atualizar papel → NOT_FOUND (sem FORBIDDEN do guard)', async () => {
+    const { db } = makeDbComAlvoDeOutraInstituicao();
+    const caller = makeCaller(db, 'admin');
+    await expect(
+      caller.usuarios.atualizar({ id: OUTRO_ADMIN_ID, role: 'usuario' }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('alvo de outra instituição: desativar → NOT_FOUND (sem FORBIDDEN do guard)', async () => {
+    const { db } = makeDbComAlvoDeOutraInstituicao();
+    const caller = makeCaller(db, 'admin');
+    await expect(
+      caller.usuarios.desativar({ id: OUTRO_ADMIN_ID }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+});
+
 describe('usuarios.desativar — guards do último admin (T-47)', () => {
   it('desativar o único admin ativo é FORBIDDEN', async () => {
     const { db } = makeDb({

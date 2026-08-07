@@ -52,7 +52,10 @@ async function garantirNaoUltimoAdmin(
   alvoId: string,
 ) {
   const alvo = await db.query.usuarios.findFirst({
-    where: eq(usuarios.id, alvoId),
+    where: and(
+      eq(usuarios.id, alvoId),
+      eq(usuarios.instituicaoId, instituicaoId),
+    ),
     columns: { role: true, ativo: true },
   });
   if (!alvo?.ativo || alvo.role !== 'admin') return;

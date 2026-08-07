@@ -9,9 +9,15 @@ import { z } from 'zod';
 export const urlHttpSchema = z
   .string()
   .url()
-  .refine((v) => /^https?:\/\//i.test(v), {
+  .refine((v) => {
+    const parsed = new URL(v);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  }, {
     message: 'A URL deve começar com http:// ou https://',
   })
-  .refine((v) => !/@/.test(v.split('://')[1] ?? ''), {
+  .refine((v) => {
+    const parsed = new URL(v);
+    return parsed.username === '' && parsed.password === '';
+  }, {
     message: 'URL não pode conter credenciais embutidas',
   });
