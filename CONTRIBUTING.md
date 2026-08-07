@@ -18,6 +18,7 @@ We welcome contributions to GerontiCare! This document explains how to contribut
 
 - Use **conventional commits**: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, `perf:`
 - Write TypeScript in **strict mode**
+- The standalone npm CLI in `cli/` is an intentional JavaScript ESM package for Node 22; CI enforces its ESLint, `node --check`, and native test gates.
 - Run checks before pushing: `npm run lint && npm run type-check`
 - All tRPC procedures must be registered in `lib/trpc/root.ts`
 - Any schema change requires `npm run db:generate` and `npm run db:push`
@@ -72,6 +73,7 @@ Contribuições são bem-vindas! Este documento explica como contribuir.
 
 - Use **conventional commits**: `feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, `perf:`
 - Escreva TypeScript em **modo strict**
+- O CLI npm independente em `cli/` é intencionalmente um pacote JavaScript ESM para Node 22; o CI aplica ESLint, `node --check` e os testes nativos nessa fronteira.
 - Execute verificações antes de enviar: `npm run lint && npm run type-check`
 - Toda procedure tRPC deve ser registrada em `lib/trpc/root.ts`
 - Qualquer mudança no schema exige `npm run db:generate` e `npm run db:push`

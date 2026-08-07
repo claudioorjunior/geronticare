@@ -9,7 +9,7 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    exclude: [...configDefaults.exclude, 'e2e/**', '.worktrees/**'],
+    exclude: [...configDefaults.exclude, 'e2e/**', '.worktrees/**', 'cli/test/**'],
     // PGlite integration tests boot + migrate + seed in beforeAll (~9s each);
     // under full-suite parallelism that can exceed vitest's 10s default.
     hookTimeout: 30_000,

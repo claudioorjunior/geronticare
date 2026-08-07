@@ -1,0 +1,24 @@
+{
+  "name": "geronticare",
+  "version": "0.5.0",
+  "description": "GerontiCare self-hosted installer",
+  "type": "module",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "bin": {
+    "geronticare": "bin/geronticare.js"
+  },
+  "files": [
+    "bin",
+    "src"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.10.1",
+    "postgres": "^3.4.9"
+  },
+  "license": "MIT"
+}
