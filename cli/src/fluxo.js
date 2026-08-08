@@ -9,7 +9,9 @@ import { PORTA_POSTGRES_PADRAO, validarDistroLinux } from './db/local.js';
 import { criarClientePostgres, provarComCliente } from './db/validacao.js';
 import { executarDoctor } from './doctor.js';
 import { escolherPorta } from './porta.js';
-import { prepararRelease, releaseInstaladaValida } from './release.js';
+import { backupAntesDeMigrar } from './backup.js';
+import { compararVersoes, listarReleases, podarReleases, prepararRelease, releaseInstaladaValida, versaoSegura } from './release.js';
+import { formatarAviso, verificarAtualizacao } from './update-check.js';
 import {
   escreverSegredos,
   gerarSegredo,
@@ -22,7 +24,10 @@ import {
   encerrarFilho,
   iniciarHandoff,
   iniciarServidor,
+  iniciarServidorDetached,
+  lerLogs,
   monitorarBootstrap,
+  pararServidorDetached,
 } from './servidor.js';
 import {
   comInstallLock,
@@ -212,6 +217,10 @@ export async function executarFluxo({
   distroId,
   distroVersion,
   versao = null,
+  versaoAlvo = null,
+  fundo = false,
+  linhasLog = 100,
+  seguirLog = false,
   nodeVersion = process.version,
   isTTY = process.stdin.isTTY === true,
 } = {}) {
@@ -230,7 +239,21 @@ export async function executarFluxo({
   };
 
   if (comando === 'doctor') {
-    return diagnosticar({ ...servicos, isTTY });
+    await diagnosticar({ ...servicos, isTTY });
+    await notificarAtualizacao({ root, fetchFn, ui, estado: await lerEstado(root), config: await lerArquivoJson(root, 'config.json') });
+    return;
+  }
+  if (comando === 'stop') {
+    return pararServidorDetached({ root, log: ui.log });
+  }
+  if (comando === 'logs') {
+    return lerLogs({ root, n: linhasLog, log: ui.log, seguir: seguirLog, spawnFn });
+  }
+  if (comando === 'upgrade') {
+    return comInstallLock(root, () => upgradeFluxo({ ...servicos, versaoAlvo }));
+  }
+  if (comando === 'rollback') {
+    return comInstallLock(root, () => rollbackFluxo({ ...servicos, versaoAlvo }));
   }
   if (comando === 'start') {
     validarNode22(nodeVersion);
@@ -241,8 +264,9 @@ export async function executarFluxo({
       : { ...servicos, versao: versaoEfetiva };
     let resultadoStart;
     await comInstallLock(root, async () => {
-      resultadoStart = await instalarOuIniciar({ ...servicosStart, somenteIniciar: true });
+      resultadoStart = await instalarOuIniciar({ ...servicosStart, somenteIniciar: true, fundo });
     });
+    await notificarAtualizacao({ root, fetchFn, ui, estado: await lerEstado(root), config: await lerArquivoJson(root, 'config.json'), fallbackVersao: versaoEfetiva });
     return resultadoStart;
   }
 
@@ -269,7 +293,7 @@ export async function executarFluxo({
       portaLivreFn,
       portasReservadas: new Set([PORTA_POSTGRES_PADRAO]),
     });
-  await comInstallLock(root, () => instalarOuIniciar({ ...servicosInstalacao, portaInicial }));
+  await comInstallLock(root, () => instalarOuIniciar({ ...servicosInstalacao, portaInicial, fundo }));
 }
 
 async function diagnosticar({ ui, root, criarCliente, fetchFn }) {
@@ -289,7 +313,7 @@ async function instalarOuIniciar({
   ui, root, env, platform, arquitetura, fetchFn, executar, spawnFn,
   registrarSinal, abrirNavegador, criarCliente, versao, somenteIniciar = false,
   criarServidorHttp, baixar, hashFn, fsBanco, portaLivreFn, portaInicial, versaoSistema,
-  distroId, distroVersion,
+  distroId, distroVersion, fundo = false,
 }) {
   let estado = await lerEstado(root);
   let faseAtual = ORDEM_FASES.get(estado?.fase) ? estado.fase : 'PREFLIGHT';
@@ -408,7 +432,7 @@ async function instalarOuIniciar({
       }
       await provarComCliente(criarCliente, segredos.DATABASE_URL);
     }
-    if (ordemFase > 4 && !(await releaseInstaladaValida({ root, versao, porta }))) {
+    if (ordemFase > 4 && !(await releaseInstaladaValida({ root, versao }))) {
       throw new Error(`Release v${versao} não está disponível ou íntegra. Rode o instalador novamente.`);
     }
     if (ordemFase >= 7) {
@@ -608,6 +632,19 @@ async function instalarOuIniciar({
       ui.conclusao('Instalação concluída. O servidor está rodando.');
     }
 
+    if (fundo) {
+      const releaseDirFundo = join(root, 'releases', versao);
+      await pararServidorDetached({ root, log: () => {} }).catch(() => {});
+      if (filho) {
+        await encerrarFilho({ filho, saida: saidaServidor }).catch(() => {});
+      }
+      const configFundo = (await lerArquivoJson(root, 'config.json')) ?? { host: '127.0.0.1', porta, versao };
+      const segredosFundo = (await lerSegredos(root)) ?? segredosAtuais;
+      await iniciarServidorDetached({ releaseDir: releaseDirFundo, config: configFundo, segredos: segredosFundo, spawnFn, log: ui.log });
+      ui.log(`GerontiCare em background em http://127.0.0.1:${porta}. Use 'geronticare logs' e 'geronticare stop'.`);
+      servidorEncerrado = true;
+      return;
+    }
     ui.log(`GerontiCare rodando em http://127.0.0.1:${porta} (Ctrl+C para parar).`);
     await new Promise((resolver) => {
       saidaServidor.then((codigo) => {
@@ -652,6 +689,111 @@ async function instalarOuIniciar({
 function expirado(expiraEm) {
   const ms = Date.parse(expiraEm ?? '');
   return !Number.isFinite(ms) || ms <= Date.now();
+}
+
+async function resolverVersaoAlvo({ versaoAlvo, fetchFn }) {
+  if (versaoAlvo) {
+    const v = String(versaoAlvo).replace(/^v/, '');
+    if (!versaoSegura(v)) throw new Error(`Versão inválida: ${versaoAlvo}. Use X.Y.Z.`);
+    return v;
+  }
+  const resposta = await fetchFn('https://api.github.com/repos/claudioorjunior/geronticare/releases/latest');
+  if (!resposta.ok) throw new Error('Não foi possível resolver a versão mais recente.');
+  const dados = await resposta.json();
+  const tag = String(dados.tag_name ?? dados.name ?? '').replace(/^v/, '');
+  if (!versaoSegura(tag)) throw new Error('Versão latest inválida retornada pelo GitHub.');
+  return tag;
+}
+
+async function upgradeFluxo({ root, ui, fetchFn, executar, spawnFn, versaoAlvo }) {
+  const estado = await lerEstado(root);
+  if (!estado || estado.fase !== 'READY') throw new Error('Instalação não está em READY. Rode o instalador primeiro.');
+  const config = await lerArquivoJson(root, 'config.json');
+  const segredos = await lerSegredos(root);
+  if (!config || !segredos?.DATABASE_URL) throw new Error('config/secrets ausentes para upgrade.');
+  const alvo = await resolverVersaoAlvo({ versaoAlvo, fetchFn });
+  if (alvo === config.versao) throw new Error(`Já está na versão ${alvo}.`);
+  if (compararVersoes(alvo, config.versao) < 0) throw new Error(`upgrade exige versão maior que ${config.versao}; use rollback para voltar.`);
+  ui.log(`Atualizando de v${config.versao} para v${alvo}...`);
+  await backupAntesDeMigrar({ root, config, segredos, executar, log: ui.log });
+  await prepararRelease({ root, versao: alvo, porta: config.porta, fetchFn, spawnFn: executar, log: ui.log });
+  const releaseDir = join(root, 'releases', alvo);
+  const resultado = await executar([process.execPath, join(releaseDir, 'scripts', 'migrate.mjs')], { cwd: releaseDir, env: { ...process.env, DATABASE_URL: segredos.DATABASE_URL } });
+  if (resultado.exitCode !== 0) throw new Error('Falha ao aplicar migrations do upgrade.');
+  const configAnterior = { ...config };
+  const versaoAnterior = config.versao;
+  let cutoverOk = false;
+  try {
+    await pararServidorDetached({ root, log: () => {} });
+    const segredosAtuais = await lerSegredos(root);
+    await iniciarServidorDetached({ releaseDir, config: { ...config, versao: alvo }, segredos: segredosAtuais, spawnFn, log: ui.log });
+    await aguardarProntidao({ porta: config.porta, fetchFn, log: ui.log });
+    cutoverOk = true;
+  } catch (error) {
+    ui.log(`Aviso: cutover falhou (${sanitizarErro(error)}); restaurando v${versaoAnterior}.`);
+    try {
+      await pararServidorDetached({ root, log: () => {} }).catch(() => {});
+      const releaseAnterior = join(root, 'releases', versaoAnterior);
+      const segredosAtuais = await lerSegredos(root).catch(() => segredos);
+      await iniciarServidorDetached({ releaseDir: releaseAnterior, config: configAnterior, segredos: segredosAtuais, spawnFn, log: () => {} }).catch(() => {});
+    } catch {}
+    throw error;
+  }
+  if (cutoverOk) {
+    await escreverArquivoAtomicamente(root, 'config.json', { ...config, versao: alvo, ativo: true });
+    await escreverEstado(root, { fase: 'READY', porta: config.porta, provedor: estado.provedor, versao: alvo, versaoAnterior });
+    await podarReleases(root, { keep: 2 });
+    ui.log(`Upgrade para v${alvo} concluído.`);
+  }
+}
+
+async function rollbackFluxo({ root, ui, executar, versaoAlvo, spawnFn }) {
+  const estado = await lerEstado(root);
+  if (!estado || estado.fase !== 'READY') throw new Error('Instalação não está em READY para rollback.');
+  const config = await lerArquivoJson(root, 'config.json');
+  if (!config) throw new Error('config.json ausente para rollback.');
+  const releases = await listarReleases(root);
+  if (releases.length < 2 && !versaoAlvo) throw new Error('Nenhuma versão anterior retida para rollback.');
+  let alvo = versaoAlvo ? String(versaoAlvo).replace(/^v/, '') : releases.find((v) => v !== config.versao);
+  if (!alvo) throw new Error('Versão alvo não encontrada.');
+  if (!versaoSegura(alvo)) throw new Error(`Versão inválida: ${alvo}`);
+  if (!releases.includes(alvo)) throw new Error(`Versão ${alvo} não está retida em releases/.`);
+  const { readdir } = await import('node:fs/promises');
+  let backupDir = null;
+  try {
+    const entradas = await readdir(join(root, 'backups'));
+    const cand = entradas.filter((n) => n.endsWith(`-${alvo}`)).sort().reverse()[0];
+    if (cand) backupDir = join(root, 'backups', cand);
+  } catch {}
+  if (backupDir) {
+    try {
+      const dump = join(backupDir, 'dump.sql');
+      const segredos = await lerSegredos(root);
+      const res = await executar(['psql', segredos.DATABASE_URL, '-f', dump], { env: { DATABASE_URL: segredos.DATABASE_URL } });
+      if (res.exitCode !== 0) ui.log('Aviso: restore do dump falhou; rollback só de código.');
+    } catch {
+      ui.log('Aviso: sem psql; rollback só de código.');
+    }
+  } else {
+    ui.log('Aviso: sem backup de banco para esta versão; rollback só de código.');
+  }
+  await pararServidorDetached({ root, log: () => {} }).catch(() => {});
+  const releaseDir = join(root, 'releases', alvo);
+  const segredosAtuais = await lerSegredos(root);
+  await iniciarServidorDetached({ releaseDir, config: { ...config, versao: alvo }, segredos: segredosAtuais, spawnFn, log: ui.log });
+  await aguardarProntidao({ porta: config.porta, fetchFn: fetch, log: ui.log });
+  await escreverArquivoAtomicamente(root, 'config.json', { ...config, versao: alvo });
+  await escreverEstado(root, { fase: 'READY', porta: config.porta, provedor: estado.provedor, versao: alvo, versaoAnterior: config.versao });
+  ui.log(`Rollback para v${alvo} concluído.`);
+}
+
+async function notificarAtualizacao({ root, fetchFn, ui, estado, config, fallbackVersao }) {
+  const v = config?.versao ?? estado?.versao ?? fallbackVersao;
+  if (!v) return;
+  try {
+    const info = await verificarAtualizacao({ root, versaoAtual: v, fetchFn });
+    if (info) ui.log(formatarAviso(info));
+  } catch {}
 }
 
 async function verificarMarcador({ databaseUrl, criarCliente }) {

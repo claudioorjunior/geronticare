@@ -1,8 +1,11 @@
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
+import { open, readFile } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { redigirUri, sanitizarErro } from './secrets.js';
+import { escreverPid, lerPid, removerPid } from './state.js';
 
 function atraso(ms, sinal) {
   return new Promise((resolver) => {
@@ -18,7 +21,7 @@ function redigirMensagem(mensagem) {
   return mensagem.replace(/[a-z][a-z0-9+.-]*:\/\/[^\s"'<>]+/gi, (uri) => redigirUri(uri));
 }
 
-export function montarAmbiente({ segredos, config }) {
+export function montarAmbiente({ segredos, config, root }) {
   const authUrl = `http://127.0.0.1:${config.porta}`;
   const ambiente = {
     DATABASE_URL: segredos.DATABASE_URL,
@@ -30,6 +33,7 @@ export function montarAmbiente({ segredos, config }) {
     PATH: process.env.PATH,
     HOME: process.env.HOME,
   };
+  if (root) ambiente.GERONTICARE_HOME = root;
   for (const chave of ['SystemRoot', 'TEMP', 'TMP', 'USERPROFILE', 'COMSPEC']) {
     if (process.env[chave]) ambiente[chave] = process.env[chave];
   }
@@ -225,4 +229,114 @@ export async function encerrarFilho({ filho, saida, esperarMs = 5_000 } = {}) {
     return saida;
   }
   return vencedor.codigo;
+}
+
+export async function iniciarServidorDetached({
+  releaseDir,
+  config,
+  segredos,
+  spawnFn = spawn,
+  log = console.log,
+}) {
+  const root = join(releaseDir, '..', '..');
+  const pidAtual = await lerPid(root);
+  if (pidAtual !== null) {
+    try {
+      process.kill(pidAtual, 0);
+      throw new Error(`Servidor já está rodando (PID ${pidAtual}). Use stop antes de iniciar novamente.`);
+    } catch (error) {
+      if (error?.message?.includes('já está rodando')) throw error;
+      if (error?.code !== 'ESRCH') throw error;
+      await removerPid(root);
+    }
+  }
+  const logsDir = join(root, 'logs');
+  await mkdir(logsDir, { recursive: true, mode: 0o700 });
+  const logPath = join(logsDir, 'server.log');
+  const logFd = await open(logPath, 'a', 0o600);
+  const fd = logFd.fd;
+  const binarioNext = join(releaseDir, 'node_modules', 'next', 'dist', 'bin', 'next');
+  const filho = spawnFn(
+    process.execPath,
+    [binarioNext, 'start', '-H', '127.0.0.1', '-p', String(config.porta)],
+    {
+      cwd: releaseDir,
+      env: montarAmbiente({ segredos, config, root }),
+      detached: true,
+      stdio: ['ignore', fd, fd],
+      windowsHide: true,
+    },
+  );
+  filho.unref();
+  await escreverPid(root, filho.pid);
+  log(`Servidor em background iniciado (PID ${filho.pid}) em http://127.0.0.1:${config.porta}. Logs em ${logPath}.`);
+  return { pid: filho.pid, logPath };
+}
+
+export async function pararServidorDetached({ root, log = console.log } = {}) {
+  const pid = await lerPid(root);
+  if (pid === null) {
+    log('Nenhum servidor em background encontrado.');
+    return { parado: false };
+  }
+  try {
+    process.kill(pid, 0);
+  } catch (error) {
+    if (error?.code === 'ESRCH') {
+      await removerPid(root);
+      log('PID stale removido; nenhum processo ativo.');
+      return { parado: false };
+    }
+    throw error;
+  }
+  try {
+    process.kill(pid, 'SIGTERM');
+  } catch {}
+  const inicio = Date.now();
+  while (Date.now() - inicio < 5_000) {
+    try {
+      process.kill(pid, 0);
+    } catch (error) {
+      if (error?.code === 'ESRCH') break;
+      throw error;
+    }
+    await atraso(200);
+  }
+  try {
+    process.kill(pid, 0);
+    try {
+      process.kill(pid, 'SIGKILL');
+    } catch {}
+  } catch (error) {
+    if (error?.code !== 'ESRCH') throw error;
+  }
+  await removerPid(root);
+  log(`Servidor em background parado (PID ${pid}).`);
+  return { parado: true, pid };
+}
+
+export async function lerLogs({ root, n = 100, log = console.log, seguir = false, spawnFn = spawn } = {}) {
+  const logPath = join(root, 'logs', 'server.log');
+  if (seguir) {
+    const filho = spawnFn('tail', ['-f', logPath], { stdio: ['ignore', 'pipe', 'pipe'] });
+    filho.stdout?.on('data', (c) => log(redigirMensagem(String(c))));
+    filho.stderr?.on('data', (c) => log(redigirMensagem(String(c))));
+    return '';
+  }
+  let conteudo;
+  try {
+    conteudo = await readFile(logPath, 'utf8');
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      log('Nenhum log encontrado.');
+      return '';
+    }
+    throw error;
+  }
+  const linhas = conteudo.split('\n');
+  const fatia = n != null ? linhas.slice(-n) : linhas;
+  const saida = fatia.join('\n');
+  const redigido = redigirMensagem(saida);
+  log(redigido);
+  return redigido;
 }

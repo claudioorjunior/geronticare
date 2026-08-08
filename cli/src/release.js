@@ -1,6 +1,48 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { copyFile, mkdir, open, readFile, rename, rm } from 'node:fs/promises';
+import { copyFile, mkdir, open, readFile, readdir, rename, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+
+export function versaoSegura(versao) {
+  return typeof versao === 'string' && /^v?\d+\.\d+\.\d+$/.test(versao);
+}
+
+function semverPartes(versao) {
+  const m = String(versao).match(/^v?(\d+)\.(\d+)\.(\d+)$/);
+  if (!m) return null;
+  return [Number(m[1]), Number(m[2]), Number(m[3])];
+}
+
+export function compararVersoes(a, b) {
+  const pa = semverPartes(a);
+  const pb = semverPartes(b);
+  if (!pa || !pb) return String(a).localeCompare(String(b));
+  for (let i = 0; i < 3; i += 1) {
+    if (pa[i] !== pb[i]) return pa[i] - pb[i];
+  }
+  return 0;
+}
+
+export async function listarReleases(root) {
+  const dir = join(root, 'releases');
+  let entradas;
+  try {
+    entradas = await readdir(dir);
+  } catch (error) {
+    if (error?.code === 'ENOENT') return [];
+    throw error;
+  }
+  return entradas.filter((v) => versaoSegura(v)).sort((a, b) => compararVersoes(b, a));
+}
+
+export async function podarReleases(root, { keep = 2 } = {}) {
+  const lista = await listarReleases(root);
+  const excedentes = lista.slice(keep);
+  for (const versao of excedentes) {
+    await rm(join(root, 'releases', versao), { recursive: true, force: true });
+    await rm(join(root, 'downloads', 'releases', versao), { recursive: true, force: true });
+  }
+  return { removidas: excedentes, mantidas: lista.slice(0, keep) };
+}
 
 import { redigirUri, sanitizarErro } from './secrets.js';
 import { escreverArquivoAtomicamente, lerArquivoJson } from './state.js';
@@ -97,9 +139,9 @@ function ultimaLinha(resultado) {
   return linha.length > 300 ? `${linha.slice(0, 300)}…` : linha;
 }
 
-async function releaseReutilizavel(releaseDir, nomeTar, urlApp) {
+async function releaseReutilizavel(releaseDir, nomeTar) {
   const marker = await lerArquivoJson(releaseDir, 'verified.json');
-  if (!marker || marker.nextPublicAppUrl !== urlApp) return false;
+  if (!marker || !marker.sha256 || marker.arquivo !== nomeTar) return false;
   try {
     const sha256 = await hashSha256(join(releaseDir, nomeTar));
     return sha256 === marker.sha256;
@@ -109,10 +151,10 @@ async function releaseReutilizavel(releaseDir, nomeTar, urlApp) {
   }
 }
 
-export async function releaseInstaladaValida({ root, versao, porta }) {
+export async function releaseInstaladaValida({ root, versao }) {
   const releaseDir = join(root, 'releases', versao);
   const nomeTar = `geronticare-app-v${versao}.tar.gz`;
-  return releaseReutilizavel(releaseDir, nomeTar, `http://127.0.0.1:${porta}`);
+  return releaseReutilizavel(releaseDir, nomeTar);
 }
 
 async function assetVerificado(dir, nomeTar) {
@@ -145,7 +187,7 @@ export async function prepararRelease({
   const nomeSha = `geronticare-app-v${versao}.sha256`;
   const baseUrl = `https://github.com/${github.repo}/releases/download/v${versao}`;
 
-  if (await releaseReutilizavel(releaseDir, nomeTar, urlApp)) {
+  if (await releaseReutilizavel(releaseDir, nomeTar)) {
     log(`Release v${versao} já verificado; pulando download.`);
     return { releaseDir, baixado: false };
   }

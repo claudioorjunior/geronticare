@@ -4,6 +4,61 @@ import { statSync } from 'node:fs';
 import { mkdir, open, readFile, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
+export function caminhoPid(root) {
+  return join(root, 'server.pid');
+}
+
+export async function lerPid(root) {
+  try {
+    const conteudo = await readFile(caminhoPid(root), 'utf8');
+    const pid = Number.parseInt(conteudo.trim(), 10);
+    if (!Number.isInteger(pid)) return null;
+    return pid;
+  } catch (error) {
+    if (error?.code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
+export async function escreverPid(root, pid) {
+  await mkdir(root, { recursive: true, mode: 0o700 });
+  aplicarAclWindows(root);
+  const destino = caminhoPid(root);
+  const temporario = `${destino}.${process.pid}.${randomUUID()}.tmp`;
+  const arquivo = await open(temporario, 'wx', 0o600);
+  try {
+    await arquivo.writeFile(`${pid}\n`);
+    await arquivo.sync();
+  } finally {
+    await arquivo.close();
+  }
+  try {
+    try {
+      await rename(temporario, destino);
+    } catch (error) {
+      if (error?.code !== 'EPERM' && error?.code !== 'EEXIST') throw error;
+      await rm(destino, { force: true });
+      await rename(temporario, destino);
+    }
+    aplicarAclWindows(destino);
+    if (process.platform !== 'win32') {
+      const diretorio = await open(root, 'r');
+      try {
+        await diretorio.sync();
+      } finally {
+        await diretorio.close();
+      }
+    }
+  } catch (error) {
+    await rm(temporario, { force: true });
+    throw error;
+  }
+}
+
+export async function removerPid(root) {
+  await rm(caminhoPid(root), { force: true });
+}
+
 const LOCK_NAME = 'install.lock';
 const STATE_NAME = 'install-state.json';
 const WINDOWS_LOCK_RETRY_DELAYS_MS = [25, 50, 100, 200, 400];
