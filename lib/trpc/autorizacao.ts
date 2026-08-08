@@ -23,8 +23,10 @@ export type UserRole = 'admin' | 'profissional' | 'usuario';
 export const PERMISSOES_BASE: Record<UserRole, Permissao[]> = {
   // Admin acompanha automaticamente todo o catálogo, inclusive módulos futuros.
   admin: [...PERMISSOES],
-  profissional: ['clinico:ler', 'clinico:editar'],
-  usuario: ['clinico:ler'],
+  profissional: ['clinico:ler', 'clinico:editar', 'anexo:ver', 'anexo:criar', 'anexo:deletar'],
+  // Usuário administrativo: lê clínico e documentos, mas não escreve
+  // (ex.: secretaria consulta exames, não anexa).
+  usuario: ['clinico:ler', 'anexo:ver'],
 };
 
 /** Leitura clínica: inclui o papel administrativo `usuario`. */

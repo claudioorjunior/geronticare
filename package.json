@@ -16,7 +16,8 @@
     "db:studio": "drizzle-kit studio",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "storage:limpar-orfaos": "node scripts/limpar-orfaos.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1093.0",

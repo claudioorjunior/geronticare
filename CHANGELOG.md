@@ -1,9 +1,51 @@
 # Changelog
 
-Todos os mudanças notáveis deste projeto serão documentadas neste arquivo.
+Todos os mudanças notáveis deste projeto serão documentados neste arquivo.
 
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
+
+## [0.6.0] - 2026-08-08
+
+### Adicionado
+
+- **Anexos & Storage**
+  - Tabela dedicada `anexos` (migration 0006) com FK para registro (`ON DELETE CASCADE`),
+    chave única, tenant/paciente/autor explícitos
+  - Dois drivers de storage: **local** (filesystem, default zero-config) e **S3-compatible**
+    (R2/MinIO/S3/B2) via `S3_*`; `STORAGE_DRIVER=none` desabilita com aviso na UI
+  - `s3Client` agora é **lazy** — importar o módulo não quebra sem credenciais
+  - Fluxo de upload em 2 fases: presigned URL / upload local + metadados persistidos
+    **na mesma transação** do `registros.criar`
+  - Router `anexos`: `listarPorPaciente` (RBAC `clinico:ler` + ownership), `remover`
+    (`anexo:deletar`), `status` (configurado/não)
+  - Rotas: `upload-url`/`download-url` com suporte a driver local e 503 sem storage;
+    `upload-local`/`download-local` para o driver filesystem
+  - UI: aba **"Documentos"** no paciente (galeria com filtros e download),
+    uploader opcional no formulário de registro, chips de anexo nos cards da timeline,
+    aviso discreto quando o storage está desabilitado
+
+### Segurança
+
+- Chaves de anexo validadas contra o tenant/paciente da sessão antes de persistir
+  (fail-closed em `registros.criar` e rotas de upload/download)
+- Papel `usuario` (leitura) pode listar/baixar anexos, mas não anexar/remover
+- Path traversal bloqueado no driver local (`caminhoDaChave`)
+- Download de anexo exige metadado existente na tabela `anexos` (404 se removido)
+- Erros 500 nas rotas de upload/download são genéricos (não vazam bucket/região/chave)
+- Write atômico no driver local (`.part` + rename) — sem arquivo parcial servido
+- Job de limpeza de órfãos (`npm run storage:limpar-orfaos`) — remove arquivos
+  sem metadados na tabela `anexos` (uploads abortados); ignora `.part` em gravação
+
+### Removido
+
+- Mutation `registros.anexar` (fluxo morto que escrevia na coluna legada jsonb
+  `registros.anexos`; ninguém chamava — o fluxo canônico é a tabela `anexos`)
+
+### Pendência (migração futura)
+
+- Coluna legada `registros.anexos` (jsonb) permanece na tabela, sem escrita ativa;
+  migrar dados antigos para a tabela `anexos` e dropar a coluna numa release futura
 
 ## [0.5.5] - 2026-08-08
 

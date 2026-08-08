@@ -5,8 +5,10 @@ import { useParams } from 'next/navigation';
 import { useUserRole } from '@/lib/auth/use-user-role';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Stethoscope, Pill, AlertTriangle, ClipboardList } from 'lucide-react';
+import { Stethoscope, Pill, AlertTriangle, ClipboardList, AlertCircle } from 'lucide-react';
 import { trpc } from '@/lib/trpc/client';
+import { AnexosUpload, type AnexoSelecionado } from '@/components/registros/AnexosUpload';
+import { AnexosChips } from '@/components/registros/AnexosChips';
 
 type TipoRegistro = 'evolucao' | 'prescricao' | 'intercorrencia';
 type RegistroTimeline = {
@@ -14,7 +16,7 @@ type RegistroTimeline = {
   data: Date;
   titulo: string;
   profissional: string;
-  detalhes: { tipo: TipoRegistro; conteudo: string };
+  detalhes: { tipo: TipoRegistro; conteudo: string; anexos?: Array<{ chave: string; nome: string; tipo: string }> };
 };
 
 const tipoConfig: Record<TipoRegistro, { label: string; icon: typeof Stethoscope }> = {
@@ -51,16 +53,20 @@ export default function RegistrosPage() {
   const [novoTipo, setNovoTipo] = useState<TipoRegistro>('evolucao');
   const [novoTitulo, setNovoTitulo] = useState('');
   const [novoConteudo, setNovoConteudo] = useState('');
+  const [anexosSelecionados, setAnexosSelecionados] = useState<AnexoSelecionado[]>([]);
   const [message, setMessage] = useState('');
   const canEdit = role === 'admin' || role === 'profissional';
+  const storageStatusQuery = trpc.anexos.status.useQuery();
 
   const criarRegistro = trpc.registros.criar.useMutation({
     onSuccess: () => {
       utils.registros.listar.invalidate({ pacienteId: params.id });
       utils.registros.timeline.invalidate({ pacienteId: params.id });
+      utils.anexos.listarPorPaciente.invalidate({ pacienteId: params.id });
       setNovoTipo('evolucao');
       setNovoTitulo('');
       setNovoConteudo('');
+      setAnexosSelecionados([]);
       setShowForm(false);
       setMessage('Registro salvo com sucesso.');
       window.setTimeout(() => setMessage(''), 2200);
@@ -77,15 +83,21 @@ export default function RegistrosPage() {
       especialidade: 'enfermagem',
       titulo: novoTitulo.trim(),
       conteudo: novoConteudo.trim(),
+      anexosNovos: anexosSelecionados.map((a) => ({
+        chave: a.chave,
+        nome: a.nome,
+        tipo: a.tipo,
+        tamanhoBytes: a.tamanhoBytes,
+      })),
     });
   };
 
   const registros: RegistroTimeline[] = (timelineQuery.data ?? []).flatMap((item) => {
     if (item.tipo !== 'registro') return [];
-    const detalhes = item.detalhes as { tipo?: string; conteudo?: string } | undefined;
+    const detalhes = item.detalhes as { tipo?: string; conteudo?: string; anexos?: Array<{ chave: string; nome: string; tipo: string }> } | undefined;
     const tipo = detalhes?.tipo;
     if (!detalhes || (tipo !== 'evolucao' && tipo !== 'prescricao' && tipo !== 'intercorrencia')) return [];
-    return [{ id: item.id, data: item.data, titulo: item.titulo, profissional: item.profissional, detalhes: { tipo: tipo as TipoRegistro, conteudo: detalhes.conteudo ?? '' } }];
+    return [{ id: item.id, data: item.data, titulo: item.titulo, profissional: item.profissional, detalhes: { tipo: tipo as TipoRegistro, conteudo: detalhes.conteudo ?? '', anexos: detalhes.anexos } }];
   });
   const registrosFiltrados = filtroTipo ? registros.filter((registro) => registro.detalhes.tipo === filtroTipo) : registros;
   const grouped = useMemo(() => {
@@ -109,6 +121,15 @@ export default function RegistrosPage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <section className="space-y-6 lg:col-span-2">
+          {storageStatusQuery.data && !storageStatusQuery.data.configurado && (
+            <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                Anexos indisponíveis — configure o storage no <code className="rounded bg-amber-100 px-1">.env</code> para habilitar uploads.
+              </p>
+            </div>
+          )}
+
           {canEdit && showForm && (
             <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-m3-2">
               <h3 className="mb-4 text-sm font-medium text-slate-500">Novo registro clinico</h3>
@@ -137,6 +158,18 @@ export default function RegistrosPage() {
                 <label className="mb-1.5 block text-xs font-medium text-slate-500">Conteudo</label>
                 <textarea value={novoConteudo} onChange={(event) => setNovoConteudo(event.target.value)} placeholder="Descreva a evolucao, prescricao, intercorrencia..." rows={4} className="w-full resize-y rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10" />
               </div>
+              {storageStatusQuery.data?.configurado && (
+                <div className="mb-4">
+                  <label className="mb-1.5 block text-xs font-medium text-slate-500">
+                    Anexos (opcional)
+                  </label>
+                  <AnexosUpload
+                    pacienteId={params.id}
+                    onAnexosChange={setAnexosSelecionados}
+                    disabled={!canEdit}
+                  />
+                </div>
+              )}
               <div className="flex items-center gap-3">
                 <Button onClick={salvarRegistro} disabled={criarRegistro.isPending || !novoTitulo.trim() || !novoConteudo.trim()} size="sm">
                   {criarRegistro.isPending ? 'Salvando...' : 'Salvar registro'}
@@ -173,6 +206,7 @@ export default function RegistrosPage() {
                         </div>
                       </div>
                       <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-600">{detalhes.conteudo}</p>
+                      <AnexosChips anexos={detalhes.anexos ?? []} />
                     </div>
                   );
                 })}

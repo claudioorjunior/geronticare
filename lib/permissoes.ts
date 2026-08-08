@@ -17,6 +17,10 @@ const MODULO_INFO = {
     label: 'Clínico',
     descricao: 'Dados clínicos do residente (AGA, escalas, sinais vitais, registros).',
   },
+  anexo: {
+    label: 'Documentos',
+    descricao: 'Anexos de arquivos do residente (exames, fotos, documentos administrativos).',
+  },
   admin: {
     label: 'Administrativo',
     descricao: 'Gestão da instituição (usuários, cargos, configurações).',
@@ -40,6 +44,30 @@ const CATALOGO_PERMISSOES = [
     atribuivel: true,
     label: 'Editar dados clínicos',
     descricao: 'Criar e editar registros clínicos (AGA, escalas, sinais vitais).',
+  },
+  {
+    id: 'anexo:ver',
+    modulo: 'anexo',
+    acao: 'ver',
+    atribuivel: true,
+    label: 'Ver documentos',
+    descricao: 'Listar e baixar anexos do residente.',
+  },
+  {
+    id: 'anexo:criar',
+    modulo: 'anexo',
+    acao: 'criar',
+    atribuivel: true,
+    label: 'Anexar documentos',
+    descricao: 'Enviar novos anexos (exames, fotos, documentos administrativos).',
+  },
+  {
+    id: 'anexo:deletar',
+    modulo: 'anexo',
+    acao: 'deletar',
+    atribuivel: true,
+    label: 'Remover documentos',
+    descricao: 'Remover anexos do residente.',
   },
   {
     id: 'admin:administrar',

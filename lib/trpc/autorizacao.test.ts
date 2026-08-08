@@ -263,14 +263,28 @@ describe('autorização — escrita clínica (clinicalProcedure)', () => {
 
 describe('permissaoEfetiva (RBAC dinâmico — cargo adiciona, nunca remove)', () => {
   it('papel sem cargo mantém a matriz base', () => {
-    expect(permissaoEfetiva('admin')).toEqual(['clinico:ler', 'clinico:editar', 'admin:administrar']);
-    expect(permissaoEfetiva('profissional')).toEqual(['clinico:ler', 'clinico:editar']);
-    expect(permissaoEfetiva('usuario')).toEqual(['clinico:ler']);
+    expect(permissaoEfetiva('admin')).toEqual([
+      'clinico:ler',
+      'clinico:editar',
+      'anexo:ver',
+      'anexo:criar',
+      'anexo:deletar',
+      'admin:administrar',
+    ]);
+    expect(permissaoEfetiva('profissional')).toEqual([
+      'clinico:ler',
+      'clinico:editar',
+      'anexo:ver',
+      'anexo:criar',
+      'anexo:deletar',
+    ]);
+    expect(permissaoEfetiva('usuario')).toEqual(['clinico:ler', 'anexo:ver']);
   });
 
   it('cargo adiciona permissão ao papel usuario (caso jurídico com edição)', () => {
     expect(permissaoEfetiva('usuario', ['clinico:editar'])).toEqual([
       'clinico:ler',
+      'anexo:ver',
       'clinico:editar',
     ]);
   });
@@ -280,6 +294,9 @@ describe('permissaoEfetiva (RBAC dinâmico — cargo adiciona, nunca remove)', (
     expect(permissaoEfetiva('admin', ['clinico:ler'])).toEqual([
       'clinico:ler',
       'clinico:editar',
+      'anexo:ver',
+      'anexo:criar',
+      'anexo:deletar',
       'admin:administrar',
     ]);
   });
@@ -287,6 +304,7 @@ describe('permissaoEfetiva (RBAC dinâmico — cargo adiciona, nunca remove)', (
   it('cargo não concede administração total a um não-admin', () => {
     expect(permissaoEfetiva('usuario', ['admin:administrar'])).toEqual([
       'clinico:ler',
+      'anexo:ver',
     ]);
   });
 
@@ -295,11 +313,14 @@ describe('permissaoEfetiva (RBAC dinâmico — cargo adiciona, nunca remove)', (
       'clinico:editar',
       'permissao-inventada' as never,
     ]);
-    expect(resultado).toEqual(['clinico:ler', 'clinico:editar']);
+    expect(resultado).toEqual(['clinico:ler', 'anexo:ver', 'clinico:editar']);
   });
 
   it('deduplica permissões repetidas', () => {
-    expect(permissaoEfetiva('usuario', ['clinico:ler', 'clinico:ler'])).toEqual(['clinico:ler']);
+    expect(permissaoEfetiva('usuario', ['clinico:ler', 'clinico:ler'])).toEqual([
+      'clinico:ler',
+      'anexo:ver',
+    ]);
   });
 });
 
@@ -307,7 +328,7 @@ describe('permissões futuras de módulos (escalabilidade ERP)', () => {
   it('permissão de módulo futuro não quebra o filtro fail-closed', () => {
     // financeiro:editar ainda não existe no catálogo — deve ser descartada
     const resultado = permissaoEfetiva('usuario', ['financeiro:editar' as never]);
-    expect(resultado).toEqual(['clinico:ler']);
+    expect(resultado).toEqual(['clinico:ler', 'anexo:ver']);
   });
 
   it('gate parametrizada exige a permissão exata (exigirPermissao)', async () => {
@@ -315,7 +336,10 @@ describe('permissões futuras de módulos (escalabilidade ERP)', () => {
     expect(permissaoEfetiva('usuario').includes('financeiro:editar' as never)).toBe(false);
     // a factory é exercitada pelas 3 gates existentes (readClinical/admin/clinical),
     // que agora delegam para exigirPermissao — cobertura real nos testes de RBAC.
-    expect(permissaoEfetiva('usuario', ['financeiro:editar' as never])).toEqual(['clinico:ler']);
+    expect(permissaoEfetiva('usuario', ['financeiro:editar' as never])).toEqual([
+      'clinico:ler',
+      'anexo:ver',
+    ]);
   });
 });
 
