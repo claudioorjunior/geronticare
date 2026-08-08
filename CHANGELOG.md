@@ -5,6 +5,33 @@ Todos os mudanças notáveis deste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [0.5.5] - 2026-08-08
+
+### Adicionado
+
+- **CLI self-hosted installer (v0.5.0)**
+  - Instala o GerontiCare em modo gerenciado: PostgreSQL local automático ou provedor cloud (Neon/Supabase)
+  - Comandos `start`, `stop`, `status`, `upgrade`, `rollback` e `doctor`
+  - Servidor detached com PID tracking e lock de instalação
+
+- **Upgrade/rollback com downtime mínimo**
+  - Backup + preparo do release com servidor ainda no ar; cutover de ~2–3s
+  - Validação de porta ocupada por TCP (não apenas `/api/health`) antes de upgrade/rollback
+  - Validação de secrets/config antes de parar o servidor no rollback
+  - Restauração única da versão anterior em falha de cutover (CLI e admin runner)
+  - Bookkeeping pós-cutover fora do catch de rollback (falha de persistência não reverte servidor saudável)
+  - Rollback permitido quando o servidor já está parado
+
+- **Admin update & version awareness (v0.5.5)**
+  - Página admin de atualização com runner em background (`scripts/upgrade-runner.mjs`)
+  - Notificação de versão disponível no CLI (doctor/start) e no app (admin)
+
+### Corrigido
+
+- CLI version alinhada a 0.5.5 (release tag check)
+- Teste CLI no Windows: normalização de path separators (`GERONTICARE_HOME`)
+- Rollback não deixava o servidor offline quando secrets inválidos
+
 ## [0.3.0] - 2026-08-05
 
 ### Adicionado
