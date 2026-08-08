@@ -316,28 +316,41 @@ async function main() {
 
   await escreverStatus({ state: 'running', phase: 'downloading', target, startedAt: new Date().toISOString(), error: null });
 
-  // Guarda do servidor gerenciado ANTES de qualquer mudança irreversível.
+  const versaoAnterior = config.versao;
+  const configAnterior = { ...config };
+
+  // ponytail: backup + preparo com servidor ainda no ar; downtime só no cutover (2-3s)
+  await backupAntesDeMigrar(config, segredos).catch(() => {});
+  await escreverStatus({ phase: 'preparing' });
+  await prepararRelease({ versao: target, porta: config.porta });
+
+  // Guarda ANTES de mudanças irreversíveis (migrate/cutover); backup+prepare já ocorreram sem downtime
   const parado = await pararServidorDetached().catch(() => ({ parado: false }));
   if (!parado.parado) {
     throw new Error('Servidor não está em modo gerenciado (server.pid ausente/inativo); pare-o com `geronticare stop` antes de atualizar.');
   }
-  const versaoAnterior = config.versao;
-  const configAnterior = { ...config };
-
-  await backupAntesDeMigrar(config, segredos).catch(() => {});
-  await escreverStatus({ phase: 'preparing' });
-  await prepararRelease({ versao: target, porta: config.porta });
-  await escreverStatus({ phase: 'migrating' });
-  const releaseDir = join(root, 'releases', target);
-  const r = await executar([process.execPath, join(releaseDir, 'scripts', 'migrate.mjs')], { cwd: releaseDir, env: { ...process.env, DATABASE_URL: segredos.DATABASE_URL } });
-  if (r.exitCode !== 0) throw new Error('Falha ao aplicar migrations.');
-  await escreverStatus({ phase: 'switching' });
-  // ponytail: cutover de 2-3s; old serve até aqui. Migrations são expand-only; breaking schema pode falhar no old durante a janela.
   try {
-    const segredosAtuais = (await lerJson(root, 'secrets.json')) ?? segredos;
-    await iniciarServidorDetached({ releaseDir, config: { ...config, versao: target }, segredos: segredosAtuais });
-    await aguardarProntidao(config.porta);
+    await escreverStatus({ phase: 'migrating' });
+    const releaseDir = join(root, 'releases', target);
+    const r = await executar([process.execPath, join(releaseDir, 'scripts', 'migrate.mjs')], { cwd: releaseDir, env: { ...process.env, DATABASE_URL: segredos.DATABASE_URL } });
+    if (r.exitCode !== 0) throw new Error('Falha ao aplicar migrations.');
+    await escreverStatus({ phase: 'switching' });
+    // ponytail: cutover de 2-3s; old serve até aqui. Migrations são expand-only; breaking schema pode falhar no old durante a janela.
+    try {
+      const segredosAtuais = (await lerJson(root, 'secrets.json')) ?? segredos;
+      await iniciarServidorDetached({ releaseDir, config: { ...config, versao: target }, segredos: segredosAtuais });
+      await aguardarProntidao(config.porta);
+    } catch (e) {
+      try {
+        await pararServidorDetached().catch(() => {});
+        const segredosAtuais = (await lerJson(root, 'secrets.json')) ?? segredos;
+        await iniciarServidorDetached({ releaseDir: join(root, 'releases', versaoAnterior), config: configAnterior, segredos: segredosAtuais }).catch(() => {});
+      } catch {}
+      throw e;
+    }
   } catch (e) {
+    // migrate/cutover falhou com servidor já parado -> recoloca o antigo
+    if (String(e.message).includes('cutover falhou') || String(e.message).includes('Outra operação')) throw e;
     try {
       await pararServidorDetached().catch(() => {});
       const segredosAtuais = (await lerJson(root, 'secrets.json')) ?? segredos;
