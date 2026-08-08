@@ -188,7 +188,7 @@ test('doctor detecta secrets.json permissivo', async () => {
   });
   const permissoes = resultados.find((resultado) => resultado.chave === 'permissoes');
   assert.equal(permissoes.ok, false);
-  assert.match(permissoes.detalhe, /secrets\.json/);
+  assert.match(permissoes.detalhe, /ACL|secrets\.json/);
 });
 
 test('doctor trata config de porta e versão inválidas sem sair do root', async () => {

@@ -47,14 +47,14 @@ test('despacha provedor local com instância existente', async () => {
   assert.equal(resultado.providerInfo.versao, 17);
   assert.match(resultado.databaseUrl, /^postgresql:\/\/geronticare_app:/);
   assert.deepEqual(confirmacoes, [], 'instância existente não deveria pedir confirmação');
-  const psql = chamadas.find((args) => args.some((arg) => String(arg).endsWith('/psql')) && args.includes('-d'));
+  const psql = chamadas.find((args) => args.some((arg) => String(arg).replaceAll('\\','/').endsWith('/psql')) && args.includes('-d'));
   assert.equal(psql[psql.indexOf('-p') + 1], '5432');
 });
 
 test('despacha provedor local instalando do zero após confirmação', async () => {
   const executar = async (args) => {
     if (args.includes('--version')) {
-      return String(args[0]).includes('/root-teste/')
+      return String(args[0]).replaceAll('\\','/').includes('/root-teste/')
         ? { exitCode: 0, stdout: 'postgres (PostgreSQL) 16.4', stderr: '' }
         : { exitCode: 1, stdout: '', stderr: '' };
     }
@@ -84,7 +84,7 @@ test('despacha provedor local instalando do zero após confirmação', async () 
   });
 
   assert.equal(resultado.provedor, 'local');
-  assert.equal(resultado.providerInfo.binDir, '/root-teste/Postgres.app/Contents/Versions/16/bin');
+  assert.equal(String(resultado.providerInfo.binDir).replaceAll('\\','/'), '/root-teste/Postgres.app/Contents/Versions/16/bin');
   assert.equal(resultado.providerInfo.versao, 16);
   assert.ok(confirmacoes.length >= 5, 'cada passo da instalação deveria ser confirmado');
   assert.match(resultado.databaseUrl, /geronticare_app:/);

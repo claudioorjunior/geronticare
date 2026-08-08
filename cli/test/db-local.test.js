@@ -83,25 +83,31 @@ test('instalarPostgres darwin baixa, monta, copia e retorna o bin dir', async ()
     hashFn: async () => POSTGRESAPP.sha256,
   });
 
-  assert.equal(instalado.binDir, '/root-teste/Postgres.app/Contents/Versions/16/bin');
+  assert.equal(String(instalado.binDir).replaceAll('\\','/'), '/root-teste/Postgres.app/Contents/Versions/16/bin');
   assert.match(instalado.superuserPassword, /^[A-Za-z0-9_-]{32}$/);
   assert.ok(confirmacoes >= 4, 'cada passo deveria ser confirmado');
-  assert.deepEqual(acoes.find((a) => a[0] === 'baixar'), [
-    'baixar',
-    POSTGRESAPP.url,
-    join('/root-teste', 'downloads', 'postgresapp.dmg'),
-    { signal: sinal },
-  ]);
-  assert.deepEqual(
-    acoes.find((a) => a[1]?.[0] === 'hdiutil' && a[1][1] === 'attach')?.[1],
-    ['hdiutil', 'attach', '-nobrowse', '-mountpoint', join('/root-teste', 'dmg'), join('/root-teste', 'downloads', 'postgresapp.dmg')],
-  );
-  assert.deepEqual(acoes.find((a) => a[0] === 'cp'), [
-    'cp',
-    join('/root-teste', 'dmg', 'Postgres.app'),
-    join('/root-teste', 'Postgres.app'),
-    { recursive: true },
-  ]);
+  {
+    const encontrado = acoes.find((a) => a[0] === 'baixar');
+    assert.deepEqual([encontrado[0], encontrado[1], String(encontrado[2]).replaceAll('\\','/'), encontrado[3]], [
+      'baixar',
+      POSTGRESAPP.url,
+      '/root-teste/downloads/postgresapp.dmg',
+      { signal: sinal },
+    ]);
+  }
+  {
+    const args = acoes.find((a) => a[1]?.[0] === 'hdiutil' && a[1][1] === 'attach')?.[1];
+    assert.deepEqual(args.map((v) => String(v).replaceAll('\\','/')), ['hdiutil', 'attach', '-nobrowse', '-mountpoint', '/root-teste/dmg', '/root-teste/downloads/postgresapp.dmg']);
+  }
+  {
+    const encontrado = acoes.find((a) => a[0] === 'cp');
+    assert.deepEqual([encontrado[0], String(encontrado[1]).replaceAll('\\','/'), String(encontrado[2]).replaceAll('\\','/'), encontrado[3]], [
+      'cp',
+      '/root-teste/dmg/Postgres.app',
+      '/root-teste/Postgres.app',
+      { recursive: true },
+    ]);
+  }
   assert.ok(acoes.find((a) => a[1]?.[0] === 'hdiutil' && a[1][1] === 'detach'));
 });
 
@@ -310,17 +316,20 @@ test('criarBancoDedicado inicializa e inicia o cluster próprio', async () => {
     plataforma: 'darwin',
   });
 
-  assert.deepEqual(comandos.find((a) => a.args[0].endsWith('initdb')).args, [
-    '/bin-teste/initdb',
-    '-D', join('/root-teste', 'pgdata'),
-    '-U', 'postgres',
-    '--auth-local=trust',
-    '--auth-host=scram-sha-256',
-    '--pwfile', join('/root-teste', 'tmp', 'postgres-superuser.password'),
-    '-E', 'UTF8',
-  ]);
-  assert.ok(comandos.find((a) => a.args[0].endsWith('pg_ctl')));
-  assert.ok(comandos.find((a) => a.args[0].endsWith('pg_isready')));
+  {
+    const initdb = comandos.find((a) => String(a.args[0]).replaceAll('\\','/').endsWith('initdb'));
+    assert.deepEqual(initdb.args.map((v) => String(v).replaceAll('\\','/')), [
+      '/bin-teste/initdb',
+      '-D', '/root-teste/pgdata',
+      '-U', 'postgres',
+      '--auth-local=trust',
+      '--auth-host=scram-sha-256',
+      '--pwfile', '/root-teste/tmp/postgres-superuser.password',
+      '-E', 'UTF8',
+    ]);
+  }
+  assert.ok(comandos.find((a) => String(a.args[0]).replaceAll('\\','/').endsWith('pg_ctl')));
+  assert.ok(comandos.find((a) => String(a.args[0]).replaceAll('\\','/').endsWith('pg_isready')));
   assert.match(resultado.databaseUrl, /@127\.0\.0\.1:5555\/geronticare$/);
   assert.ok(confirmacoes.length >= 1);
 });

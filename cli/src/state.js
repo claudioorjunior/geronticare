@@ -72,7 +72,18 @@ export async function comInstallLock(root, executar) {
     return await executar();
   } finally {
     await lock.close();
-    await rm(lockPath, { force: true });
+    try {
+      await rm(lockPath, { force: true });
+    } catch (error) {
+      if (error?.code !== 'EPERM') throw error;
+      // ponytail: Windows AV can hold lock file briefly after close; retry once after small delay
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      try {
+        await rm(lockPath, { force: true });
+      } catch (retryError) {
+        if (retryError?.code !== 'EPERM') throw retryError;
+      }
+    }
   }
 }
 
@@ -91,7 +102,14 @@ export async function escreverArquivoAtomicamente(root, nome, dados) {
   }
 
   try {
-    await rename(temporario, destino);
+    try {
+      await rename(temporario, destino);
+    } catch (error) {
+      if (error?.code !== 'EPERM' && error?.code !== 'EEXIST') throw error;
+      // ponytail: Windows rename does not overwrite existing dest (EPERM/EEXIST); remove and retry
+      await rm(destino, { force: true });
+      await rename(temporario, destino);
+    }
     aplicarAclWindows(destino);
     if (process.platform !== 'win32') {
       const diretorio = await open(root, 'r');

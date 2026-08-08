@@ -45,11 +45,14 @@ test('configurarNeon segue a sequência oficial da CLI e valida a conexão', asy
     resultado.databaseUrl,
     'postgresql://usuario:segredo@ep-teste.us-east-2.aws.neon.tech/db1?sslmode=require',
   );
-  assert.deepEqual(chamadas[0].args, ['npx', '--yes', 'neon@^2.45.0', 'auth']);
+  const cli = chamadas[0].args;
+  assert.ok(String(cli[0]).endsWith('npx') || String(cli[0]).endsWith('npx-cli.js') || String(cli[1] ?? '').endsWith('npx-cli.js'));
+  assert.deepEqual(cli.slice(-3), ['--yes', 'neon@^2.45.0', 'auth']);
   assert.deepEqual(chamadas[0].opcoes, { tty: true });
   const conexao = chamadas.find((c) => c.args.includes('connection-string'));
-  assert.deepEqual(conexao.args, [
-    'npx', '--yes', 'neon@^2.45.0', 'connection-string',
+  assert.ok(String(conexao.args[0]).endsWith('npx') || String(conexao.args[0]).endsWith('npx-cli.js') || String(conexao.args[1] ?? '').endsWith('npx-cli.js'));
+  assert.deepEqual(conexao.args.slice(-14), [
+    '--yes', 'neon@^2.45.0', 'connection-string',
     'b1', '--project-id', 'p2', '--database-name', 'db2', '--role-name', 'role1', '--ssl', 'require', '--output', 'json',
   ]);
   assert.ok(registros.includes('CREATE TEMPORARY TABLE geronticare_prova (id integer)'));
