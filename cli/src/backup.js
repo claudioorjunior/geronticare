@@ -1,7 +1,7 @@
 import { copyFile, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { sanitizarErro } from './secrets.js';
+import { sanitizarErro, ambientePostgres } from './secrets.js';
 
 export async function backupAntesDeMigrar({
   root,
@@ -26,8 +26,8 @@ export async function backupAntesDeMigrar({
   const dumpPath = join(dir, 'dump.sql');
   try {
     const resultado = await executar(
-      ['pg_dump', '--no-owner', '--format=plain', '-f', dumpPath, '--dbname', segredos.DATABASE_URL],
-      { env: {} },
+      ['pg_dump', '--no-owner', '--format=plain', '-f', dumpPath],
+      { env: ambientePostgres(segredos.DATABASE_URL) },
     );
     if (resultado.exitCode !== 0) {
       await import('node:fs/promises').then((m) => m.rm(dumpPath, { force: true })).catch(() => {});

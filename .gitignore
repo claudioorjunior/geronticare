@@ -37,6 +37,7 @@ yarn-error.log*
 # local tool configs (MCP for editors, commandcode scratch)
 .mcp.json
 .commandcode/
+.serena/
 
 # vercel
 .vercel

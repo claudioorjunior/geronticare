@@ -51,13 +51,16 @@ export async function iniciarServidor({
   spawnFn = spawn,
   log = console.log,
 }) {
+  // GERONTICARE_HOME precisa chegar ao app também em foreground para que
+  // /api/version e /api/admin/update resolvam a instalação customizada.
+  const root = join(releaseDir, '..', '..');
   const binarioNext = join(releaseDir, 'node_modules', 'next', 'dist', 'bin', 'next');
   const filho = spawnFn(
     process.execPath,
     [binarioNext, 'start', '-H', '127.0.0.1', '-p', String(config.porta)],
     {
       cwd: releaseDir,
-      env: montarAmbiente({ segredos, config }),
+      env: montarAmbiente({ segredos, config, root }),
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
     },

@@ -10,6 +10,7 @@ import {
   monitorarBootstrap,
   montarAmbiente,
 } from '../src/servidor.js';
+import { ambientePostgres } from '../src/secrets.js';
 
 function filhoFake() {
   const registros = { stdout: [], stderr: [], mortes: [] };
@@ -53,6 +54,34 @@ test('montarAmbiente omite SETUP_TOKEN quando ausente', () => {
   });
   assert.equal('SETUP_TOKEN' in ambiente, false);
   assert.equal('SETUP_TOKEN_EXPIRES_AT' in ambiente, false);
+});
+
+test('ambientePostgres move credenciais para env sem expor a URI em argv', () => {
+  const ambiente = ambientePostgres('postgresql://usuario:senha@host.exemplo:5433/banco?sslmode=require');
+  assert.equal(ambiente.PGHOST, 'host.exemplo');
+  assert.equal(ambiente.PGPORT, '5433');
+  assert.equal(ambiente.PGUSER, 'usuario');
+  assert.equal(ambiente.PGPASSWORD, 'senha');
+  assert.equal(ambiente.PGDATABASE, 'banco');
+  assert.equal(ambiente.PGSSLMODE, 'require');
+  assert.equal('DATABASE_URL' in ambiente, false);
+  assert.ok(!JSON.stringify(ambiente).includes('postgresql://usuario'));
+});
+
+test('iniciarServidor repassa GERONTICARE_HOME em foreground', async () => {
+  const { filho } = filhoFake();
+  let spawnArgs;
+  const releaseDir = '/tmp/geronticare-root/releases/0.5.5';
+  await iniciarServidor({
+    releaseDir,
+    config: { porta: 4321 },
+    segredos: { DATABASE_URL: 'postgresql://u:s@h/db', AUTH_SECRET: 'as' },
+    spawnFn: (cmd, args, opcoes) => {
+      spawnArgs = { cmd, args, opcoes };
+      return filho;
+    },
+  });
+  assert.equal(spawnArgs.opcoes.env.GERONTICARE_HOME, '/tmp/geronticare-root');
 });
 
 test('iniciarServidor sobe o Next com ambiente e logs redigidos', async () => {

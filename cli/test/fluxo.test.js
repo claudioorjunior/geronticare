@@ -593,12 +593,13 @@ test('upgrade recusa cutover quando o servidor não é gerenciado (sem server.pi
 
   const ui = uiFake();
   const spawnLog = [];
+  const executarLog = [];
   await assert.rejects(
     executarFluxo(baseDeps({
       root,
       ui,
       fetchFn: fetchFake(),
-      executar: executarFake([]),
+      executar: executarFake(executarLog),
       spawnFn: spawnFake(spawnLog),
       extra: { comando: 'upgrade', versaoAlvo: '0.5.1' },
     })),
@@ -607,6 +608,12 @@ test('upgrade recusa cutover quando o servidor não é gerenciado (sem server.pi
 
   // nenhum servidor deve ser iniciado
   assert.equal(spawnLog.some((registro) => registro[0] === 'spawn'), false);
+  // a guarda roda ANTES das migrations/backup: nada de migrate nem pg_dump
+  assert.equal(
+    executarLog.some((args) => args.some((parte) => String(parte).endsWith('migrate.mjs'))),
+    false,
+  );
+  assert.equal(executarLog.some((args) => args[0] === 'pg_dump'), false);
   // config continua na versão antiga
   const config = JSON.parse(await readFile(join(root, 'config.json'), 'utf8'));
   assert.equal(config.versao, '0.5.0');

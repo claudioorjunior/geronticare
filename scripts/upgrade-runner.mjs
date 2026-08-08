@@ -22,6 +22,31 @@ function sanitizar(erro) {
   });
 }
 
+// Nunca colocar a DATABASE_URL (que contém senha) em argv: pg_dump/psql
+// aceitam a conexão via variáveis de ambiente, mantendo o banco selecionado.
+function ambientePostgres(databaseUrl) {
+  const ambiente = { ...process.env };
+  try {
+    const url = new URL(databaseUrl);
+    ambiente.PGDATABASE = decodeURIComponent(url.pathname.replace(/^\//, '')) || 'postgres';
+    if (url.hostname) ambiente.PGHOST = url.hostname;
+    if (url.username) ambiente.PGUSER = decodeURIComponent(url.username);
+    if (url.password) ambiente.PGPASSWORD = decodeURIComponent(url.password);
+    if (url.port) ambiente.PGPORT = url.port;
+    const sslmode = url.searchParams.get('sslmode');
+    if (sslmode) ambiente.PGSSLMODE = sslmode;
+    const options = url.searchParams.get('options');
+    if (options) ambiente.PGOPTIONS = options;
+  } catch {
+    // URL inválida: o cliente Postgres falhará com a URI original (nunca em argv).
+    if (typeof databaseUrl === 'string' && databaseUrl.includes('@')) {
+      const host = databaseUrl.match(/@([^:/]+)/)?.[1];
+      if (host) ambiente.PGHOST = host;
+    }
+  }
+  return ambiente;
+}
+
 async function lerJson(rootDir, name) {
   try {
     const raw = await readFile(join(rootDir, name), 'utf8');
@@ -62,7 +87,7 @@ async function backupAntesDeMigrar(config, segredos) {
   try { await copyFile(join(root, 'secrets.json'), join(dir, 'secrets.json')); } catch {}
   const dumpPath = join(dir, 'dump.sql');
   try {
-    const r = await executar(['pg_dump', '--no-owner', '--format=plain', '-f', dumpPath, '--dbname', segredos.DATABASE_URL], { env: {} });
+    const r = await executar(['pg_dump', '--no-owner', '--format=plain', '-f', dumpPath], { env: ambientePostgres(segredos.DATABASE_URL) });
     if (r.exitCode !== 0) { await rm(dumpPath, { force: true }).catch(() => {}); console.log(`Aviso pg_dump ${r.exitCode}`); }
   } catch (e) {
     await rm(dumpPath, { force: true }).catch(() => {});
@@ -291,6 +316,14 @@ async function main() {
 
   await escreverStatus({ state: 'running', phase: 'downloading', target, startedAt: new Date().toISOString(), error: null });
 
+  // Guarda do servidor gerenciado ANTES de qualquer mudança irreversível.
+  const parado = await pararServidorDetached().catch(() => ({ parado: false }));
+  if (!parado.parado) {
+    throw new Error('Servidor não está em modo gerenciado (server.pid ausente/inativo); pare-o com `geronticare stop` antes de atualizar.');
+  }
+  const versaoAnterior = config.versao;
+  const configAnterior = { ...config };
+
   await backupAntesDeMigrar(config, segredos).catch(() => {});
   await escreverStatus({ phase: 'preparing' });
   await prepararRelease({ versao: target, porta: config.porta });
@@ -300,12 +333,6 @@ async function main() {
   if (r.exitCode !== 0) throw new Error('Falha ao aplicar migrations.');
   await escreverStatus({ phase: 'switching' });
   // ponytail: cutover de 2-3s; old serve até aqui. Migrations são expand-only; breaking schema pode falhar no old durante a janela.
-  const versaoAnterior = config.versao;
-  const configAnterior = { ...config };
-  const parado = await pararServidorDetached().catch(() => ({ parado: false }));
-  if (!parado.parado) {
-    throw new Error('Servidor não está em modo gerenciado (server.pid ausente/inativo); pare-o com `geronticare stop` antes de atualizar.');
-  }
   try {
     const segredosAtuais = (await lerJson(root, 'secrets.json')) ?? segredos;
     await iniciarServidorDetached({ releaseDir, config: { ...config, versao: target }, segredos: segredosAtuais });

@@ -13,6 +13,7 @@ import { backupAntesDeMigrar } from './backup.js';
 import { compararVersoes, listarReleases, podarReleases, prepararRelease, releaseInstaladaValida, versaoSegura } from './release.js';
 import { formatarAviso, verificarAtualizacao } from './update-check.js';
 import {
+  ambientePostgres,
   escreverSegredos,
   gerarSegredo,
   lerSegredos,
@@ -715,17 +716,19 @@ async function upgradeFluxo({ root, ui, fetchFn, executar, spawnFn, versaoAlvo }
   if (alvo === config.versao) throw new Error(`Já está na versão ${alvo}.`);
   if (compararVersoes(alvo, config.versao) < 0) throw new Error(`upgrade exige versão maior que ${config.versao}; use rollback para voltar.`);
   ui.log(`Atualizando de v${config.versao} para v${alvo}...`);
+  // Guarda do servidor gerenciado ANTES de qualquer mudança irreversível:
+  // sem server.pid o cutover seria recusado depois, com o banco já migrado.
+  const parado = await pararServidorDetached({ root, log: () => {} }).catch(() => ({ parado: false }));
+  if (!parado.parado) {
+    throw new Error('Servidor não está em modo gerenciado (server.pid ausente/inativo); pare-o com `geronticare stop` antes de atualizar.');
+  }
+  const configAnterior = { ...config };
+  const versaoAnterior = config.versao;
   await backupAntesDeMigrar({ root, config, segredos, executar, log: ui.log });
   await prepararRelease({ root, versao: alvo, porta: config.porta, fetchFn, spawnFn: executar, log: ui.log });
   const releaseDir = join(root, 'releases', alvo);
   const resultado = await executar([process.execPath, join(releaseDir, 'scripts', 'migrate.mjs')], { cwd: releaseDir, env: { ...process.env, DATABASE_URL: segredos.DATABASE_URL } });
   if (resultado.exitCode !== 0) throw new Error('Falha ao aplicar migrations do upgrade.');
-  const configAnterior = { ...config };
-  const versaoAnterior = config.versao;
-  const parado = await pararServidorDetached({ root, log: () => {} }).catch(() => ({ parado: false }));
-  if (!parado.parado) {
-    throw new Error('Servidor não está em modo gerenciado (server.pid ausente/inativo); pare-o com `geronticare stop` antes de atualizar.');
-  }
   let cutoverOk = false;
   try {
     const segredosAtuais = await lerSegredos(root);
@@ -768,19 +771,24 @@ async function rollbackFluxo({ root, ui, executar, versaoAlvo, spawnFn }) {
     const cand = entradas.filter((n) => n.endsWith(`-${alvo}`)).sort().reverse()[0];
     if (cand) backupDir = join(root, 'backups', cand);
   } catch {}
+  const segredos = await lerSegredos(root);
   if (backupDir) {
+    const dump = join(backupDir, 'dump.sql');
+    // ponytail: restaura no schema public existente, que é recriado limpo antes
+    // do replay; um banco dedicado ficaria preso no provedor cloud (Neon/Supabase).
     try {
-      const dump = join(backupDir, 'dump.sql');
-      const segredos = await lerSegredos(root);
-      // ponytail: usa o schema public existente e um restore transactional; drop/criação
-      // de um banco dedicado ficaria presa no provedor cloud (Neon/Supabase).
+      const sql = await import('node:fs/promises').then((m) => m.readFile(dump, 'utf8'));
+      const limpar = 'DROP SCHEMA IF EXISTS public CASCADE;\nCREATE SCHEMA public;\nGRANT ALL ON SCHEMA public TO public;\n';
       const res = await executar(
-        ['psql', '--single-transaction', '--set=ON_ERROR_STOP=1', '--dbname', segredos.DATABASE_URL, '-f', dump],
-        { env: {} },
+        ['psql', '--single-transaction', '--set=ON_ERROR_STOP=1', '-f', '-'],
+        { env: ambientePostgres(segredos.DATABASE_URL), input: `${limpar}${sql}` },
       );
-      if (res.exitCode !== 0) ui.log('Aviso: restore do dump falhou; rollback só de código.');
-    } catch {
-      ui.log('Aviso: sem psql; rollback só de código.');
+      if (res.exitCode !== 0) {
+        throw new Error(`Restore do banco falhou (código ${res.exitCode}); rollback de código abortado para não rodar a versão antiga sobre o schema atual.`);
+      }
+    } catch (error) {
+      // Sem psql ou restore com erro: não trocar o código com o banco no meio do caminho.
+      throw new Error(`Rollback de banco indisponível: ${sanitizarErro(error)}`);
     }
   } else {
     ui.log('Aviso: sem backup de banco para esta versão; rollback só de código.');
