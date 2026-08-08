@@ -8,7 +8,7 @@ import { configurarBanco } from './db/index.js';
 import { PORTA_POSTGRES_PADRAO, validarDistroLinux } from './db/local.js';
 import { criarClientePostgres, provarComCliente } from './db/validacao.js';
 import { executarDoctor } from './doctor.js';
-import { escolherPorta } from './porta.js';
+import { conectarPorta, escolherPorta } from './porta.js';
 import { backupAntesDeMigrar } from './backup.js';
 import { compararVersoes, listarReleases, podarReleases, prepararRelease, releaseInstaladaValida, versaoSegura } from './release.js';
 import { formatarAviso, verificarAtualizacao } from './update-check.js';
@@ -207,6 +207,7 @@ export async function executarFluxo({
   spawnFn = spawn,
   fs = { statfs: statfsPromises },
   portaLivreFn,
+  conectarPortaFn,
   versaoSistema,
   registrarSinal = registrarSinalPadrao,
   abrirNavegador = abrirNavegadorPadrao,
@@ -230,6 +231,7 @@ export async function executarFluxo({
     ui, root, env, platform, arquitetura, fetchFn, executar, spawnFn,
     versaoSistema,
     registrarSinal, abrirNavegador, criarCliente, portaLivreFn,
+    conectarPortaFn: conectarPortaFn ?? conectarPorta,
     criarServidorHttp,
     baixar,
     hashFn,
@@ -706,7 +708,8 @@ async function resolverVersaoAlvo({ versaoAlvo, fetchFn }) {
   return tag;
 }
 
-async function upgradeFluxo({ root, ui, fetchFn, executar, spawnFn, versaoAlvo }) {
+async function upgradeFluxo({ root, ui, fetchFn, executar, spawnFn, versaoAlvo, conectarPortaFn }) {
+  const chkPorta = conectarPortaFn ?? conectarPorta;
   const estado = await lerEstado(root);
   if (!estado || estado.fase !== 'READY') throw new Error('Instalação não está em READY. Rode o instalador primeiro.');
   const config = await lerArquivoJson(root, 'config.json');
@@ -716,44 +719,63 @@ async function upgradeFluxo({ root, ui, fetchFn, executar, spawnFn, versaoAlvo }
   if (alvo === config.versao) throw new Error(`Já está na versão ${alvo}.`);
   if (compararVersoes(alvo, config.versao) < 0) throw new Error(`upgrade exige versão maior que ${config.versao}; use rollback para voltar.`);
   ui.log(`Atualizando de v${config.versao} para v${alvo}...`);
-  // Guarda do servidor gerenciado ANTES de qualquer mudança irreversível:
-  // sem server.pid o cutover seria recusado depois, com o banco já migrado.
-  const parado = await pararServidorDetached({ root, log: () => {} }).catch(() => ({ parado: false }));
-  if (!parado.parado) {
-    throw new Error('Servidor não está em modo gerenciado (server.pid ausente/inativo); pare-o com `geronticare stop` antes de atualizar.');
-  }
   const configAnterior = { ...config };
   const versaoAnterior = config.versao;
+  // ponytail: backup + preparo com servidor ainda no ar (downtime só no cutover);
+  // guarda antes de mudanças irreversíveis (migrate).
   await backupAntesDeMigrar({ root, config, segredos, executar, log: ui.log });
   await prepararRelease({ root, versao: alvo, porta: config.porta, fetchFn, spawnFn: executar, log: ui.log });
-  const releaseDir = join(root, 'releases', alvo);
-  const resultado = await executar([process.execPath, join(releaseDir, 'scripts', 'migrate.mjs')], { cwd: releaseDir, env: { ...process.env, DATABASE_URL: segredos.DATABASE_URL } });
-  if (resultado.exitCode !== 0) throw new Error('Falha ao aplicar migrations do upgrade.');
-  let cutoverOk = false;
+  const parado = await pararServidorDetached({ root, log: () => {} }).catch(() => ({ parado: false }));
+  if (!parado.parado) {
+    const portaOcupada = await chkPorta(config.porta);
+    if (portaOcupada) {
+      throw new Error('Servidor não está em modo gerenciado (server.pid ausente/inativo); pare-o com `geronticare stop` antes de atualizar.');
+    }
+  }
+  // migrate + cutover com recuperação única; bookkeeping fora do catch (falha pós-cutover não reverte servidor saudável)
+  let cutoverFalhou = false;
   try {
-    const segredosAtuais = await lerSegredos(root);
-    await iniciarServidorDetached({ releaseDir, config: { ...config, versao: alvo }, segredos: segredosAtuais, spawnFn, log: ui.log });
-    await aguardarProntidao({ porta: config.porta, fetchFn, log: ui.log });
-    cutoverOk = true;
+    const releaseDir = join(root, 'releases', alvo);
+    const resultado = await executar([process.execPath, join(releaseDir, 'scripts', 'migrate.mjs')], { cwd: releaseDir, env: { ...process.env, DATABASE_URL: segredos.DATABASE_URL } });
+    if (resultado.exitCode !== 0) throw new Error('Falha ao aplicar migrations do upgrade.');
+    try {
+      const segredosAtuais = await lerSegredos(root);
+      await iniciarServidorDetached({ releaseDir, config: { ...config, versao: alvo }, segredos: segredosAtuais, spawnFn, log: ui.log });
+      await aguardarProntidao({ porta: config.porta, fetchFn, log: ui.log });
+    } catch (error) {
+      cutoverFalhou = true;
+      ui.log(`Aviso: cutover falhou (${sanitizarErro(error)}); restaurando v${versaoAnterior}.`);
+      try {
+        await pararServidorDetached({ root, log: () => {} }).catch(() => {});
+        const releaseAnterior = join(root, 'releases', versaoAnterior);
+        const segredosAtuais = await lerSegredos(root).catch(() => segredos);
+        await iniciarServidorDetached({ releaseDir: releaseAnterior, config: configAnterior, segredos: segredosAtuais, spawnFn, log: () => {} }).catch(() => {});
+      } catch {}
+      throw error;
+    }
   } catch (error) {
-    ui.log(`Aviso: cutover falhou (${sanitizarErro(error)}); restaurando v${versaoAnterior}.`);
+    if (cutoverFalhou) throw error;
     try {
       await pararServidorDetached({ root, log: () => {} }).catch(() => {});
       const releaseAnterior = join(root, 'releases', versaoAnterior);
       const segredosAtuais = await lerSegredos(root).catch(() => segredos);
       await iniciarServidorDetached({ releaseDir: releaseAnterior, config: configAnterior, segredos: segredosAtuais, spawnFn, log: () => {} }).catch(() => {});
+      ui.log(`Aviso: falha na migration (${sanitizarErro(error)}); v${versaoAnterior} recolocada no ar.`);
     } catch {}
     throw error;
   }
-  if (cutoverOk) {
+  try {
     await escreverArquivoAtomicamente(root, 'config.json', { ...config, versao: alvo, ativo: true });
     await escreverEstado(root, { fase: 'READY', porta: config.porta, provedor: estado.provedor, versao: alvo, versaoAnterior });
     await podarReleases(root, { keep: 2 });
     ui.log(`Upgrade para v${alvo} concluído.`);
+  } catch (error) {
+    ui.log(`Aviso: servidor em v${alvo} já rodando, mas falha ao persistir estado (${sanitizarErro(error)}); rode doctor.`);
+    throw error;
   }
 }
 
-async function rollbackFluxo({ root, ui, executar, versaoAlvo, spawnFn }) {
+async function rollbackFluxo({ root, ui, executar, versaoAlvo, spawnFn, conectarPortaFn }) {
   const estado = await lerEstado(root);
   if (!estado || estado.fase !== 'READY') throw new Error('Instalação não está em READY para rollback.');
   const config = await lerArquivoJson(root, 'config.json');
@@ -772,6 +794,17 @@ async function rollbackFluxo({ root, ui, executar, versaoAlvo, spawnFn }) {
     if (cand) backupDir = join(root, 'backups', cand);
   } catch {}
   const segredos = await lerSegredos(root);
+  if (!config || !segredos?.DATABASE_URL) throw new Error('config/secrets ausentes para rollback.');
+  // Guarda antes do restore destrutivo; se já parado (stop manual / crash) permite seguir.
+  const chkPortaRb = conectarPortaFn ?? conectarPorta;
+  const parado = await pararServidorDetached({ root, log: () => {} }).catch(() => ({ parado: false }));
+  if (!parado.parado) {
+    const portaOcupada = await chkPortaRb(config.porta);
+    if (portaOcupada) {
+      throw new Error('Servidor não está em modo gerenciado (server.pid ausente/inativo); pare-o com `geronticare stop` antes do rollback.');
+    }
+    ui.log('Aviso: servidor já parado; prosseguindo com rollback.');
+  }
   if (backupDir) {
     const dump = join(backupDir, 'dump.sql');
     // ponytail: restaura no schema public existente, que é recriado limpo antes
@@ -787,13 +820,16 @@ async function rollbackFluxo({ root, ui, executar, versaoAlvo, spawnFn }) {
         throw new Error(`Restore do banco falhou (código ${res.exitCode}); rollback de código abortado para não rodar a versão antiga sobre o schema atual.`);
       }
     } catch (error) {
-      // Sem psql ou restore com erro: não trocar o código com o banco no meio do caminho.
+      // Restore falhou com servidor já parado -> recoloca o atual no ar antes de abortar
+      try {
+        const segredosAtuais = await lerSegredos(root).catch(() => segredos);
+        await iniciarServidorDetached({ releaseDir: join(root, 'releases', config.versao), config, segredos: segredosAtuais, spawnFn, log: () => {} }).catch(() => {});
+      } catch {}
       throw new Error(`Rollback de banco indisponível: ${sanitizarErro(error)}`);
     }
   } else {
     ui.log('Aviso: sem backup de banco para esta versão; rollback só de código.');
   }
-  await pararServidorDetached({ root, log: () => {} }).catch(() => {});
   const releaseDir = join(root, 'releases', alvo);
   const segredosAtuais = await lerSegredos(root);
   await iniciarServidorDetached({ releaseDir, config: { ...config, versao: alvo }, segredos: segredosAtuais, spawnFn, log: ui.log });

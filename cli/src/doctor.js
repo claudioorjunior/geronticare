@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { readFile, readdir, stat } from 'node:fs/promises';
-import net from 'node:net';
 import { join } from 'node:path';
 
 import { lerPid } from './state.js';
 
+import { conectarPorta as conectarPortaCompartilhada } from './porta.js';
 import { redigirUri, sanitizarErro } from './secrets.js';
 
 const FASES = new Set([
@@ -16,15 +16,7 @@ const FASES = new Set([
 const VERSAO_MAJOR_VALIDAS = new Set([16, 17, 18]);
 
 function conectarPortaPadrao(porta) {
-  if (!Number.isInteger(porta) || porta < 1 || porta > 65_535) return Promise.resolve(false);
-  return new Promise((resolver) => {
-    const socket = net.connect({ host: '127.0.0.1', port: porta });
-    socket.once('connect', () => {
-      socket.destroy();
-      resolver(true);
-    });
-    socket.once('error', () => resolver(false));
-  });
+  return conectarPortaCompartilhada(porta);
 }
 
 function versaoSegura(versao) {

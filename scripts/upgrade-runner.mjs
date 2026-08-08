@@ -1,7 +1,19 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { copyFile, mkdir, open, readFile, readdir, rename, rm } from 'node:fs/promises';
+import net from 'node:net';
 import { dirname, join } from 'node:path';
+
+function conectarPorta(porta) {
+  if (!Number.isInteger(porta) || porta < 1 || porta > 65_535) return Promise.resolve(false);
+  return new Promise((resolver) => {
+    const socket = net.connect({ host: '127.0.0.1', port: porta });
+    const done = (v) => { try { socket.destroy(); } catch {} resolver(v); };
+    socket.once('connect', () => done(true));
+    socket.once('error', () => done(false));
+    socket.setTimeout(1500, () => done(false));
+  });
+}
 
 const root = process.argv[2];
 const target = process.argv[3];
@@ -316,28 +328,44 @@ async function main() {
 
   await escreverStatus({ state: 'running', phase: 'downloading', target, startedAt: new Date().toISOString(), error: null });
 
-  // Guarda do servidor gerenciado ANTES de qualquer mudança irreversível.
-  const parado = await pararServidorDetached().catch(() => ({ parado: false }));
-  if (!parado.parado) {
-    throw new Error('Servidor não está em modo gerenciado (server.pid ausente/inativo); pare-o com `geronticare stop` antes de atualizar.');
-  }
   const versaoAnterior = config.versao;
   const configAnterior = { ...config };
 
+  // ponytail: backup + preparo com servidor ainda no ar; downtime só no cutover (2-3s)
   await backupAntesDeMigrar(config, segredos).catch(() => {});
   await escreverStatus({ phase: 'preparing' });
   await prepararRelease({ versao: target, porta: config.porta });
-  await escreverStatus({ phase: 'migrating' });
-  const releaseDir = join(root, 'releases', target);
-  const r = await executar([process.execPath, join(releaseDir, 'scripts', 'migrate.mjs')], { cwd: releaseDir, env: { ...process.env, DATABASE_URL: segredos.DATABASE_URL } });
-  if (r.exitCode !== 0) throw new Error('Falha ao aplicar migrations.');
-  await escreverStatus({ phase: 'switching' });
-  // ponytail: cutover de 2-3s; old serve até aqui. Migrations são expand-only; breaking schema pode falhar no old durante a janela.
+
+  // Guarda ANTES de mudanças irreversíveis (migrate/cutover); se já parado permite seguir
+  const parado = await pararServidorDetached().catch(() => ({ parado: false }));
+  if (!parado.parado) {
+    const portaOcupada = await conectarPorta(config.porta);
+    if (portaOcupada) throw new Error('Servidor não está em modo gerenciado (server.pid ausente/inativo); pare-o com `geronticare stop` antes de atualizar.');
+  }
+  // migrate + cutover com recuperação única; bookkeeping fora do catch (falha pós-cutover não reverte servidor saudável)
+  let cutoverFalhou = false;
   try {
-    const segredosAtuais = (await lerJson(root, 'secrets.json')) ?? segredos;
-    await iniciarServidorDetached({ releaseDir, config: { ...config, versao: target }, segredos: segredosAtuais });
-    await aguardarProntidao(config.porta);
+    await escreverStatus({ phase: 'migrating' });
+    const releaseDir = join(root, 'releases', target);
+    const r = await executar([process.execPath, join(releaseDir, 'scripts', 'migrate.mjs')], { cwd: releaseDir, env: { ...process.env, DATABASE_URL: segredos.DATABASE_URL } });
+    if (r.exitCode !== 0) throw new Error('Falha ao aplicar migrations.');
+    await escreverStatus({ phase: 'switching' });
+    // ponytail: cutover de 2-3s; old serve até aqui. Migrations são expand-only; breaking schema pode falhar no old durante a janela.
+    try {
+      const segredosAtuais = (await lerJson(root, 'secrets.json')) ?? segredos;
+      await iniciarServidorDetached({ releaseDir, config: { ...config, versao: target }, segredos: segredosAtuais });
+      await aguardarProntidao(config.porta);
+    } catch (e) {
+      cutoverFalhou = true;
+      try {
+        await pararServidorDetached().catch(() => {});
+        const segredosAtuais = (await lerJson(root, 'secrets.json')) ?? segredos;
+        await iniciarServidorDetached({ releaseDir: join(root, 'releases', versaoAnterior), config: configAnterior, segredos: segredosAtuais }).catch(() => {});
+      } catch {}
+      throw e;
+    }
   } catch (e) {
+    if (cutoverFalhou) throw e;
     try {
       await pararServidorDetached().catch(() => {});
       const segredosAtuais = (await lerJson(root, 'secrets.json')) ?? segredos;
@@ -345,16 +373,21 @@ async function main() {
     } catch {}
     throw e;
   }
-  await escreverAtomico(root, 'config.json', { ...config, versao: target, ativo: true });
-  await escreverAtomico(root, 'install-state.json', { fase: 'READY', porta: config.porta, provedor: estado.provedor, versao: target, versaoAnterior });
-  const lista = await readdir(join(root, 'releases')).catch(() => []);
-  const versoes = lista.filter((v) => /^\d+\.\d+\.\d+$/.test(v)).sort((a, b) => {
-    const pa = a.split('.').map(Number), pb = b.split('.').map(Number);
-    for (let i = 0; i < 3; i++) if (pa[i] !== pb[i]) return pb[i] - pa[i];
-    return 0;
-  });
-  for (const v of versoes.slice(2)) { await rm(join(root, 'releases', v), { recursive: true, force: true }); await rm(join(root, 'downloads', 'releases', v), { recursive: true, force: true }); }
-  await escreverStatus({ state: 'done', phase: 'done', finishedAt: new Date().toISOString() });
+  try {
+    await escreverAtomico(root, 'config.json', { ...config, versao: target, ativo: true });
+    await escreverAtomico(root, 'install-state.json', { fase: 'READY', porta: config.porta, provedor: estado.provedor, versao: target, versaoAnterior });
+    const lista = await readdir(join(root, 'releases')).catch(() => []);
+    const versoes = lista.filter((v) => /^\d+\.\d+\.\d+$/.test(v)).sort((a, b) => {
+      const pa = a.split('.').map(Number), pb = b.split('.').map(Number);
+      for (let i = 0; i < 3; i++) if (pa[i] !== pb[i]) return pb[i] - pa[i];
+      return 0;
+    });
+    for (const v of versoes.slice(2)) { await rm(join(root, 'releases', v), { recursive: true, force: true }); await rm(join(root, 'downloads', 'releases', v), { recursive: true, force: true }); }
+    await escreverStatus({ state: 'done', phase: 'done', finishedAt: new Date().toISOString() });
+  } catch (e) {
+    console.log(`Aviso: servidor em v${target} já rodando, mas falha ao persistir estado (${sanitizar(e)}); rode doctor.`);
+    throw e;
+  }
   } finally { try { await lock.close(); } catch {} try { const { rm } = await import('node:fs/promises'); await rm(join(root, 'install.lock'), { force: true }); } catch {} }
 }
 

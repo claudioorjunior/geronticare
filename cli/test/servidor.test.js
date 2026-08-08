@@ -71,7 +71,7 @@ test('ambientePostgres move credenciais para env sem expor a URI em argv', () =>
 test('iniciarServidor repassa GERONTICARE_HOME em foreground', async () => {
   const { filho } = filhoFake();
   let spawnArgs;
-  const releaseDir = '/tmp/geronticare-root/releases/0.5.5';
+  const releaseDir = join('/tmp/geronticare-root', 'releases', '0.5.5');
   const promessa = iniciarServidor({
     releaseDir,
     config: { porta: 4321 },
@@ -83,7 +83,7 @@ test('iniciarServidor repassa GERONTICARE_HOME em foreground', async () => {
   });
   filho.emitir('spawn');
   await promessa;
-  assert.equal(spawnArgs.opcoes.env.GERONTICARE_HOME, '/tmp/geronticare-root');
+  assert.equal(spawnArgs.opcoes.env.GERONTICARE_HOME, join('/tmp/geronticare-root'));
 });
 
 test('iniciarServidor sobe o Next com ambiente e logs redigidos', async () => {
