@@ -6,6 +6,7 @@ import { join } from 'node:path';
 
 const LOCK_NAME = 'install.lock';
 const STATE_NAME = 'install-state.json';
+const WINDOWS_LOCK_RETRY_DELAYS_MS = [25, 50, 100, 200, 400];
 
 function aplicarAclWindows(caminho) {
   if (process.platform !== 'win32') return;
@@ -31,6 +32,20 @@ async function processoExiste(pid) {
   } catch (error) {
     if (error?.code === 'ESRCH') return false;
     return true;
+  }
+}
+
+async function removerLock(lockPath) {
+  for (const atraso of [0, ...WINDOWS_LOCK_RETRY_DELAYS_MS]) {
+    if (atraso > 0) await new Promise((resolve) => setTimeout(resolve, atraso));
+    try {
+      await rm(lockPath, { force: true });
+      return;
+    } catch (error) {
+      const bloqueioTemporario = process.platform === 'win32'
+        && (error?.code === 'EPERM' || error?.code === 'EBUSY');
+      if (!bloqueioTemporario || atraso === WINDOWS_LOCK_RETRY_DELAYS_MS.at(-1)) throw error;
+    }
   }
 }
 
@@ -76,18 +91,10 @@ export async function comInstallLock(root, executar) {
     return await executar();
   } finally {
     await lock.close();
-    try {
-      await rm(lockPath, { force: true });
-    } catch (error) {
-      if (error?.code !== 'EPERM') throw error;
-      // ponytail: Windows AV can hold lock file briefly after close; retry once after small delay
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      try {
-        await rm(lockPath, { force: true });
-      } catch (retryError) {
-        if (retryError?.code !== 'EPERM') throw retryError;
-      }
-    }
+    // Windows Defender/indexers can retain the just-closed handle briefly. Do not
+    // leave a live-PID lock behind: it would make the following smoke test look
+    // like a concurrent installation.
+    await removerLock(lockPath);
   }
 }
 
