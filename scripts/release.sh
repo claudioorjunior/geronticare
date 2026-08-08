@@ -54,6 +54,7 @@ npm test
 
 echo "==> Atualizando package.json para $VERSION..."
 npm version "$VERSION" --no-git-tag-version >/dev/null
+npm version "$VERSION" --prefix cli --no-git-tag-version >/dev/null
 
 echo "==> Fixando data no CHANGELOG.md..."
 TODAY="$(date +%Y-%m-%d)"
@@ -61,7 +62,7 @@ sed -i.bak "s/## \[$VERSION\] - Não lançado/## [$VERSION] - $TODAY/" CHANGELOG
 rm -f CHANGELOG.md.bak
 
 echo "==> Criando commit e tag $TAG..."
-git add package.json package-lock.json CHANGELOG.md
+git add package.json package-lock.json cli/package.json cli/package-lock.json CHANGELOG.md
 git commit -m "chore(release): $TAG"
 git tag -a "$TAG" -m "GerontiCare $TAG"
 

@@ -38,6 +38,17 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Install CLI dependencies
+        run: npm ci --prefix cli
+
+      - name: Test CLI
+        run: npm test --prefix cli
+
+      - name: Check CLI syntax and lint
+        run: |
+          npx eslint cli
+          find cli -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
@@ -45,4 +56,24 @@ jobs:
         run: npm run test:e2e
 
       - name: Build
-        run: npm run build
+        run: npm run build -- --webpack
+
+  cli-smoke:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install CLI dependencies
+        run: npm ci --prefix cli
+
+      - name: Test CLI
+        run: npm test --prefix cli

@@ -40,8 +40,46 @@ jobs:
       - name: Test
         run: npm test
 
+      - name: Check CLI version matches tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          CLI_VERSION="$(node -p "require('./cli/package.json').version")"
+          if [[ "$CLI_VERSION" != "$VERSION" ]]; then
+            echo "cli/package.json version $CLI_VERSION does not match tag $VERSION." >&2
+            exit 1
+          fi
+
+      - name: Install CLI dependencies
+        run: npm ci --prefix cli
+
+      - name: Test CLI
+        run: npm test --prefix cli
+
+      - name: Check CLI syntax and lint
+        run: |
+          npx eslint cli
+          find cli -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+
       - name: Build
-        run: npm run build
+        run: npm run build -- --webpack
+
+      - name: Package app asset
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          tar \
+            --exclude='./.git' \
+            --exclude='./node_modules' \
+            --exclude='./.next' \
+            --exclude='./.worktrees' \
+            --exclude='./.pglite' \
+            --exclude='./.env*' \
+            --exclude='./cli' \
+            --exclude='./e2e' \
+            --exclude='./playwright-report' \
+            --exclude='./test-results' \
+            -czf "geronticare-app-v${VERSION}.tar.gz" .
+          shasum -a 256 "geronticare-app-v${VERSION}.tar.gz" \
+            > "geronticare-app-v${VERSION}.sha256"
 
       - name: Extract changelog section
         id: changelog
@@ -62,6 +100,49 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          VERSION="${GITHUB_REF_NAME#v}"
           gh release create "$GITHUB_REF_NAME" \
+            "geronticare-app-v${VERSION}.tar.gz" \
+            "geronticare-app-v${VERSION}.sha256" \
             --title "GerontiCare $GITHUB_REF_NAME" \
             --notes-file release-notes.md
+
+  publish-npm:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Check CLI version matches tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          CLI_VERSION="$(node -p "require('./cli/package.json').version")"
+          if [[ "$CLI_VERSION" != "$VERSION" ]]; then
+            echo "cli/package.json version $CLI_VERSION does not match tag $VERSION." >&2
+            exit 1
+          fi
+
+      - name: Install CLI dependencies
+        run: npm ci --prefix cli
+
+      - name: Test CLI
+        run: npm test --prefix cli
+
+      - name: Check CLI syntax
+        run: |
+          find cli -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+
+      - name: Publish to npm
+        run: npm publish --access public
+        working-directory: cli
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
