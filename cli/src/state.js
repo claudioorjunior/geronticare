@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { statSync } from 'node:fs';
 import { mkdir, open, readFile, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -10,9 +11,12 @@ function aplicarAclWindows(caminho) {
   if (process.platform !== 'win32') return;
   const usuario = process.env.USERNAME;
   if (!usuario) throw new Error('USERNAME não está definido para proteger os arquivos da instalação.');
+  const regras = statSync(caminho).isDirectory()
+    ? [`${usuario}:F`, `${usuario}:(OI)(CI)F`, 'SYSTEM:F', 'SYSTEM:(OI)(CI)F']
+    : [`${usuario}:F`, 'SYSTEM:F'];
   const resultado = spawnSync(
     'icacls',
-    [caminho, '/inheritance:r', '/grant:r', `${usuario}:(OI)(CI)F`, 'SYSTEM:(OI)(CI)F'],
+    [caminho, '/inheritance:r', '/grant:r', ...regras],
     { encoding: 'utf8', windowsHide: true },
   );
   if (resultado.status !== 0) {
