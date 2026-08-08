@@ -794,6 +794,7 @@ async function rollbackFluxo({ root, ui, executar, versaoAlvo, spawnFn, conectar
     if (cand) backupDir = join(root, 'backups', cand);
   } catch {}
   const segredos = await lerSegredos(root);
+  if (!config || !segredos?.DATABASE_URL) throw new Error('config/secrets ausentes para rollback.');
   // Guarda antes do restore destrutivo; se já parado (stop manual / crash) permite seguir.
   const chkPortaRb = conectarPortaFn ?? conectarPorta;
   const parado = await pararServidorDetached({ root, log: () => {} }).catch(() => ({ parado: false }));
