@@ -145,10 +145,10 @@ jobs:
 
       - name: Publish to npm
         run: |
-          # setup-node writes the token to NPM_CONFIG_USERCONFIG; ensure it
-          # is also visible for the publish step regardless of cwd
+          # Pin npm version that works with granular tokens; the runner's
+          # bundled npm may 404 on PUT for token-scoped packages
           printf '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}\n' > .npmrc
-          npm publish --access public
+          npx --yes npm@12 publish --access public
         working-directory: cli
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
