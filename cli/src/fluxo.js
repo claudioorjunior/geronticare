@@ -234,7 +234,16 @@ export async function executarFluxo({
   }
   if (comando === 'start') {
     validarNode22(nodeVersion);
-    return comInstallLock(root, () => instalarOuIniciar({ ...servicos, somenteIniciar: true }));
+    const estadoExistente = await lerEstado(root);
+    const versaoEfetiva = estadoExistente?.versao ?? servicos.versao;
+    const servicosStart = versaoEfetiva === servicos.versao
+      ? servicos
+      : { ...servicos, versao: versaoEfetiva };
+    let resultadoStart;
+    await comInstallLock(root, async () => {
+      resultadoStart = await instalarOuIniciar({ ...servicosStart, somenteIniciar: true });
+    });
+    return resultadoStart;
   }
 
   validarPreflight({ nodeVersion, isTTY });
@@ -249,6 +258,10 @@ export async function executarFluxo({
     validarMatriz: false,
   });
   const estadoInicial = await lerEstado(root);
+  const versaoInstalacao = estadoInicial?.versao ?? servicos.versao;
+  const servicosInstalacao = versaoInstalacao === servicos.versao
+    ? servicos
+    : { ...servicos, versao: versaoInstalacao };
   const portaInicial = estadoInicial
     ? undefined
     : await escolherPorta({
@@ -256,7 +269,7 @@ export async function executarFluxo({
       portaLivreFn,
       portasReservadas: new Set([PORTA_POSTGRES_PADRAO]),
     });
-  await comInstallLock(root, () => instalarOuIniciar({ ...servicos, portaInicial }));
+  await comInstallLock(root, () => instalarOuIniciar({ ...servicosInstalacao, portaInicial }));
 }
 
 async function diagnosticar({ ui, root, criarCliente, fetchFn }) {

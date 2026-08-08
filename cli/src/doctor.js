@@ -86,10 +86,12 @@ export async function executarDoctor({
 
   // 1. lock (somente leitura; nunca remover).
   const lockConteudo = await lerArquivo(root, 'install.lock');
+  let lockIndice = -1;
   if (lockConteudo === null) {
     resultados.push({
       chave: 'lock', nome: 'Lock de instalação', ok: true, detalhe: 'sem lock de instalação',
     });
+    lockIndice = resultados.length - 1;
   } else {
     const pid = Number.parseInt(lockConteudo.trim(), 10);
     let ativo = false;
@@ -107,6 +109,7 @@ export async function executarDoctor({
         ? `outra instalação em execução (PID ${pid})`
         : 'lock presente, mas o processo não está ativo',
     });
+    lockIndice = resultados.length - 1;
   }
 
   const permissoes = await verificarPermissoes(root);
@@ -310,6 +313,19 @@ export async function executarDoctor({
         detalhe: redigirMensagem(sanitizarErro(error)),
       });
     }
+  }
+
+  const lockAtivo = lockIndice >= 0 && !resultados[lockIndice].ok;
+  const servidorSaudavel = portaAberta === true
+    && resultados.some((r) => r.chave === 'processo' && r.ok)
+    && resultados.some((r) => r.chave === 'banco' && r.ok);
+  if (lockAtivo && servidorSaudavel) {
+    resultados[lockIndice] = {
+      chave: 'lock',
+      nome: 'Lock de instalação',
+      ok: true,
+      detalhe: `lock presente com servidor ativo (PID ${lockConteudo.trim()}); instalação já concluída`,
+    };
   }
 
   for (const resultado of resultados) {
