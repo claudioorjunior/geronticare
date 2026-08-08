@@ -722,9 +722,12 @@ async function upgradeFluxo({ root, ui, fetchFn, executar, spawnFn, versaoAlvo }
   if (resultado.exitCode !== 0) throw new Error('Falha ao aplicar migrations do upgrade.');
   const configAnterior = { ...config };
   const versaoAnterior = config.versao;
+  const parado = await pararServidorDetached({ root, log: () => {} }).catch(() => ({ parado: false }));
+  if (!parado.parado) {
+    throw new Error('Servidor não está em modo gerenciado (server.pid ausente/inativo); pare-o com `geronticare stop` antes de atualizar.');
+  }
   let cutoverOk = false;
   try {
-    await pararServidorDetached({ root, log: () => {} });
     const segredosAtuais = await lerSegredos(root);
     await iniciarServidorDetached({ releaseDir, config: { ...config, versao: alvo }, segredos: segredosAtuais, spawnFn, log: ui.log });
     await aguardarProntidao({ porta: config.porta, fetchFn, log: ui.log });
@@ -769,7 +772,12 @@ async function rollbackFluxo({ root, ui, executar, versaoAlvo, spawnFn }) {
     try {
       const dump = join(backupDir, 'dump.sql');
       const segredos = await lerSegredos(root);
-      const res = await executar(['psql', segredos.DATABASE_URL, '-f', dump], { env: { DATABASE_URL: segredos.DATABASE_URL } });
+      // ponytail: usa o schema public existente e um restore transactional; drop/criação
+      // de um banco dedicado ficaria presa no provedor cloud (Neon/Supabase).
+      const res = await executar(
+        ['psql', '--single-transaction', '--set=ON_ERROR_STOP=1', '--dbname', segredos.DATABASE_URL, '-f', dump],
+        { env: {} },
+      );
       if (res.exitCode !== 0) ui.log('Aviso: restore do dump falhou; rollback só de código.');
     } catch {
       ui.log('Aviso: sem psql; rollback só de código.');

@@ -62,7 +62,7 @@ async function backupAntesDeMigrar(config, segredos) {
   try { await copyFile(join(root, 'secrets.json'), join(dir, 'secrets.json')); } catch {}
   const dumpPath = join(dir, 'dump.sql');
   try {
-    const r = await executar(['pg_dump', '--no-owner', '--format=plain', '-f', dumpPath], { env: { DATABASE_URL: segredos.DATABASE_URL } });
+    const r = await executar(['pg_dump', '--no-owner', '--format=plain', '-f', dumpPath, '--dbname', segredos.DATABASE_URL], { env: {} });
     if (r.exitCode !== 0) { await rm(dumpPath, { force: true }).catch(() => {}); console.log(`Aviso pg_dump ${r.exitCode}`); }
   } catch (e) {
     await rm(dumpPath, { force: true }).catch(() => {});
@@ -302,8 +302,11 @@ async function main() {
   // ponytail: cutover de 2-3s; old serve até aqui. Migrations são expand-only; breaking schema pode falhar no old durante a janela.
   const versaoAnterior = config.versao;
   const configAnterior = { ...config };
+  const parado = await pararServidorDetached().catch(() => ({ parado: false }));
+  if (!parado.parado) {
+    throw new Error('Servidor não está em modo gerenciado (server.pid ausente/inativo); pare-o com `geronticare stop` antes de atualizar.');
+  }
   try {
-    await pararServidorDetached().catch(() => {});
     const segredosAtuais = (await lerJson(root, 'secrets.json')) ?? segredos;
     await iniciarServidorDetached({ releaseDir, config: { ...config, versao: target }, segredos: segredosAtuais });
     await aguardarProntidao(config.porta);

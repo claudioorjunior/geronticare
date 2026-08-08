@@ -1,27 +1,40 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { NextResponse } from 'next/server';
-import pkg from '@/package.json';
+
+import { semverGt } from '@/app/api/admin/update/_lib';
 
 export const revalidate = 3600;
 
-function appVersion(): string {
-  return (pkg as { version?: string }).version ?? '0.0.0';
+function getRoot(): string {
+  const env = process.env as Record<string, string | undefined>;
+  if (env.GERONTICARE_HOME) return env.GERONTICARE_HOME;
+  const home = process.env.HOME ?? process.env.USERPROFILE ?? '/tmp';
+  if (process.platform === 'darwin') return `${home}/Library/Application Support/GerontiCare`;
+  if (process.platform === 'win32') {
+    const base = env.LOCALAPPDATA ?? `${home}/AppData/Local`;
+    return `${base}/GerontiCare`;
+  }
+  const xdg = env.XDG_DATA_HOME ?? `${home}/.local/share`;
+  return `${xdg}/geronticare`;
 }
 
-function semverGt(a: string, b: string): boolean {
-  const partes = (v: string) => {
-    const m = String(v).match(/^v?(\d+)\.(\d+)\.(\d+)$/);
-    if (!m) return null;
-    return [Number(m[1]), Number(m[2]), Number(m[3])] as [number, number, number];
-  };
-  const pa = partes(a);
-  const pb = partes(b);
-  if (!pa || !pb) return String(a).localeCompare(String(b)) > 0;
-  for (let i = 0; i < 3; i += 1) if (pa[i] !== pb[i]) return pa[i] > pb[i];
-  return false;
+async function versaoInstalada(): Promise<string | null> {
+  const root = getRoot();
+  for (const arquivo of ['config.json', 'install-state.json', 'update-status.json']) {
+    try {
+      const dados = JSON.parse(await readFile(join(root, arquivo), 'utf8')) as { versao?: unknown; target?: unknown };
+      const versao = String(dados?.versao ?? dados?.target ?? '');
+      if (/^\d+\.\d+\.\d+$/.test(versao)) return versao;
+    } catch {
+      // arquivo ausente ou inválido; tenta o próximo.
+    }
+  }
+  return null;
 }
 
 export async function GET() {
-  const current = appVersion();
+  const current = (await versaoInstalada()) ?? '0.0.0';
   let latest: string | null = null;
   try {
     const r = await fetch('https://api.github.com/repos/claudioorjunior/geronticare/releases/latest', {

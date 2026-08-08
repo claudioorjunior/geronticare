@@ -26,8 +26,8 @@ export async function backupAntesDeMigrar({
   const dumpPath = join(dir, 'dump.sql');
   try {
     const resultado = await executar(
-      ['pg_dump', '--no-owner', '--format=plain', '-f', dumpPath],
-      { env: { DATABASE_URL: segredos.DATABASE_URL } },
+      ['pg_dump', '--no-owner', '--format=plain', '-f', dumpPath, '--dbname', segredos.DATABASE_URL],
+      { env: {} },
     );
     if (resultado.exitCode !== 0) {
       await import('node:fs/promises').then((m) => m.rm(dumpPath, { force: true })).catch(() => {});
