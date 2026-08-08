@@ -144,7 +144,11 @@ jobs:
           find cli -type f -name '*.js' -print0 | xargs -0 -n1 node --check
 
       - name: Publish to npm
-        run: npm publish --access public
+        run: |
+          # setup-node writes the token to NPM_CONFIG_USERCONFIG; ensure it
+          # is also visible for the publish step regardless of cwd
+          printf '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}\n' > .npmrc
+          npm publish --access public
         working-directory: cli
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
