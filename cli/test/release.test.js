@@ -153,7 +153,12 @@ test('baixa, valida, extrai, compila e promove o release', async (t) => {
   const build = spawn.chamadas.find((c) => c.args.includes('--webpack'));
   assert.ok(build);
   assert.equal(build.opcoes.env.NEXT_PUBLIC_APP_URL, `http://127.0.0.1:${porta}`);
-  assert.ok(spawn.chamadas.some((c) => c.args.join(' ') === 'npm ci'));
+  assert.ok(
+    spawn.chamadas.some((c) => (
+      (c.args[0] === 'npm' && c.args[1] === 'ci')
+      || (c.args[0] === process.execPath && /npm-cli\.js$/.test(c.args[1] ?? '') && c.args[2] === 'ci')
+    )),
+  );
   assert.deepEqual(await readdir(join(root, 'staging')), []);
 });
 
