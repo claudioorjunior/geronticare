@@ -724,19 +724,27 @@ async function upgradeFluxo({ root, ui, fetchFn, executar, spawnFn, versaoAlvo }
   await prepararRelease({ root, versao: alvo, porta: config.porta, fetchFn, spawnFn: executar, log: ui.log });
   const parado = await pararServidorDetached({ root, log: () => {} }).catch(() => ({ parado: false }));
   if (!parado.parado) {
-    throw new Error('Servidor não está em modo gerenciado (server.pid ausente/inativo); pare-o com `geronticare stop` antes de atualizar.');
+    let ativo = false;
+    try {
+      const probe = await (fetchFn ?? fetch)(`http://127.0.0.1:${config.porta}/api/health`, { signal: AbortSignal.timeout(1500) });
+      ativo = Boolean(probe?.ok);
+    } catch { ativo = false; }
+    if (ativo) {
+      throw new Error('Servidor não está em modo gerenciado (server.pid ausente/inativo); pare-o com `geronticare stop` antes de atualizar.');
+    }
   }
+  // migrate + cutover com recuperação única; bookkeeping fora do catch (falha pós-cutover não reverte servidor saudável)
+  let cutoverFalhou = false;
   try {
     const releaseDir = join(root, 'releases', alvo);
     const resultado = await executar([process.execPath, join(releaseDir, 'scripts', 'migrate.mjs')], { cwd: releaseDir, env: { ...process.env, DATABASE_URL: segredos.DATABASE_URL } });
     if (resultado.exitCode !== 0) throw new Error('Falha ao aplicar migrations do upgrade.');
-    let cutoverOk = false;
     try {
       const segredosAtuais = await lerSegredos(root);
       await iniciarServidorDetached({ releaseDir, config: { ...config, versao: alvo }, segredos: segredosAtuais, spawnFn, log: ui.log });
       await aguardarProntidao({ porta: config.porta, fetchFn, log: ui.log });
-      cutoverOk = true;
     } catch (error) {
+      cutoverFalhou = true;
       ui.log(`Aviso: cutover falhou (${sanitizarErro(error)}); restaurando v${versaoAnterior}.`);
       try {
         await pararServidorDetached({ root, log: () => {} }).catch(() => {});
@@ -746,14 +754,8 @@ async function upgradeFluxo({ root, ui, fetchFn, executar, spawnFn, versaoAlvo }
       } catch {}
       throw error;
     }
-    if (cutoverOk) {
-      await escreverArquivoAtomicamente(root, 'config.json', { ...config, versao: alvo, ativo: true });
-      await escreverEstado(root, { fase: 'READY', porta: config.porta, provedor: estado.provedor, versao: alvo, versaoAnterior });
-      await podarReleases(root, { keep: 2 });
-      ui.log(`Upgrade para v${alvo} concluído.`);
-    }
   } catch (error) {
-    if (String(error.message).includes('cutover falhou')) throw error;
+    if (cutoverFalhou) throw error;
     try {
       await pararServidorDetached({ root, log: () => {} }).catch(() => {});
       const releaseAnterior = join(root, 'releases', versaoAnterior);
@@ -761,6 +763,15 @@ async function upgradeFluxo({ root, ui, fetchFn, executar, spawnFn, versaoAlvo }
       await iniciarServidorDetached({ releaseDir: releaseAnterior, config: configAnterior, segredos: segredosAtuais, spawnFn, log: () => {} }).catch(() => {});
       ui.log(`Aviso: falha na migration (${sanitizarErro(error)}); v${versaoAnterior} recolocada no ar.`);
     } catch {}
+    throw error;
+  }
+  try {
+    await escreverArquivoAtomicamente(root, 'config.json', { ...config, versao: alvo, ativo: true });
+    await escreverEstado(root, { fase: 'READY', porta: config.porta, provedor: estado.provedor, versao: alvo, versaoAnterior });
+    await podarReleases(root, { keep: 2 });
+    ui.log(`Upgrade para v${alvo} concluído.`);
+  } catch (error) {
+    ui.log(`Aviso: servidor em v${alvo} já rodando, mas falha ao persistir estado (${sanitizarErro(error)}); rode doctor.`);
     throw error;
   }
 }
@@ -784,11 +795,18 @@ async function rollbackFluxo({ root, ui, executar, versaoAlvo, spawnFn }) {
     if (cand) backupDir = join(root, 'backups', cand);
   } catch {}
   const segredos = await lerSegredos(root);
-  // Guarda do servidor gerenciado ANTES do restore destrutivo:
-  // DROP SCHEMA com servidor no ar gera corrida com requests vivas.
+  // Guarda antes do restore destrutivo; se já parado (stop manual / crash) permite seguir.
   const parado = await pararServidorDetached({ root, log: () => {} }).catch(() => ({ parado: false }));
   if (!parado.parado) {
-    throw new Error('Servidor não está em modo gerenciado (server.pid ausente/inativo); pare-o com `geronticare stop` antes do rollback.');
+    let ativo = false;
+    try {
+      const probe = await fetch(`http://127.0.0.1:${config.porta}/api/health`, { signal: AbortSignal.timeout(1500) });
+      ativo = Boolean(probe?.ok);
+    } catch { ativo = false; }
+    if (ativo) {
+      throw new Error('Servidor não está em modo gerenciado (server.pid ausente/inativo); pare-o com `geronticare stop` antes do rollback.');
+    }
+    ui.log('Aviso: servidor já parado; prosseguindo com rollback.');
   }
   if (backupDir) {
     const dump = join(backupDir, 'dump.sql');

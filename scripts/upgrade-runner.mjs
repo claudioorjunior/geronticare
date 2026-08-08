@@ -324,11 +324,18 @@ async function main() {
   await escreverStatus({ phase: 'preparing' });
   await prepararRelease({ versao: target, porta: config.porta });
 
-  // Guarda ANTES de mudanças irreversíveis (migrate/cutover); backup+prepare já ocorreram sem downtime
+  // Guarda ANTES de mudanças irreversíveis (migrate/cutover); se já parado permite seguir
   const parado = await pararServidorDetached().catch(() => ({ parado: false }));
   if (!parado.parado) {
-    throw new Error('Servidor não está em modo gerenciado (server.pid ausente/inativo); pare-o com `geronticare stop` antes de atualizar.');
+    let ativo = false;
+    try {
+      const h = await fetch(`http://127.0.0.1:${config.porta}/api/health`, { signal: AbortSignal.timeout(1500) });
+      ativo = Boolean(h?.ok);
+    } catch { ativo = false; }
+    if (ativo) throw new Error('Servidor não está em modo gerenciado (server.pid ausente/inativo); pare-o com `geronticare stop` antes de atualizar.');
   }
+  // migrate + cutover com recuperação única; bookkeeping fora do catch (falha pós-cutover não reverte servidor saudável)
+  let cutoverFalhou = false;
   try {
     await escreverStatus({ phase: 'migrating' });
     const releaseDir = join(root, 'releases', target);
@@ -341,6 +348,7 @@ async function main() {
       await iniciarServidorDetached({ releaseDir, config: { ...config, versao: target }, segredos: segredosAtuais });
       await aguardarProntidao(config.porta);
     } catch (e) {
+      cutoverFalhou = true;
       try {
         await pararServidorDetached().catch(() => {});
         const segredosAtuais = (await lerJson(root, 'secrets.json')) ?? segredos;
@@ -349,8 +357,7 @@ async function main() {
       throw e;
     }
   } catch (e) {
-    // migrate/cutover falhou com servidor já parado -> recoloca o antigo
-    if (String(e.message).includes('cutover falhou') || String(e.message).includes('Outra operação')) throw e;
+    if (cutoverFalhou) throw e;
     try {
       await pararServidorDetached().catch(() => {});
       const segredosAtuais = (await lerJson(root, 'secrets.json')) ?? segredos;
@@ -358,16 +365,21 @@ async function main() {
     } catch {}
     throw e;
   }
-  await escreverAtomico(root, 'config.json', { ...config, versao: target, ativo: true });
-  await escreverAtomico(root, 'install-state.json', { fase: 'READY', porta: config.porta, provedor: estado.provedor, versao: target, versaoAnterior });
-  const lista = await readdir(join(root, 'releases')).catch(() => []);
-  const versoes = lista.filter((v) => /^\d+\.\d+\.\d+$/.test(v)).sort((a, b) => {
-    const pa = a.split('.').map(Number), pb = b.split('.').map(Number);
-    for (let i = 0; i < 3; i++) if (pa[i] !== pb[i]) return pb[i] - pa[i];
-    return 0;
-  });
-  for (const v of versoes.slice(2)) { await rm(join(root, 'releases', v), { recursive: true, force: true }); await rm(join(root, 'downloads', 'releases', v), { recursive: true, force: true }); }
-  await escreverStatus({ state: 'done', phase: 'done', finishedAt: new Date().toISOString() });
+  try {
+    await escreverAtomico(root, 'config.json', { ...config, versao: target, ativo: true });
+    await escreverAtomico(root, 'install-state.json', { fase: 'READY', porta: config.porta, provedor: estado.provedor, versao: target, versaoAnterior });
+    const lista = await readdir(join(root, 'releases')).catch(() => []);
+    const versoes = lista.filter((v) => /^\d+\.\d+\.\d+$/.test(v)).sort((a, b) => {
+      const pa = a.split('.').map(Number), pb = b.split('.').map(Number);
+      for (let i = 0; i < 3; i++) if (pa[i] !== pb[i]) return pb[i] - pa[i];
+      return 0;
+    });
+    for (const v of versoes.slice(2)) { await rm(join(root, 'releases', v), { recursive: true, force: true }); await rm(join(root, 'downloads', 'releases', v), { recursive: true, force: true }); }
+    await escreverStatus({ state: 'done', phase: 'done', finishedAt: new Date().toISOString() });
+  } catch (e) {
+    console.log(`Aviso: servidor em v${target} já rodando, mas falha ao persistir estado (${sanitizar(e)}); rode doctor.`);
+    throw e;
+  }
   } finally { try { await lock.close(); } catch {} try { const { rm } = await import('node:fs/promises'); await rm(join(root, 'install.lock'), { force: true }); } catch {} }
 }
 
