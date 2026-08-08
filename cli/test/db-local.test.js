@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { join } from 'node:path';
 import test from 'node:test';
 
 import { POSTGRESAPP, criarBancoDedicado, detectarPostgres, instalarPostgres } from '../src/db/local.js';

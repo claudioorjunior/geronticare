@@ -6,9 +6,24 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import { Search, User, LogOut, X, Bell, ChevronDown } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+
 import { Input } from '@/components/ui/input';
 import { useUserRole } from '@/lib/auth/use-user-role';
 import { authClient, logoutAndClearClientState } from '@/lib/auth/client';
+
+function useVersionCheck(enabled: boolean) {
+  const [data, setData] = useState<{ current: string; latest: string | null; updateAvailable: boolean } | null>(null);
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    fetch('/api/version', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (!cancelled && j) setData(j); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [enabled]);
+  return data;
+}
 
 // Mock patients for dev (replace with tRPC search later)
 const mockPatients = [
@@ -48,6 +63,19 @@ export function TopNav() {
 
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const isAdmin = userRole === 'admin';
+  const versionInfo = useVersionCheck(isAdmin);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!notifOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setNotifOpen(false); };
+    const onClick = (e: MouseEvent) => { if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false); };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onClick);
+    return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', onClick); };
+  }, [notifOpen]);
 
   // Fecha o dropdown ao clicar fora ou apertar Escape (acessibilidade basica)
   useEffect(() => {
@@ -171,10 +199,36 @@ export function TopNav() {
 
         {/* User Menu */}
         <div className="flex items-center gap-3 ml-auto shrink-0">
-          {/* Notification bell — dot only shows when unread > 0 (stub, always 0 for now) */}
-          <button className="relative p-2 text-m3-secondary hover:text-m3-primary transition-colors rounded-full hover:bg-m3-surface-variant">
-            <Bell className="h-5 w-5" />
-          </button>
+          {isAdmin && (
+            <div className="relative" ref={notifRef}>
+              <button
+                type="button"
+                onClick={() => setNotifOpen((v) => !v)}
+                aria-label="Notificações"
+                aria-expanded={notifOpen}
+                className="relative p-2 text-m3-secondary hover:text-m3-primary transition-colors rounded-full hover:bg-m3-surface-variant"
+              >
+                <Bell className="h-5 w-5" />
+                {versionInfo?.updateAvailable && (
+                  <span className="absolute top-1 right-1 h-2.5 w-2.5 rounded-full bg-m3-error ring-2 ring-m3-surface" />
+                )}
+              </button>
+              {notifOpen && (
+                <div className="absolute right-0 top-full mt-2 w-80 bg-m3-surface-container-lowest border border-m3-outline-variant rounded-m3-xl shadow-lg z-50 py-2 text-sm">
+                  {versionInfo?.updateAvailable ? (
+                    <div className="px-4 py-2">
+                      <div className="font-medium text-m3-on-surface">Nova versão disponível</div>
+                      <div className="text-m3-secondary text-xs mt-1">v{versionInfo.latest} disponível (atual v{versionInfo.current})</div>
+                      <Link href="/admin/atualizacao" onClick={() => setNotifOpen(false)} className="mt-3 inline-flex items-center justify-center rounded-full bg-m3-primary px-4 py-1.5 text-xs font-medium text-white hover:bg-m3-primary/90">Atualizar agora →</Link>
+                      <a href="https://github.com/claudioorjunior/geronticare/releases" target="_blank" rel="noopener noreferrer" className="text-m3-primary text-xs mt-2 ml-3 inline-block hover:underline">Ver releases</a>
+                    </div>
+                  ) : (
+                    <div className="px-4 py-3 text-m3-secondary">Nenhuma atualização disponível.</div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Indicador de usuario + dropdown (nome, cargo, foto) */}
           <div className="relative" ref={menuRef}>

@@ -33,6 +33,8 @@ import SetupPage from './page';
 describe('setup bootstrap gate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Keep setup tests independent from the shell's NODE_ENV (localhost is valid in test/dev).
+    vi.stubEnv('NODE_ENV', 'test');
     process.env.SETUP_TOKEN = SETUP_TOKEN;
     process.env.SETUP_TOKEN_EXPIRES_AT = new Date(Date.now() + 300_000).toISOString();
     process.env.AUTH_URL = 'http://localhost';

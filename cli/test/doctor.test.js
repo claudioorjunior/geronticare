@@ -64,7 +64,7 @@ test('doctor reporta todos os checks ok em ambiente saudável', async () => {
   });
 
   const porChave = Object.fromEntries(resultados.map((r) => [r.chave, r]));
-  assert.equal(resultados.length, 10);
+  assert.equal(resultados.length, 13);
   assert.equal(porChave.lock.ok, true);
   assert.equal(porChave.estado.ok, true);
   assert.equal(porChave.estado.detalhe, 'fase READY');
@@ -91,7 +91,7 @@ test('doctor não lança quando arquivos não existem', async () => {
   });
 
   const porChave = Object.fromEntries(resultados.map((r) => [r.chave, r]));
-  assert.equal(resultados.length, 10);
+  assert.equal(resultados.length, 13);
   assert.equal(porChave.lock.ok, true);
   assert.equal(porChave.estado.ok, false);
   assert.equal(porChave.release.ok, false);

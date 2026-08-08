@@ -106,7 +106,7 @@ test('reutiliza release verificado sem rede nem spawn', async (t) => {
   const sha256 = createHash('sha256').update(conteudo).digest('hex');
   await writeFile(
     join(releaseDir, 'verified.json'),
-    `${JSON.stringify({ versao, sha256, nextPublicAppUrl: `http://127.0.0.1:${porta}` })}\n`,
+    `${JSON.stringify({ versao, arquivo: `geronticare-app-v${versao}.tar.gz`, sha256 })}\n`,
   );
 
   const resultado = await prepararRelease({

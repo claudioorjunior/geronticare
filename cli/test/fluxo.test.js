@@ -569,6 +569,56 @@ test('cancelamento durante a configuração preserva DATABASE_SELECTED para reto
   assert.equal(estado.provedor, 'local');
 });
 
+test('upgrade recusa cutover quando o servidor não é gerenciado (sem server.pid)', async (t) => {
+  const root = await raizTemporaria(t);
+  await writeFile(join(root, 'install-state.json'), JSON.stringify({
+    fase: 'READY', porta: 3100, provedor: 'local', versao: '0.5.0',
+  }));
+  await writeFile(join(root, 'config.json'), JSON.stringify({
+    host: '127.0.0.1', porta: 3100, versao: '0.5.0', schemaVersion: 1, ativo: true,
+  }));
+  await writeFile(join(root, 'secrets.json'), JSON.stringify({
+    DATABASE_URL: 'postgresql://user:senha@127.0.0.1:5432/geronticare',
+    AUTH_SECRET: 'a'.repeat(43),
+  }), { mode: 0o600 });
+  // release do alvo já verificada; prepararRelease não precisa baixar/compilar
+  await mkdir(join(root, 'releases', '0.5.1'), { recursive: true });
+  const asset = Buffer.from('release-alvo');
+  await writeFile(join(root, 'releases', '0.5.1', 'geronticare-app-v0.5.1.tar.gz'), asset);
+  await writeFile(join(root, 'releases', '0.5.1', 'verified.json'), JSON.stringify({
+    versao: '0.5.1', arquivo: 'geronticare-app-v0.5.1.tar.gz',
+    sha256: createHash('sha256').update(asset).digest('hex'),
+    nextPublicAppUrl: 'http://127.0.0.1:3100',
+  }));
+
+  const ui = uiFake();
+  const spawnLog = [];
+  const executarLog = [];
+  await assert.rejects(
+    executarFluxo(baseDeps({
+      root,
+      ui,
+      fetchFn: fetchFake(),
+      executar: executarFake(executarLog),
+      spawnFn: spawnFake(spawnLog),
+      extra: { comando: 'upgrade', versaoAlvo: '0.5.1' },
+    })),
+    /servidor não é gerenciado|server\.pid/,
+  );
+
+  // nenhum servidor deve ser iniciado
+  assert.equal(spawnLog.some((registro) => registro[0] === 'spawn'), false);
+  // a guarda roda ANTES das migrations/backup: nada de migrate nem pg_dump
+  assert.equal(
+    executarLog.some((args) => args.some((parte) => String(parte).endsWith('migrate.mjs'))),
+    false,
+  );
+  assert.equal(executarLog.some((args) => args[0] === 'pg_dump'), false);
+  // config continua na versão antiga
+  const config = JSON.parse(await readFile(join(root, 'config.json'), 'utf8'));
+  assert.equal(config.versao, '0.5.0');
+});
+
 test('doctor aponta problemas e falha com resumo', async (t) => {
   const root = await raizTemporaria(t);
 

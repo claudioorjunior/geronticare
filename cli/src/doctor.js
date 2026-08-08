@@ -1,8 +1,10 @@
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import net from 'node:net';
 import { join } from 'node:path';
+
+import { lerPid } from './state.js';
 
 import { redigirUri, sanitizarErro } from './secrets.js';
 
@@ -326,6 +328,29 @@ export async function executarDoctor({
       ok: true,
       detalhe: `lock presente com servidor ativo (PID ${lockConteudo.trim()}); instalação já concluída`,
     };
+  }
+
+  const pid = await lerPid(root);
+  if (pid === null) {
+    resultados.push({ chave: 'pid', nome: 'Servidor background', ok: true, detalhe: 'sem server.pid' });
+  } else {
+    let vivo = false;
+    try { process.kill(pid, 0); vivo = true; } catch (e) { vivo = e?.code !== 'ESRCH'; }
+    resultados.push({ chave: 'pid', nome: 'Servidor background', ok: !vivo || portaAberta === true, detalhe: vivo ? `PID ${pid} ativo` : `PID ${pid} stale` });
+  }
+  try {
+    const releases = await readdir(join(root, 'releases'));
+    const validas = releases.filter((v) => /^v?\d+\.\d+\.\d+$/.test(v));
+    resultados.push({ chave: 'releases', nome: 'Releases retidas', ok: validas.length >= 1 && validas.length <= 5, detalhe: `${validas.length} release(s) retida(s)` });
+  } catch {
+    resultados.push({ chave: 'releases', nome: 'Releases retidas', ok: true, detalhe: 'sem releases' });
+  }
+  try {
+    await stat(join(root, 'logs', 'server.log'));
+    resultados.push({ chave: 'logs', nome: 'Logs', ok: true, detalhe: 'logs/server.log presente' });
+  } catch (error) {
+    if (error?.code === 'ENOENT') resultados.push({ chave: 'logs', nome: 'Logs', ok: true, detalhe: 'sem logs ainda' });
+    else resultados.push({ chave: 'logs', nome: 'Logs', ok: false, detalhe: sanitizarErro(error) });
   }
 
   for (const resultado of resultados) {
