@@ -10,6 +10,17 @@ function portaLivre(porta) {
   });
 }
 
+export function conectarPorta(porta) {
+  if (!Number.isInteger(porta) || porta < 1 || porta > 65_535) return Promise.resolve(false);
+  return new Promise((resolver) => {
+    const socket = net.connect({ host: '127.0.0.1', port: porta });
+    const done = (v) => { try { socket.destroy(); } catch {} resolver(v); };
+    socket.once('connect', () => done(true));
+    socket.once('error', () => done(false));
+    socket.setTimeout(1500, () => done(false));
+  });
+}
+
 export async function escolherPorta({
   portaDesejada = 3000,
   limite = 50,

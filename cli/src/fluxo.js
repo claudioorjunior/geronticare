@@ -8,7 +8,7 @@ import { configurarBanco } from './db/index.js';
 import { PORTA_POSTGRES_PADRAO, validarDistroLinux } from './db/local.js';
 import { criarClientePostgres, provarComCliente } from './db/validacao.js';
 import { executarDoctor } from './doctor.js';
-import { escolherPorta } from './porta.js';
+import { conectarPorta, escolherPorta } from './porta.js';
 import { backupAntesDeMigrar } from './backup.js';
 import { compararVersoes, listarReleases, podarReleases, prepararRelease, releaseInstaladaValida, versaoSegura } from './release.js';
 import { formatarAviso, verificarAtualizacao } from './update-check.js';
@@ -207,6 +207,7 @@ export async function executarFluxo({
   spawnFn = spawn,
   fs = { statfs: statfsPromises },
   portaLivreFn,
+  conectarPortaFn,
   versaoSistema,
   registrarSinal = registrarSinalPadrao,
   abrirNavegador = abrirNavegadorPadrao,
@@ -230,6 +231,7 @@ export async function executarFluxo({
     ui, root, env, platform, arquitetura, fetchFn, executar, spawnFn,
     versaoSistema,
     registrarSinal, abrirNavegador, criarCliente, portaLivreFn,
+    conectarPortaFn: conectarPortaFn ?? conectarPorta,
     criarServidorHttp,
     baixar,
     hashFn,
@@ -706,7 +708,8 @@ async function resolverVersaoAlvo({ versaoAlvo, fetchFn }) {
   return tag;
 }
 
-async function upgradeFluxo({ root, ui, fetchFn, executar, spawnFn, versaoAlvo }) {
+async function upgradeFluxo({ root, ui, fetchFn, executar, spawnFn, versaoAlvo, conectarPortaFn }) {
+  const chkPorta = conectarPortaFn ?? conectarPorta;
   const estado = await lerEstado(root);
   if (!estado || estado.fase !== 'READY') throw new Error('Instalação não está em READY. Rode o instalador primeiro.');
   const config = await lerArquivoJson(root, 'config.json');
@@ -724,12 +727,8 @@ async function upgradeFluxo({ root, ui, fetchFn, executar, spawnFn, versaoAlvo }
   await prepararRelease({ root, versao: alvo, porta: config.porta, fetchFn, spawnFn: executar, log: ui.log });
   const parado = await pararServidorDetached({ root, log: () => {} }).catch(() => ({ parado: false }));
   if (!parado.parado) {
-    let ativo = false;
-    try {
-      const probe = await (fetchFn ?? fetch)(`http://127.0.0.1:${config.porta}/api/health`, { signal: AbortSignal.timeout(1500) });
-      ativo = Boolean(probe?.ok);
-    } catch { ativo = false; }
-    if (ativo) {
+    const portaOcupada = await chkPorta(config.porta);
+    if (portaOcupada) {
       throw new Error('Servidor não está em modo gerenciado (server.pid ausente/inativo); pare-o com `geronticare stop` antes de atualizar.');
     }
   }
@@ -776,7 +775,7 @@ async function upgradeFluxo({ root, ui, fetchFn, executar, spawnFn, versaoAlvo }
   }
 }
 
-async function rollbackFluxo({ root, ui, executar, versaoAlvo, spawnFn }) {
+async function rollbackFluxo({ root, ui, executar, versaoAlvo, spawnFn, conectarPortaFn }) {
   const estado = await lerEstado(root);
   if (!estado || estado.fase !== 'READY') throw new Error('Instalação não está em READY para rollback.');
   const config = await lerArquivoJson(root, 'config.json');
@@ -796,14 +795,11 @@ async function rollbackFluxo({ root, ui, executar, versaoAlvo, spawnFn }) {
   } catch {}
   const segredos = await lerSegredos(root);
   // Guarda antes do restore destrutivo; se já parado (stop manual / crash) permite seguir.
+  const chkPortaRb = conectarPortaFn ?? conectarPorta;
   const parado = await pararServidorDetached({ root, log: () => {} }).catch(() => ({ parado: false }));
   if (!parado.parado) {
-    let ativo = false;
-    try {
-      const probe = await fetch(`http://127.0.0.1:${config.porta}/api/health`, { signal: AbortSignal.timeout(1500) });
-      ativo = Boolean(probe?.ok);
-    } catch { ativo = false; }
-    if (ativo) {
+    const portaOcupada = await chkPortaRb(config.porta);
+    if (portaOcupada) {
       throw new Error('Servidor não está em modo gerenciado (server.pid ausente/inativo); pare-o com `geronticare stop` antes do rollback.');
     }
     ui.log('Aviso: servidor já parado; prosseguindo com rollback.');

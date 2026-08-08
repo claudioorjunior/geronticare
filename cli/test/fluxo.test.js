@@ -601,7 +601,7 @@ test('upgrade recusa cutover quando o servidor não é gerenciado (sem server.pi
       fetchFn: fetchFake(),
       executar: executarFake(executarLog),
       spawnFn: spawnFake(spawnLog),
-      extra: { comando: 'upgrade', versaoAlvo: '0.5.1' },
+      extra: { comando: 'upgrade', versaoAlvo: '0.5.1', conectarPortaFn: async () => true },
     })),
     /servidor não é gerenciado|server\.pid/,
   );

@@ -1,7 +1,19 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { copyFile, mkdir, open, readFile, readdir, rename, rm } from 'node:fs/promises';
+import net from 'node:net';
 import { dirname, join } from 'node:path';
+
+function conectarPorta(porta) {
+  if (!Number.isInteger(porta) || porta < 1 || porta > 65_535) return Promise.resolve(false);
+  return new Promise((resolver) => {
+    const socket = net.connect({ host: '127.0.0.1', port: porta });
+    const done = (v) => { try { socket.destroy(); } catch {} resolver(v); };
+    socket.once('connect', () => done(true));
+    socket.once('error', () => done(false));
+    socket.setTimeout(1500, () => done(false));
+  });
+}
 
 const root = process.argv[2];
 const target = process.argv[3];
@@ -327,12 +339,8 @@ async function main() {
   // Guarda ANTES de mudanças irreversíveis (migrate/cutover); se já parado permite seguir
   const parado = await pararServidorDetached().catch(() => ({ parado: false }));
   if (!parado.parado) {
-    let ativo = false;
-    try {
-      const h = await fetch(`http://127.0.0.1:${config.porta}/api/health`, { signal: AbortSignal.timeout(1500) });
-      ativo = Boolean(h?.ok);
-    } catch { ativo = false; }
-    if (ativo) throw new Error('Servidor não está em modo gerenciado (server.pid ausente/inativo); pare-o com `geronticare stop` antes de atualizar.');
+    const portaOcupada = await conectarPorta(config.porta);
+    if (portaOcupada) throw new Error('Servidor não está em modo gerenciado (server.pid ausente/inativo); pare-o com `geronticare stop` antes de atualizar.');
   }
   // migrate + cutover com recuperação única; bookkeeping fora do catch (falha pós-cutover não reverte servidor saudável)
   let cutoverFalhou = false;
