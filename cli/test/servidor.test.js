@@ -72,7 +72,7 @@ test('iniciarServidor repassa GERONTICARE_HOME em foreground', async () => {
   const { filho } = filhoFake();
   let spawnArgs;
   const releaseDir = '/tmp/geronticare-root/releases/0.5.5';
-  await iniciarServidor({
+  const promessa = iniciarServidor({
     releaseDir,
     config: { porta: 4321 },
     segredos: { DATABASE_URL: 'postgresql://u:s@h/db', AUTH_SECRET: 'as' },
@@ -81,6 +81,8 @@ test('iniciarServidor repassa GERONTICARE_HOME em foreground', async () => {
       return filho;
     },
   });
+  filho.emitir('spawn');
+  await promessa;
   assert.equal(spawnArgs.opcoes.env.GERONTICARE_HOME, '/tmp/geronticare-root');
 });
 
