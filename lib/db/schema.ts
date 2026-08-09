@@ -319,6 +319,38 @@ export const registros = pgTable('registros', {
   profissionalIdx: index('registros_profissional_idx').on(table.profissionalId),
 }));
 
+// Tabela: Anexos clínicos (arquivos de exames, fotos, documentos)
+// Metadados dedicados; o objeto em si fica no storage (local ou S3).
+// registro_id é opcional: anexos podem nascer avulsos na aba Documentos
+// (sem vínculo com um registro), além de anexados a um registro.
+export const anexos = pgTable('anexos', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  instituicaoId: uuid('instituicao_id').references(() => instituicoes.id).notNull(),
+  pacienteId: uuid('paciente_id').references(() => pacientes.id).notNull(),
+  registroId: uuid('registro_id').references(() => registros.id, { onDelete: 'cascade' }),
+  chave: text('chave').notNull().unique(),
+  nome: text('nome').notNull(),
+  tipo: text('tipo').notNull(), // MIME
+  tamanhoBytes: integer('tamanho_bytes').notNull(),
+  criadoPorId: uuid('criado_por_id').references(() => usuarios.id).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  pacienteIdx: index('anexos_paciente_idx').on(table.pacienteId),
+  registroIdx: index('anexos_registro_idx').on(table.registroId),
+}));
+
+export const anexosRelations = relations(anexos, ({ one }) => ({
+  instituicao: one(instituicoes, { fields: [anexos.instituicaoId], references: [instituicoes.id] }),
+  paciente: one(pacientes, { fields: [anexos.pacienteId], references: [pacientes.id] }),
+  registro: one(registros, { fields: [anexos.registroId], references: [registros.id] }),
+  criadoPor: one(usuarios, { fields: [anexos.criadoPorId], references: [usuarios.id] }),
+}));
+
+export const registrosRelations = relations(registros, ({ many }) => ({
+  anexos: many(anexos),
+}));
+
 // Tabela: Sinais vitais
 export const sinaisVitais = pgTable('sinais_vitais', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -359,5 +391,7 @@ export type AgaAplicacao = typeof agaAplicacoes.$inferSelect;
 export type NovaAgaAplicacao = typeof agaAplicacoes.$inferInsert;
 export type Registro = typeof registros.$inferSelect;
 export type NovoRegistro = typeof registros.$inferInsert;
+export type Anexo = typeof anexos.$inferSelect;
+export type NovoAnexo = typeof anexos.$inferInsert;
 export type SinaisVitais = typeof sinaisVitais.$inferSelect;
 export type NovosSinaisVitais = typeof sinaisVitais.$inferInsert;

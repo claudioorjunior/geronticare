@@ -5,46 +5,25 @@ import { getAuth } from '@/lib/auth';
 import { resolverUsuarioAutorizacao } from '@/lib/auth/resolver-usuario';
 import { getDb } from '@/lib/db';
 import { pacientes, anexos } from '@/lib/db/schema';
-import {
-  extrairContextoChaveAnexo,
-  gerarUrlDownload,
-} from '@/lib/storage/s3';
+import { extrairContextoChaveAnexo } from '@/lib/storage/s3';
 import { storageConfigurado, driverAtivo } from '@/lib/storage';
-import { lerJsonBodyLimitado, RequestBodyTooLargeError } from '@/lib/http/body';
-
-const MAX_BODY_BYTES = 8 * 1024;
-
-const bodySchema = z.object({
-  chave: z.string().min(1).max(1024),
-});
+import { lerAnexoLocal } from '@/lib/storage/local';
 
 /**
- * Emite uma URL curta para leitura de um anexo clínico privado.
- * A chave nunca é convertida em URL pública: o acesso passa por sessão,
- * tenant, paciente e permissão clínica antes de assinar o GetObject.
- *
- * Driver local: retorna { chave, driver: 'local' } — o download é feito via
- * GET /api/anexos/download-local (mesma autorização, stream do disco).
- * Driver S3: retorna { downloadUrl, expiresIn } com URL pré-assinada.
+ * Download do arquivo para o driver local (filesystem).
+ * Mesma autorização do download-url (sessão + tenant + paciente + clinico:ler).
  */
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    if (!storageConfigurado()) {
+    if (!storageConfigurado() || driverAtivo() !== 'local') {
       return NextResponse.json(
         { error: 'Storage de anexos não configurado' },
         { status: 503 },
       );
     }
 
-    const auth = await getAuth();
-    const db = await getDb();
-    const session = await auth.api.getSession({ headers: request.headers });
-
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-    }
-
-    const parsed = bodySchema.safeParse(await lerJsonBodyLimitado(request, MAX_BODY_BYTES));
+    const chave = new URL(request.url).searchParams.get('chave');
+    const parsed = z.object({ chave: z.string().min(1).max(1024) }).safeParse({ chave });
     if (!parsed.success) {
       return NextResponse.json({ error: 'Chave de anexo inválida' }, { status: 400 });
     }
@@ -54,12 +33,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Chave de anexo inválida' }, { status: 400 });
     }
 
+    const auth = await getAuth();
+    const db = await getDb();
+    const session = await auth.api.getSession({ headers: request.headers });
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    }
+
     const usuario = await resolverUsuarioAutorizacao(db, session.user.id);
     if (!usuario?.instituicaoId || !usuario.ativo) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
-
-    // A instituição e a permissão são verificadas antes de consultar o paciente.
     if (
       usuario.instituicaoId !== contexto.instituicaoId ||
       !usuario.permissoes.includes('anexo:ver')
@@ -74,7 +58,6 @@ export async function POST(request: NextRequest) {
       ),
       columns: { id: true },
     });
-
     if (!paciente) {
       return NextResponse.json({ error: 'Anexo não encontrado' }, { status: 404 });
     }
@@ -92,23 +75,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Anexo não encontrado' }, { status: 404 });
     }
 
-    if (driverAtivo() === 'local') {
-      return NextResponse.json({
-        chave: parsed.data.chave,
-        driver: 'local',
-      });
+    const conteudo = await lerAnexoLocal(parsed.data.chave).catch(() => null);
+    if (!conteudo) {
+      return NextResponse.json({ error: 'Anexo não encontrado' }, { status: 404 });
     }
 
-    const downloadUrl = await gerarUrlDownload(parsed.data.chave);
-    return NextResponse.json({ downloadUrl, expiresIn: 300 });
+    const nome = parsed.data.chave.split('/').pop() ?? 'anexo';
+    return new NextResponse(new Uint8Array(conteudo), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(nome)}`,
+        'Cache-Control': 'private, no-store',
+      },
+    });
   } catch (error) {
-    if (error instanceof RequestBodyTooLargeError) {
-      return NextResponse.json(
-        { error: 'Corpo da requisição excede o limite permitido' },
-        { status: 413 },
-      );
-    }
-    console.error('Erro ao gerar URL de download do anexo:', error);
+    console.error('Erro ao ler anexo local:', error);
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }
 }

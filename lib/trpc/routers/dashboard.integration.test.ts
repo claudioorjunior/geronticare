@@ -33,6 +33,8 @@ let db!: Db;
 beforeAll(async () => {
   // Dev path loads the in-memory PGlite and applies every migration + seed.
   (process.env as { NODE_ENV?: string }).NODE_ENV = 'development';
+  // Garante PGlite in-memory (schema migrado) mesmo com DATABASE_URL no shell.
+  delete (process.env as Record<string, string | undefined>).DATABASE_URL;
   const { getDb } = await import('@/lib/db');
   const { appRouter } = await import('@/lib/trpc/root');
   db = await getDb<Db>();

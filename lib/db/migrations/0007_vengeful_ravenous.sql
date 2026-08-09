@@ -1,0 +1,1 @@
+ALTER TABLE "anexos" ALTER COLUMN "registro_id" DROP NOT NULL;

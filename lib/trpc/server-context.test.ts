@@ -94,7 +94,11 @@ describe('SEGURANÇA — cargo inativo não concede permissões', () => {
 
     const context = await createTRPCContext({ headers: new Headers() });
 
-    expect(context.permissoes).toEqual(['clinico:ler', 'clinico:editar']);
+    expect(context.permissoes).toEqual([
+      'clinico:ler',
+      'anexo:ver',
+      'clinico:editar',
+    ]);
   });
 
   it('cargo desativado NÃO concede permissões (revogação imediata)', async () => {
@@ -109,7 +113,7 @@ describe('SEGURANÇA — cargo inativo não concede permissões', () => {
 
     // Sem o fix, as permissões do cargo inativo entrariam (['clinico:editar'])
     // e o usuário manteria escrita clínica após o gestor desativar o cargo.
-    expect(context.permissoes).toEqual(['clinico:ler']);
+    expect(context.permissoes).toEqual(['clinico:ler', 'anexo:ver']);
   });
 
   it('usuário sem cargo mantém apenas a matriz do papel', async () => {
@@ -122,6 +126,6 @@ describe('SEGURANÇA — cargo inativo não concede permissões', () => {
 
     const context = await createTRPCContext({ headers: new Headers() });
 
-    expect(context.permissoes).toEqual(['clinico:ler']);
+    expect(context.permissoes).toEqual(['clinico:ler', 'anexo:ver']);
   });
 });
