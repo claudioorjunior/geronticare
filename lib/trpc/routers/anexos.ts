@@ -8,7 +8,7 @@ import {
 } from '../server';
 import { anexos, registros } from '@/lib/db/schema';
 import { verificarOwnershipPaciente } from '../ownership';
-import { storageConfigurado } from '@/lib/storage';
+import { objetoExiste, storageConfigurado } from '@/lib/storage';
 
 const TAMANHO_MAXIMO = 50 * 1024 * 1024;
 
@@ -58,6 +58,13 @@ export const anexosRouter = createTRPCRouter({
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'Chave de anexo inválida para este paciente',
+        });
+      }
+
+      if (!(await objetoExiste(input.chave))) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Arquivo de anexo não encontrado no storage',
         });
       }
 

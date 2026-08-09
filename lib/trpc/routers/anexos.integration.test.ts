@@ -22,6 +22,7 @@ function chaveValida(paciente = PACIENTE): string {
 
 let caller: Caller;
 let db!: Db;
+let objetoExiste: ReturnType<typeof vi.spyOn>;
 
 beforeAll(async () => {
   (process.env as { NODE_ENV?: string }).NODE_ENV = 'development';
@@ -30,7 +31,9 @@ beforeAll(async () => {
   delete (process.env as Record<string, string | undefined>).DATABASE_URL;
   const { getDb } = await import('@/lib/db');
   const { appRouter } = await import('@/lib/trpc/root');
+  const storage = await import('@/lib/storage');
   db = await getDb<Db>();
+  objetoExiste = vi.spyOn(storage, 'objetoExiste').mockResolvedValue(true);
   caller = appRouter.createCaller({
     db,
     session: null,
@@ -134,6 +137,26 @@ describe('integração anexos (PGlite real) — v0.6.0', () => {
         ],
       }),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('registros.criar rejeita metadados quando o objeto não existe no storage', async () => {
+    objetoExiste.mockResolvedValue(false);
+    try {
+      await expect(
+        caller.registros.criar({
+          pacienteId: PACIENTE,
+          especialidade: 'medicina',
+          tipo: 'exame',
+          titulo: 'Exame sem objeto',
+          conteudo: 'O arquivo ainda não existe.',
+          anexosNovos: [
+            { chave: chaveValida(), nome: 'x.pdf', tipo: 'application/pdf', tamanhoBytes: 100 },
+          ],
+        }),
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    } finally {
+      objetoExiste.mockResolvedValue(true);
+    }
   });
 
   it('rejeita chave de anexo de outro paciente/instituição (fail-closed)', async () => {
@@ -319,6 +342,23 @@ describe('integração anexos (PGlite real) — v0.6.0', () => {
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     } finally {
       spy.mockRestore();
+    }
+  });
+
+  it('anexos.criar rejeita metadados quando o objeto não existe no storage', async () => {
+    objetoExiste.mockResolvedValue(false);
+    try {
+      await expect(
+        caller.anexos.criar({
+          pacienteId: PACIENTE,
+          chave: chaveValida(),
+          nome: 'fantasma.pdf',
+          tipo: 'application/pdf',
+          tamanhoBytes: 2048,
+        }),
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    } finally {
+      objetoExiste.mockResolvedValue(true);
     }
   });
 

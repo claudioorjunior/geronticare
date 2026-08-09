@@ -5,7 +5,7 @@ import { eq, and, gte, lte, inArray } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { verificarOwnershipPaciente } from '../ownership';
 import { urlHttpSchema } from '@/lib/validations/url';
-import { storageConfigurado } from '@/lib/storage';
+import { objetoExiste, storageConfigurado } from '@/lib/storage';
 import { temPermissao } from '../autorizacao';
 
 const anexoSchema = z.object({
@@ -144,6 +144,16 @@ export const registrosRouter = createTRPCRouter({
             message: 'Chave de anexo inválida para este paciente',
           });
         }
+      }
+
+      const objetosExistem = await Promise.all(
+        anexosNovos.map((anexo) => objetoExiste(anexo.chave)),
+      );
+      if (objetosExistem.some((existe) => !existe)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Arquivo de anexo não encontrado no storage',
+        });
       }
 
       // Registro + metadados de anexos na mesma transação — falha reverte tudo.

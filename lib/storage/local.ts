@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile, unlink, readFile, link, readdir } from 'node:fs/promises';
+import { mkdir, writeFile, unlink, readFile, link, readdir, stat } from 'node:fs/promises';
 import { join, resolve, sep, relative } from 'node:path';
 import { env } from '@/lib/env';
 import { sanitizarNomeArquivo } from './s3';
@@ -49,7 +49,13 @@ export function gerarChaveAnexoLocal(
 /** Converte uma chave de anexo em caminho absoluto seguro dentro do diretório local. */
 export function caminhoDaChave(chave: string): string {
   // SEGURANÇA: path traversal — só aceita chaves no formato gerado pelo app.
-  if (!chave || chave.includes('..') || chave.startsWith('/') || chave.includes('\\')) {
+  const segmentos = chave.split('/');
+  if (
+    !chave ||
+    chave.startsWith('/') ||
+    chave.includes('\\') ||
+    segmentos.some((segmento) => !segmento || segmento === '.' || segmento === '..')
+  ) {
     throw new Error('Chave de armazenamento inválida');
   }
   const base = diretorioLocal();
@@ -108,6 +114,15 @@ export async function gravarAnexoLocal(
 export async function lerAnexoLocal(chave: string): Promise<Buffer> {
   const caminho = caminhoDaChave(chave);
   return readFile(caminho);
+}
+
+/** Verifica a existência de um objeto local sem carregar seu conteúdo. */
+export async function anexoExisteLocal(chave: string): Promise<boolean> {
+  try {
+    return (await stat(caminhoDaChave(chave))).isFile();
+  } catch {
+    return false;
+  }
 }
 
 /** Remove um anexo local do disco (não falha se já não existir). */
