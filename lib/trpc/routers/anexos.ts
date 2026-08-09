@@ -41,6 +41,13 @@ export const anexosRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await verificarOwnershipPaciente(ctx.db, input.pacienteId, ctx.instituicaoId);
 
+      if (!storageConfigurado()) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Storage de anexos não configurado',
+        });
+      }
+
       const { extrairContextoChaveAnexo } = await import('@/lib/storage/s3');
       const contexto = extrairContextoChaveAnexo(input.chave);
       if (

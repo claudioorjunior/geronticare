@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile, unlink, readFile, rename, readdir } from 'node:fs/promises';
+import { mkdir, writeFile, unlink, readFile, link, readdir } from 'node:fs/promises';
 import { join, resolve, sep, relative } from 'node:path';
 import { env } from '@/lib/env';
 import { sanitizarNomeArquivo } from './s3';
@@ -82,9 +82,8 @@ export function validarUploadLocal(tipoMime: string, tamanhoBytes: number): void
  * Grava o conteúdo de um anexo no disco local.
  * Usado pelo fluxo de upload via corpo da requisição (driver local).
  *
- * Write atômico: grava em `<chave>.part` e renomeia ao final — um crash no
- * meio do write nunca deixa um arquivo parcial no caminho final (que seria
- * servido por download com conteúdo truncado).
+ * Write atômico: grava em arquivo `.part` único e publica por hard link — um
+ * crash nunca expõe conteúdo parcial e uma chave existente nunca é substituída.
  */
 export async function gravarAnexoLocal(
   chave: string,
@@ -94,10 +93,15 @@ export async function gravarAnexoLocal(
 ): Promise<void> {
   validarUploadLocal(tipoMime, tamanhoBytes);
   const caminho = caminhoDaChave(chave);
-  const caminhoPart = `${caminho}.part`;
+  const caminhoPart = `${caminho}.${randomUUID()}.part`;
   await mkdir(join(caminho, '..'), { recursive: true });
-  await writeFile(caminhoPart, conteudo);
-  await rename(caminhoPart, caminho);
+  try {
+    await writeFile(caminhoPart, conteudo);
+    // `link` publica atomicamente e falha com EEXIST sem substituir o destino.
+    await link(caminhoPart, caminho);
+  } finally {
+    await unlink(caminhoPart).catch(() => {});
+  }
 }
 
 /** Lê o conteúdo de um anexo local (para servir download). */

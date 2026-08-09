@@ -6,6 +6,7 @@ import { TRPCError } from '@trpc/server';
 import { verificarOwnershipPaciente } from '../ownership';
 import { urlHttpSchema } from '@/lib/validations/url';
 import { storageConfigurado } from '@/lib/storage';
+import { temPermissao } from '../autorizacao';
 
 const anexoSchema = z.object({
   nome: z.string(),
@@ -114,6 +115,10 @@ export const registrosRouter = createTRPCRouter({
       await verificarOwnershipPaciente(ctx.db, input.pacienteId, ctx.instituicaoId);
 
       const anexosNovos = input.anexosNovos ?? [];
+
+      if (anexosNovos.length > 0 && !temPermissao(ctx.permissoes, 'anexo:criar')) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
 
       // SEGURANÇA: não persiste metadados de anexo sem storage configurado —
       // evita "anexo fantasma" (metadado sem objeto) com chave forjada.

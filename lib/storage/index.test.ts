@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { randomUUID } from 'node:crypto';
 
 const envMock = vi.hoisted(() => ({
   STORAGE_DRIVER: 'local',
@@ -104,42 +105,24 @@ describe('driver local', () => {
     expect(() => validarUploadLocal('application/pdf', 4096)).not.toThrow();
   });
 
-  it('grava em arquivo temporário .part e renomeia ao final (write atômico)', async () => {
-    // Hook para capturar os caminhos usados pelo writeFile (o write deve ir
-    // para .part, nunca direto no destino) — via mocking do fs/promises.
-    vi.mock('node:fs/promises', async (importOriginal) => {
-      const actual = await importOriginal<typeof import('node:fs/promises')>();
-      return {
-        ...actual,
-        writeFile: vi.fn(actual.writeFile),
-        rename: vi.fn(actual.rename),
-      };
-    });
-
-    const fsPromises = await import('node:fs/promises');
-    const { readFile } = await import('node:fs/promises');
+  it('não sobrescreve um anexo local quando a chave já existe', async () => {
+    const { readFile, unlink } = await import('node:fs/promises');
     const { gravarAnexoLocal, caminhoDaChave } = await import('./local');
 
     const chave = `instituicoes/320471aa-5994-4886-9ee6-1cee8e7aa810/pacientes/` +
-      '420471aa-5994-4886-9ee6-1cee8e7aa810/520471aa-5994-4886-9ee6-1cee8e7aa810-exame.pdf';
+      `420471aa-5994-4886-9ee6-1cee8e7aa810/${randomUUID()}-exame.pdf`;
     const caminho = caminhoDaChave(chave);
 
-    await gravarAnexoLocal(chave, Buffer.from('conteudo'), 'application/pdf', 8);
+    try {
+      await gravarAnexoLocal(chave, Buffer.from('original'), 'application/pdf', 8);
 
-    const conteudo = await readFile(caminho);
-    expect(conteudo.toString()).toBe('conteudo');
+      await expect(
+        gravarAnexoLocal(chave, Buffer.from('alterado'), 'application/pdf', 8),
+      ).rejects.toMatchObject({ code: 'EEXIST' });
 
-    // writeFile foi chamado com caminho .part (não direto no destino)
-    const writeFileMock = fsPromises.writeFile as ReturnType<typeof vi.fn>;
-    expect(writeFileMock).toHaveBeenCalledTimes(1);
-    const [writePath] = writeFileMock.mock.calls[0] as [string];
-    expect(writePath.endsWith('.part')).toBe(true);
-
-    // rename foi chamado uma vez, do .part para o destino
-    const renameMock = fsPromises.rename as ReturnType<typeof vi.fn>;
-    expect(renameMock).toHaveBeenCalledTimes(1);
-    const [de, para] = renameMock.mock.calls[0] as [string, string];
-    expect(de.endsWith('.part')).toBe(true);
-    expect(para).toBe(caminho);
+      await expect(readFile(caminho, 'utf8')).resolves.toBe('original');
+    } finally {
+      await unlink(caminho).catch(() => {});
+    }
   });
 });

@@ -48,7 +48,7 @@ vi.mock('@/lib/storage/s3', () => ({
 vi.mock('@/lib/storage/local', () => ({
   gravarAnexoLocal: mocks.gravarAnexoLocal,
   lerAnexoLocal: mocks.lerAnexoLocal,
-  TAMANHO_MAXIMO_UPLOAD_BYTES: 50 * 1024 * 1024,
+  TAMANHO_MAXIMO_UPLOAD_BYTES: 1024,
 }));
 
 import { POST as uploadLocal } from './upload-local/route';
@@ -107,6 +107,56 @@ describe('POST /api/anexos/upload-local', () => {
     mocks.storageConfigurado.mockReturnValue(false);
     const response = await uploadLocal(new NextRequest('http://localhost/api/anexos/upload-local', { method: 'POST' }));
     expect(response.status).toBe(503);
+    expect(mocks.gravarAnexoLocal).not.toHaveBeenCalled();
+  });
+
+  it('nega usuário sem anexo:criar antes de interpretar o multipart', async () => {
+    autenticado([]);
+
+    const response = await uploadLocal(
+      new NextRequest('http://localhost/api/anexos/upload-local', {
+        method: 'POST',
+        headers: { 'content-type': 'multipart/form-data; boundary=invalido' },
+        body: 'corpo multipart inválido',
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(mocks.gravarAnexoLocal).not.toHaveBeenCalled();
+  });
+
+  it('retorna 413 quando Content-Length excede o limite antes do formData', async () => {
+    autenticado(['anexo:criar']);
+    const form = new FormData();
+    form.append('chave', chave);
+    form.append('tipoMime', 'application/pdf');
+    form.append('tamanhoBytes', '17');
+    form.append('file', new File(['conteudo-do-anexo'], 'exame.pdf', { type: 'application/pdf' }));
+
+    const response = await uploadLocal(
+      new NextRequest('http://localhost/api/anexos/upload-local', {
+        method: 'POST',
+        headers: { 'content-length': String(1024 + 1024 * 1024 + 1) },
+        body: form,
+      }),
+    );
+
+    expect(response.status).toBe(413);
+    expect(mocks.gravarAnexoLocal).not.toHaveBeenCalled();
+  });
+
+  it('retorna 413 para corpo sem Content-Length que ultrapassa o limite', async () => {
+    autenticado(['anexo:criar']);
+
+    const response = await uploadLocal(
+      new NextRequest('http://localhost/api/anexos/upload-local', {
+        method: 'POST',
+        headers: { 'content-type': 'application/octet-stream' },
+        body: new Uint8Array(1024 + 1024 * 1024 + 1),
+      }),
+    );
+
+    expect(response.status).toBe(413);
     expect(mocks.gravarAnexoLocal).not.toHaveBeenCalled();
   });
 

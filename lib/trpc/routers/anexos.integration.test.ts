@@ -111,6 +111,31 @@ describe('integração anexos (PGlite real) — v0.6.0', () => {
     }
   });
 
+  it('registros.criar exige anexo:criar quando anexosNovos não está vazio', async () => {
+    const semPermissaoAnexo = (await import('@/lib/trpc/root')).appRouter.createCaller({
+      db,
+      session: null,
+      headers: new Headers(),
+      userId: LEITOR,
+      instituicaoId: INSTITUICAO,
+      userRole: 'usuario',
+      permissoes: ['clinico:ler', 'clinico:editar', 'anexo:ver'],
+    } as unknown as Context);
+
+    await expect(
+      semPermissaoAnexo.registros.criar({
+        pacienteId: PACIENTE,
+        especialidade: 'medicina',
+        tipo: 'exame',
+        titulo: 'Exame sem permissão de anexo',
+        conteudo: 'Não deve contornar o RBAC de documentos.',
+        anexosNovos: [
+          { chave: chaveValida(), nome: 'x.pdf', tipo: 'application/pdf', tamanhoBytes: 100 },
+        ],
+      }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
   it('rejeita chave de anexo de outro paciente/instituição (fail-closed)', async () => {
     await expect(
       caller.registros.criar({
@@ -277,6 +302,24 @@ describe('integração anexos (PGlite real) — v0.6.0', () => {
       chave,
       nome: 'avulso.pdf',
     });
+  });
+
+  it('anexos.criar rejeita metadados quando o storage não está configurado', async () => {
+    const storage = await import('@/lib/storage');
+    const spy = vi.spyOn(storage, 'storageConfigurado').mockReturnValue(false);
+    try {
+      await expect(
+        caller.anexos.criar({
+          pacienteId: PACIENTE,
+          chave: chaveValida(),
+          nome: 'fantasma.pdf',
+          tipo: 'application/pdf',
+          tamanhoBytes: 2048,
+        }),
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('anexos.criar rejeita chave de outro paciente/instituição', async () => {

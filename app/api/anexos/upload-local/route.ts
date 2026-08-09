@@ -9,6 +9,47 @@ import { extrairContextoChaveAnexo } from '@/lib/storage/s3';
 import { storageConfigurado, driverAtivo } from '@/lib/storage';
 import { gravarAnexoLocal, TAMANHO_MAXIMO_UPLOAD_BYTES } from '@/lib/storage/local';
 
+const TAMANHO_MAXIMO_CORPO_MULTIPART_BYTES =
+  TAMANHO_MAXIMO_UPLOAD_BYTES + 1024 * 1024;
+
+async function formDataComLimite(request: NextRequest): Promise<FormData | null> {
+  const contentLength = Number(request.headers.get('content-length'));
+  if (Number.isFinite(contentLength) && contentLength > TAMANHO_MAXIMO_CORPO_MULTIPART_BYTES) {
+    return null;
+  }
+
+  if (!request.body) return new FormData();
+
+  const reader = request.body.getReader();
+  const partes: Uint8Array[] = [];
+  let tamanho = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    tamanho += value.byteLength;
+    if (tamanho > TAMANHO_MAXIMO_CORPO_MULTIPART_BYTES) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    partes.push(value);
+  }
+
+  const corpo = new Uint8Array(tamanho);
+  let offset = 0;
+  for (const parte of partes) {
+    corpo.set(parte, offset);
+    offset += parte.byteLength;
+  }
+
+  const contentType = request.headers.get('content-type');
+  return new Request(request.url, {
+    method: 'POST',
+    headers: contentType ? { 'content-type': contentType } : undefined,
+    body: corpo.buffer,
+  }).formData();
+}
+
 /**
  * Upload do arquivo para o driver local (filesystem).
  * O fluxo: POST /api/anexos/upload-url (gera chave + valida) → upload do
@@ -32,7 +73,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
     }
 
-    const formData = await request.formData();
+    const usuario = await resolverUsuarioAutorizacao(db, session.user.id);
+    if (
+      !usuario?.instituicaoId ||
+      !usuario.ativo ||
+      !usuario.permissoes.includes('anexo:criar')
+    ) {
+      return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
+    }
+
+    const formData = await formDataComLimite(request);
+    if (!formData) {
+      return NextResponse.json({ error: 'Arquivo excede 50 MB' }, { status: 413 });
+    }
     const chave = formData.get('chave');
     const tipoMime = formData.get('tipoMime');
     const tamanhoBytes = formData.get('tamanhoBytes');
@@ -62,15 +115,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Chave de anexo inválida' }, { status: 400 });
     }
 
-    const usuario = await resolverUsuarioAutorizacao(db, session.user.id);
-    if (!usuario?.instituicaoId || !usuario.ativo) {
-      return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
-    }
-    // SEGURANÇA: anexar exige `anexo:criar`; tenant garantido pelo contexto da chave.
-    if (
-      usuario.instituicaoId !== contexto.instituicaoId ||
-      !usuario.permissoes.includes('anexo:criar')
-    ) {
+    // SEGURANÇA: tenant garantido pelo contexto da chave.
+    if (usuario.instituicaoId !== contexto.instituicaoId) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
