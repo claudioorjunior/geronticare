@@ -132,8 +132,18 @@ describe('S3 upload capability', () => {
       Key: chave,
     });
 
-    mocks.send.mockRejectedValueOnce(new Error('NotFound'));
+    mocks.send.mockRejectedValueOnce({
+      name: 'NotFound',
+      $metadata: { httpStatusCode: 404 },
+    });
     await expect(anexoExisteS3(chave)).resolves.toBe(false);
+
+    const indisponivel = Object.assign(new Error('Storage indisponível'), {
+      name: 'TimeoutError',
+      $metadata: { httpStatusCode: 503 },
+    });
+    mocks.send.mockRejectedValueOnce(indisponivel);
+    await expect(anexoExisteS3(chave)).rejects.toBe(indisponivel);
   });
 
   it('lista objetos de anexos por página', async () => {

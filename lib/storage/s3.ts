@@ -170,8 +170,12 @@ export async function anexoExisteS3(chave: string): Promise<boolean> {
   try {
     await obterS3Client().send(new HeadObjectCommand({ Bucket: bucket, Key: chave }));
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    const status = typeof error === 'object' && error !== null && '$metadata' in error
+      ? (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode
+      : undefined;
+    if (status === 404) return false;
+    throw error;
   }
 }
 
