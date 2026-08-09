@@ -32,6 +32,9 @@ const antigo =
 const persistido =
   'instituicoes/320471aa-5994-4886-9ee6-1cee8e7aa810/pacientes/' +
   '420471aa-5994-4886-9ee6-1cee8e7aa810/620471aa-5994-4886-9ee6-1cee8e7aa810-ok.pdf';
+const legado =
+  'instituicoes/320471aa-5994-4886-9ee6-1cee8e7aa810/pacientes/' +
+  '420471aa-5994-4886-9ee6-1cee8e7aa810/720471aa-5994-4886-9ee6-1cee8e7aa810-legado.pdf';
 
 describe('limpeza de órfãos no storage S3', () => {
   it('remove objetos antigos sem metadados e pagina o bucket', async () => {
@@ -42,25 +45,38 @@ describe('limpeza de órfãos no storage S3', () => {
       .mockResolvedValueOnce({
         objetos: [
           { chave: antigo, atualizadoEm: antigoData },
-          { chave: persistido, atualizadoEm: antigoData },
         ],
         proximaPagina: 'pagina-2',
       })
       .mockResolvedValueOnce({
-        objetos: [{ chave: antigo + '.recente', atualizadoEm: recenteData }],
+        objetos: [
+          { chave: persistido, atualizadoEm: antigoData },
+          { chave: legado, atualizadoEm: antigoData },
+          { chave: antigo + '.recente', atualizadoEm: recenteData },
+        ],
       });
     mocks.removerAnexo.mockResolvedValue(undefined);
 
+    const findAnexo = vi.fn()
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ id: 'metadado-criado-durante-scan' })
+      .mockResolvedValueOnce(undefined);
+    const findRegistroLegado = vi.fn()
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ id: 'registro-legado' });
+
     const db = {
       query: {
-        anexos: {
-          findMany: vi.fn().mockResolvedValue([{ chave: persistido }]),
-        },
+        anexos: { findFirst: findAnexo },
+        registros: { findFirst: findRegistroLegado },
       },
     } as unknown as Db;
 
-    await expect(limparOrfaosS3(db)).resolves.toEqual({ removidos: 1, verificados: 3 });
+    await expect(limparOrfaosS3(db)).resolves.toEqual({ removidos: 1, verificados: 4 });
     expect(mocks.removerAnexo).toHaveBeenCalledWith(antigo);
+    expect(findAnexo).toHaveBeenCalledTimes(3);
+    expect(findRegistroLegado).toHaveBeenCalledTimes(3);
     expect(mocks.listarObjetosAnexosS3).toHaveBeenCalledTimes(2);
   });
 });

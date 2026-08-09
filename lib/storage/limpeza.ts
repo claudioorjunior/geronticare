@@ -1,6 +1,6 @@
 import type { Db } from '@/lib/db';
-import { anexos } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { anexos, registros } from '@/lib/db/schema';
+import { eq, sql } from 'drizzle-orm';
 import { stat } from 'node:fs/promises';
 import { listarArquivosLocais, removerAnexoLocal, caminhoDaChave } from './local';
 import { driverAtivo } from './index';
@@ -8,15 +8,31 @@ import { extrairContextoChaveAnexo, listarObjetosAnexosS3, removerAnexo } from '
 
 export const TTL_ORFAO_HORAS_PADRAO = 24;
 
+/** Confere referências atuais e legadas imediatamente antes da exclusão. */
+async function anexoPersistido(db: Db, chave: string): Promise<boolean> {
+  const [metadado, registroLegado] = await Promise.all([
+    db.query.anexos.findFirst({
+      where: eq(anexos.chave, chave),
+      columns: { id: true },
+    }),
+    db.query.registros.findFirst({
+      where: sql`${registros.anexos} @> ${JSON.stringify([{ chave }])}::jsonb`,
+      columns: { id: true },
+    }),
+  ]);
+
+  return Boolean(metadado || registroLegado);
+}
+
 /**
  * Job de limpeza de anexos órfãos no storage local.
  *
  * Um anexo vira órfão quando o upload grava o objeto mas os metadados nunca
  * são persistidos (upload abortado, submit que falhou, transação revertida).
- * Este job apaga objetos no disco sem metadados correspondentes na tabela
- * `anexos`.
+ * Este job apaga objetos no disco sem referência na tabela `anexos` nem no
+ * JSON legado de `registros.anexos`.
  *
- * Segurança: cada chave é conferida contra a tabela `anexos` ANTES de apagar
+ * Segurança: cada chave é conferida no banco imediatamente ANTES de apagar
  * (nunca apaga por padrão de nome). Arquivos `.part` (em gravação) são
  * ignorados pelo listador.
  */
@@ -39,13 +55,7 @@ export async function limparOrfaosLocais(
     const arquivo = await stat(caminhoDaChave(chave)).catch(() => null);
     if (!arquivo || arquivo.mtimeMs > limite) continue;
 
-    // Verifica se existe metadado na tabela anexos para esta chave.
-    const metadado = await db.query.anexos.findFirst({
-      where: eq(anexos.chave, chave),
-      columns: { id: true },
-    });
-
-    if (!metadado) {
+    if (!(await anexoPersistido(db, chave))) {
       await removerAnexoLocal(chave);
       removidos++;
     }
@@ -64,8 +74,6 @@ export async function limparOrfaosS3(
     throw new Error('ttlHoras deve ser um número finito não negativo');
   }
 
-  const metadados = await db.query.anexos.findMany({ columns: { chave: true } });
-  const chavesPersistidas = new Set(metadados.map(({ chave }) => chave));
   const limite = Date.now() - ttlHoras * 60 * 60 * 1000;
   let removidos = 0;
   let verificados = 0;
@@ -79,7 +87,7 @@ export async function limparOrfaosS3(
 
       // Sem timestamp não há evidência suficiente para apagar um objeto.
       if (!objeto.atualizadoEm || objeto.atualizadoEm.getTime() > limite) continue;
-      if (chavesPersistidas.has(objeto.chave)) continue;
+      if (await anexoPersistido(db, objeto.chave)) continue;
 
       await removerAnexo(objeto.chave);
       removidos++;
