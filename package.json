@@ -17,7 +17,7 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "storage:limpar-orfaos": "node scripts/limpar-orfaos.mjs"
+    "storage:limpar-orfaos": "tsx scripts/limpar-orfaos.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1093.0",
@@ -38,6 +38,7 @@
     "lucide-react": "^1.26.0",
     "next": "16.2.11",
     "postgres": "^3.4.9",
+    "tsx": "^4.23.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "recharts": "^3.10.0",

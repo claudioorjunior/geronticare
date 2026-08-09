@@ -54,6 +54,7 @@ export default function RegistrosPage() {
   const [novoTitulo, setNovoTitulo] = useState('');
   const [novoConteudo, setNovoConteudo] = useState('');
   const [anexosSelecionados, setAnexosSelecionados] = useState<AnexoSelecionado[]>([]);
+  const [anexosEnviando, setAnexosEnviando] = useState(false);
   const [message, setMessage] = useState('');
   const canEdit = role === 'admin' || role === 'profissional';
   const storageStatusQuery = trpc.anexos.status.useQuery();
@@ -166,12 +167,13 @@ export default function RegistrosPage() {
                   <AnexosUpload
                     pacienteId={params.id}
                     onAnexosChange={setAnexosSelecionados}
+                    onUploadingChange={setAnexosEnviando}
                     disabled={!canEdit}
                   />
                 </div>
               )}
               <div className="flex items-center gap-3">
-                <Button onClick={salvarRegistro} disabled={criarRegistro.isPending || !novoTitulo.trim() || !novoConteudo.trim()} size="sm">
+                <Button onClick={salvarRegistro} disabled={criarRegistro.isPending || anexosEnviando || !novoTitulo.trim() || !novoConteudo.trim()} size="sm">
                   {criarRegistro.isPending ? 'Salvando...' : 'Salvar registro'}
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}>Cancelar</Button>

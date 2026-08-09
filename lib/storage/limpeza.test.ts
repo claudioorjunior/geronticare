@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { mkdtemp, writeFile, mkdir, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, mkdir, readdir, rm, utimes } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Db } from '@/lib/db';
@@ -57,6 +57,8 @@ describe('limpeza de órfãos no storage local', () => {
 
     await criarArquivo(orfao);
     await criarArquivo(legitimo);
+    const ontem = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    await utimes(join(DIR, orfao), ontem, ontem);
 
     // Insere metadado apenas para o legítimo (tabela real via PGlite).
     await db.insert(anexos).values({
@@ -80,31 +82,29 @@ describe('limpeza de órfãos no storage local', () => {
     expect(restantes).not.toContain('520471aa-5994-4886-9ee6-1cee8e7aa810-upload-abortado.pdf');
   });
 
-  it('não apaga arquivos legítimos (com metadado) e ignora .part', async () => {
-    const legitimo =
-      `${SUBDIR}/720471aa-5994-4886-9ee6-1cee8e7aa810-anexo-legitimo.pdf`;
-    await criarArquivo(legitimo);
-
-    await db.insert(anexos).values({
-      instituicaoId: INSTITUICAO,
-      pacienteId: PACIENTE,
-      chave: legitimo,
-      nome: 'anexo-legitimo.pdf',
-      tipo: 'application/pdf',
-      tamanhoBytes: 5,
-      criadoPorId: MEDICO,
-    });
+  it('preserva órfãos recentes e ignora .part', async () => {
+    const recente =
+      `${SUBDIR}/720471aa-5994-4886-9ee6-1cee8e7aa810-upload-recente.pdf`;
+    await criarArquivo(recente);
 
     // Arquivo .part (em gravação) não deve ser considerado órfão.
     await criarArquivo(`${SUBDIR}/820471aa-5994-4886-9ee6-1cee8e7aa810-em-gravacao.pdf.part`);
 
     const { limparOrfaosLocais } = await import('./limpeza');
-    await limparOrfaosLocais(db);
+    const resultado = await limparOrfaosLocais(db);
 
+    expect(resultado.removidos).toBe(0);
     const restantes = await arquivosEm();
-    expect(restantes).toContain('720471aa-5994-4886-9ee6-1cee8e7aa810-anexo-legitimo.pdf');
+    expect(restantes).toContain('720471aa-5994-4886-9ee6-1cee8e7aa810-upload-recente.pdf');
     // O .part é ignorado pelo listador — não é nem verificado nem removido.
     expect(restantes).toContain('820471aa-5994-4886-9ee6-1cee8e7aa810-em-gravacao.pdf.part');
+  });
+
+  it('rejeita TTL inválido', async () => {
+    const { limparOrfaosLocais } = await import('./limpeza');
+    await expect(limparOrfaosLocais(db, { ttlHoras: -1 })).rejects.toThrow(
+      'ttlHoras deve ser um número finito não negativo',
+    );
   });
 
   afterAll(async () => {

@@ -1,10 +1,11 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Paperclip, Loader2, X, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export type AnexoSelecionado = {
+  id: string;
   chave: string;
   nome: string;
   tipo: string;
@@ -32,6 +33,7 @@ const MIME_PERMITIDOS = new Set([
 type Props = {
   pacienteId: string;
   onAnexosChange: (anexos: AnexoSelecionado[]) => void;
+  onUploadingChange?: (uploading: boolean) => void;
   disabled?: boolean;
 };
 
@@ -41,13 +43,17 @@ type Props = {
  * presigned URL; local faz POST /api/anexos/upload-local com o conteúdo.
  * Os metadados só são persistidos no submit do registro (mesma transação).
  */
-export function AnexosUpload({ pacienteId, onAnexosChange, disabled }: Props) {
+export function AnexosUpload({ pacienteId, onAnexosChange, onUploadingChange, disabled }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [anexos, setAnexos] = useState<AnexoSelecionado[]>([]);
 
+  useEffect(() => {
+    onAnexosChange(anexos.filter((a) => a.status === 'pronto'));
+    onUploadingChange?.(anexos.some((a) => a.status === 'enviando'));
+  }, [anexos, onAnexosChange, onUploadingChange]);
+
   const atualizar = (proximo: AnexoSelecionado[]) => {
     setAnexos(proximo);
-    onAnexosChange(proximo.filter((a) => a.status === 'pronto'));
   };
 
   async function enviarArquivo(arquivo: File) {
@@ -56,6 +62,7 @@ export function AnexosUpload({ pacienteId, onAnexosChange, disabled }: Props) {
       setAnexos((prev) => [
         ...prev,
         {
+          id: crypto.randomUUID(),
           chave: '',
           nome: arquivo.name,
           tipo: arquivo.type,
@@ -70,6 +77,7 @@ export function AnexosUpload({ pacienteId, onAnexosChange, disabled }: Props) {
       setAnexos((prev) => [
         ...prev,
         {
+          id: crypto.randomUUID(),
           chave: '',
           nome: arquivo.name,
           tipo: arquivo.type,
@@ -82,6 +90,7 @@ export function AnexosUpload({ pacienteId, onAnexosChange, disabled }: Props) {
     }
 
     const entrada: AnexoSelecionado = {
+      id: crypto.randomUUID(),
       chave: '',
       nome: arquivo.name,
       tipo: arquivo.type,
@@ -132,15 +141,15 @@ export function AnexosUpload({ pacienteId, onAnexosChange, disabled }: Props) {
 
       setAnexos((prev) =>
         prev.map((a) =>
-          a.nome === entrada.nome && a.status === 'enviando'
-            ? { ...a, chave: dados.chave, status: 'pronto' }
+          a.id === entrada.id && a.status === 'enviando'
+            ? { ...a, chave: dados.chave, status: 'pronto' as const }
             : a,
         ),
       );
     } catch (error) {
       setAnexos((prev) =>
         prev.map((a) =>
-          a.nome === entrada.nome && a.status === 'enviando'
+          a.id === entrada.id && a.status === 'enviando'
             ? { ...a, status: 'erro', erro: error instanceof Error ? error.message : 'Erro no upload' }
             : a,
         ),
@@ -173,7 +182,7 @@ export function AnexosUpload({ pacienteId, onAnexosChange, disabled }: Props) {
       <div className="flex flex-wrap gap-2">
         {anexos.map((anexo, index) => (
           <div
-            key={`${anexo.nome}-${index}`}
+            key={anexo.id}
             className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${
               anexo.status === 'erro'
                 ? 'border-red-200 bg-red-50 text-red-700'

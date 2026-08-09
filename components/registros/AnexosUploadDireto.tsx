@@ -22,6 +22,7 @@ const MIME_PERMITIDOS = new Set([
 ]);
 
 type Item = {
+  id: string;
   nome: string;
   status: 'enviando' | 'erro';
   erro?: string;
@@ -50,17 +51,17 @@ export function AnexosUploadDireto({
   });
 
   async function enviar(arquivo: File) {
+    const id = crypto.randomUUID();
     if (!MIME_PERMITIDOS.has(arquivo.type)) {
-      setItens((prev) => [...prev, { nome: arquivo.name, status: 'erro', erro: 'Tipo não permitido' }]);
+      setItens((prev) => [...prev, { id, nome: arquivo.name, status: 'erro', erro: 'Tipo não permitido' }]);
       return;
     }
     if (arquivo.size > TAMANHO_MAXIMO) {
-      setItens((prev) => [...prev, { nome: arquivo.name, status: 'erro', erro: 'Arquivo excede 50 MB' }]);
+      setItens((prev) => [...prev, { id, nome: arquivo.name, status: 'erro', erro: 'Arquivo excede 50 MB' }]);
       return;
     }
 
-    setItens((prev) => [...prev, { nome: arquivo.name, status: 'enviando' }]);
-    const indice = itens.length; // posição aproximada para atualizar (idempotente por nome)
+    setItens((prev) => [...prev, { id, nome: arquivo.name, status: 'enviando' }]);
 
     try {
       // 1. URL de upload (valida tenant/paciente e devolve a chave)
@@ -112,11 +113,11 @@ export function AnexosUploadDireto({
         tamanhoBytes: arquivo.size,
       });
 
-      setItens((prev) => prev.filter((_, i) => i !== indice));
+      setItens((prev) => prev.filter((item) => item.id !== id));
     } catch (error) {
       setItens((prev) =>
-        prev.map((item, i) =>
-          i === indice ? { ...item, status: 'erro', erro: error instanceof Error ? error.message : 'Erro no upload' } : item,
+        prev.map((item) =>
+          item.id === id ? { ...item, status: 'erro', erro: error instanceof Error ? error.message : 'Erro no upload' } : item,
         ),
       );
     }
@@ -151,7 +152,7 @@ export function AnexosUploadDireto({
         <ul className="mt-3 space-y-1.5">
           {itens.map((item, i) => (
             <li
-              key={`${item.nome}-${i}`}
+              key={item.id}
               className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${
                 item.status === 'erro'
                   ? 'border-red-200 bg-red-50 text-red-700'
