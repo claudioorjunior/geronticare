@@ -67,17 +67,20 @@ describe('limpeza de órfãos no storage S3', () => {
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce({ id: 'registro-legado' });
 
-    const db = {
-      query: {
-        anexos: { findFirst: findAnexo },
-        registros: { findFirst: findRegistroLegado },
-      },
-    } as unknown as Db;
+    const execute = vi.fn().mockResolvedValue(undefined);
+    const query = {
+      anexos: { findFirst: findAnexo },
+      registros: { findFirst: findRegistroLegado },
+    };
+    const transaction = vi.fn(async (callback) => callback({ execute, query }));
+    const db = { query, transaction } as unknown as Db;
 
     await expect(limparOrfaosS3(db)).resolves.toEqual({ removidos: 1, verificados: 4 });
     expect(mocks.removerAnexo).toHaveBeenCalledWith(antigo);
     expect(findAnexo).toHaveBeenCalledTimes(3);
     expect(findRegistroLegado).toHaveBeenCalledTimes(2);
+    expect(transaction).toHaveBeenCalledTimes(3);
+    expect(execute).toHaveBeenCalledTimes(3);
     expect(mocks.listarObjetosAnexosS3).toHaveBeenCalledTimes(2);
   });
 });

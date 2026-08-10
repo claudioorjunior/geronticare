@@ -76,6 +76,31 @@ describe('integração anexos (PGlite real) — v0.6.0', () => {
     });
   });
 
+  it('registros.criar confere o objeto dentro da transação coordenada', async () => {
+    const transaction = vi.spyOn(db, 'transaction');
+    objetoExiste.mockClear();
+
+    try {
+      await caller.registros.criar({
+        pacienteId: PACIENTE,
+        especialidade: 'medicina',
+        tipo: 'exame',
+        titulo: 'Exame coordenado',
+        conteudo: 'Finalização protegida contra limpeza concorrente.',
+        anexosNovos: [
+          { chave: chaveValida(), nome: 'coordenado.pdf', tipo: 'application/pdf', tamanhoBytes: 1024 },
+        ],
+      });
+
+      expect(transaction).toHaveBeenCalledOnce();
+      expect(transaction.mock.invocationCallOrder[0]).toBeLessThan(
+        objetoExiste.mock.invocationCallOrder[0],
+      );
+    } finally {
+      transaction.mockRestore();
+    }
+  });
+
   it('registros.criar sem anexos funciona normalmente', async () => {
     const registro = await caller.registros.criar({
       pacienteId: PACIENTE,
@@ -304,6 +329,28 @@ describe('integração anexos (PGlite real) — v0.6.0', () => {
       where: eq(anexos.registroId, registro.id),
     });
     expect(restante).toHaveLength(0);
+  });
+
+  it('anexos.criar confere o objeto dentro da transação coordenada', async () => {
+    const transaction = vi.spyOn(db, 'transaction');
+    objetoExiste.mockClear();
+
+    try {
+      await caller.anexos.criar({
+        pacienteId: PACIENTE,
+        chave: chaveValida(),
+        nome: 'avulso-coordenado.pdf',
+        tipo: 'application/pdf',
+        tamanhoBytes: 2048,
+      });
+
+      expect(transaction).toHaveBeenCalledOnce();
+      expect(transaction.mock.invocationCallOrder[0]).toBeLessThan(
+        objetoExiste.mock.invocationCallOrder[0],
+      );
+    } finally {
+      transaction.mockRestore();
+    }
   });
 
   it('anexos.criar persiste documento avulso (sem registro)', async () => {

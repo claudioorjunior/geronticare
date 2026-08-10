@@ -5,6 +5,7 @@ import { stat } from 'node:fs/promises';
 import { listarArquivosLocais, removerAnexoLocal, caminhoDaChave } from './local';
 import { driverAtivo } from './index';
 import { extrairContextoChaveAnexo, listarObjetosAnexosS3, removerAnexo } from './s3';
+import { bloquearChavesAnexo } from './lock';
 
 export const TTL_ORFAO_HORAS_PADRAO = 24;
 
@@ -58,10 +59,13 @@ export async function limparOrfaosLocais(
     const arquivo = await stat(caminhoDaChave(chave)).catch(() => null);
     if (!arquivo || arquivo.mtimeMs > limite) continue;
 
-    if (!(await anexoPersistido(db, chave))) {
-      await removerAnexoLocal(chave);
-      removidos++;
-    }
+    await db.transaction(async (tx) => {
+      await bloquearChavesAnexo(tx, [chave]);
+      if (!(await anexoPersistido(tx, chave))) {
+        await removerAnexoLocal(chave);
+        removidos++;
+      }
+    });
   }
 
   return { removidos, verificados: chaves.length };
@@ -90,10 +94,13 @@ export async function limparOrfaosS3(
 
       // Sem timestamp não há evidência suficiente para apagar um objeto.
       if (!objeto.atualizadoEm || objeto.atualizadoEm.getTime() > limite) continue;
-      if (await anexoPersistido(db, objeto.chave)) continue;
+      await db.transaction(async (tx) => {
+        await bloquearChavesAnexo(tx, [objeto.chave]);
+        if (await anexoPersistido(tx, objeto.chave)) return;
 
-      await removerAnexo(objeto.chave);
-      removidos++;
+        await removerAnexo(objeto.chave);
+        removidos++;
+      });
     }
     continuationToken = pagina.proximaPagina;
   } while (continuationToken);
