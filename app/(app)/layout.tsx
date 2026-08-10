@@ -6,6 +6,9 @@ import { obterEstadoBootstrap } from '@/lib/bootstrap';
 import { getDb } from '@/lib/db';
 import { TopNav } from '@/components/layout/TopNav';
 import { devBypassAtivo } from '@/lib/trpc/autorizacao';
+import { AppShell } from '@/components/layout/AppShell';
+import { InstitutionThemeProvider } from '@/components/layout/InstitutionThemeProvider';
+import { NOVO_UI_ATIVO } from '@/lib/novo-ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,10 +50,18 @@ export default async function AppLayout({
 
   return (
     <>
-      <TopNav />
-      <main className="mx-auto max-w-container-max px-margin-mobile pb-16 md:px-margin-desktop">
-        {children}
-      </main>
+      {NOVO_UI_ATIVO ? (
+        <InstitutionThemeProvider>
+          <AppShell>{children}</AppShell>
+        </InstitutionThemeProvider>
+      ) : (
+        <>
+          <TopNav />
+          <main className="mx-auto max-w-container-max px-margin-mobile pb-16 md:px-margin-desktop">
+            {children}
+          </main>
+        </>
+      )}
     </>
   );
 }

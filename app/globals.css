@@ -1,12 +1,22 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@plugin "daisyui" {
+  include: button, badge, input, tooltip, dropdown, menu;
+}
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-institution-fg: var(--institution-shell-foreground);
+  --color-institution-muted: var(--institution-shell-muted);
+  --color-institution-active: var(--institution-shell-active);
+  --color-institution-active-fg: var(--institution-shell-active-foreground);
+  --color-institution-hover: var(--institution-shell-hover);
+  --color-institution-border: var(--institution-shell-border);
+  --color-institution-alert: var(--institution-shell-alert);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
@@ -204,6 +214,22 @@
   body {
     @apply bg-background text-foreground font-sans;
   }
+}
+
+/* ── Shell institucional (handoff §4): tokens derivados da cor-base ── */
+@utility institution-shell {
+  background: var(--institution-shell-bg);
+}
+/* Valores padrão (grafite) — sobrescritos via JS no tema institucional. */
+:root {
+  --institution-shell-bg: #18232a;
+  --institution-shell-foreground: #f6f7f8;
+  --institution-shell-muted: #aab8b7;
+  --institution-shell-hover: #2a3a42;
+  --institution-shell-border: #314047;
+  --institution-shell-active: #2f8179;
+  --institution-shell-active-foreground: #ffffff;
+  --institution-shell-alert: #b4533e;
 }
 
 /* ── M3 Type Scale — native --text-* utilities, see @theme block above ── */
