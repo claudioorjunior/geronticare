@@ -120,8 +120,12 @@ export async function lerAnexoLocal(chave: string): Promise<Buffer> {
 export async function anexoExisteLocal(chave: string): Promise<boolean> {
   try {
     return (await stat(caminhoDaChave(chave))).isFile();
-  } catch {
-    return false;
+  } catch (error) {
+    const code = typeof error === 'object' && error !== null && 'code' in error
+      ? (error as { code?: unknown }).code
+      : undefined;
+    if (code === 'ENOENT' || code === 'ENOTDIR') return false;
+    throw error;
   }
 }
 
