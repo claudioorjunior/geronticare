@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
 import { ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { useUserRole } from '@/lib/auth/use-user-role';
 import { NAVIGATION_GROUPS, filtrarPorPermissao, isItemActive } from '@/lib/navigation';
@@ -14,16 +13,22 @@ import { InstitutionThemePicker } from './InstitutionThemePicker';
  * navegação e ação contextual. Expandida ≈256px; recolhida ≈72px (rail de
  * ícones). O header e a sidebar compartilham a mesma cor-base
  * (`--institution-shell-bg`).
+ *
+ * O estado de colapso é controlado pelo `AppShell` (ancestral comum), para que
+ * header e main reservem a largura correta.
  */
-export function GlobalSidebar() {
+export function GlobalSidebar({
+  collapsed,
+  onToggle,
+}: {
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
   const pathname = usePathname();
   const { role } = useUserRole();
-  const [collapsed, setCollapsed] = useState(false);
 
   // Papel efetivo + permissões reais — itens sem permissão ficam ocultos.
   const groups = filtrarPorPermissao(NAVIGATION_GROUPS, role, role ? PERMISSOES_BASE[role] : []);
-
-  const toggle = () => setCollapsed((v) => !v);
 
   return (
     <aside
@@ -56,7 +61,7 @@ export function GlobalSidebar() {
       {/* Colapso */}
       <button
         type="button"
-        onClick={toggle}
+        onClick={onToggle}
         aria-label={collapsed ? 'Expandir navegação' : 'Recolher navegação'}
         className="mx-3 mb-2 flex h-8 items-center justify-center gap-2 rounded-lg text-xs text-institution-muted hover:bg-institution-hover hover:text-institution-fg"
       >

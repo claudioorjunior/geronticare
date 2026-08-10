@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { GlobalSidebar } from './GlobalSidebar';
 import { GlobalHeader } from './GlobalHeader';
 
@@ -7,15 +8,24 @@ import { GlobalHeader } from './GlobalHeader';
  * Casca do novo shell (handoff §5): sidebar + header + área principal.
  * Não contém regra de negócio — apenas composição.
  *
- * Estado local de colapso e tema institucional vivem aqui e descem por props
- * (sem Context adicional; o número de consumidores não justifica).
+ * O estado de colapso vive aqui (ancestral comum) e desce por props: a
+ * sidebar o controla, header e main dependem dele para a largura reservada.
+ * Sem Context — o número de consumidores não justifica.
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const [collapsed, setCollapsed] = useState(false);
+
   return (
     <div className="min-h-dvh">
-      <GlobalSidebar />
-      <GlobalHeader />
-      <main className="md:pl-[72px] transition-[padding] duration-300 ease-out">{children}</main>
+      <GlobalSidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
+      <GlobalHeader collapsed={collapsed} />
+      <main
+        className={`transition-[padding] duration-300 ease-out ${
+          collapsed ? 'md:pl-[72px]' : 'md:pl-64'
+        }`}
+      >
+        {children}
+      </main>
     </div>
   );
 }

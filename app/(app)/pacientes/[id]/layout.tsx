@@ -5,6 +5,10 @@ import { usePathname, useParams } from 'next/navigation';
 import { ArrowLeft, Calendar, Phone, ShieldCheck, MapPin, Loader2, AlertCircle } from 'lucide-react';
 import { useUserRole } from '@/lib/auth/use-user-role';
 import { trpc } from '@/lib/trpc/client';
+import { NOVO_UI_ATIVO } from '@/lib/novo-ui';
+import { PatientIdentity } from '@/components/pacientes/PatientIdentity';
+import { PatientRecordRail } from '@/components/pacientes/PatientRecordRail';
+import { PatientRecordSheet } from '@/components/pacientes/PatientRecordSheet';
 
 function getInitials(nome: string): string {
   return nome
@@ -75,8 +79,23 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
       </div>
     );
   }
-  const idade = calcularIdade(paciente.dataNascimento);
 
+  // ── Novo shell: prontuário em formato de fichário (Checkpoint 2) ──
+  // Identidade + rail vertical encaixada na folha branca. Preserva as rotas
+  // reais; a rail vem de `lib/patient-record.ts`.
+  if (NOVO_UI_ATIVO) {
+    return (
+      <div className="p-6">
+        <div className="mb-5 border-b border-slate-200 pb-5">
+          <PatientIdentity paciente={paciente} patientId={patientId} />
+        </div>
+        <PatientRecordSheet rail={<PatientRecordRail />}>{children}</PatientRecordSheet>
+      </div>
+    );
+  }
+
+  // ── Fallback (TopNav atual): abas horizontais ──
+  const idade = calcularIdade(paciente.dataNascimento);
   const sexoLabel = paciente?.sexo === 'masculino' ? 'M' : paciente?.sexo === 'feminino' ? 'F' : '—';
 
   return (

@@ -15,7 +15,7 @@ import { ContextualAction } from './ContextualAction';
  * de usuário. Reutiliza o perfil e o logout existentes — não recria
  * autenticação.
  */
-export function GlobalHeader() {
+export function GlobalHeader({ collapsed }: { collapsed: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -49,7 +49,11 @@ export function GlobalHeader() {
     'Dashboard';
 
   return (
-    <header className="institution-shell sticky top-0 z-30 flex h-14 items-center gap-3 pl-[72px] pr-4">
+    <header
+      className={`institution-shell sticky top-0 z-30 flex h-14 items-center gap-3 pr-4 transition-[padding] duration-300 ease-out ${
+        collapsed ? 'md:pl-[72px]' : 'md:pl-64'
+      } pl-4`}
+    >
       {/* Contexto institucional */}
       <div className="min-w-0">
         <p className="truncate text-xs text-institution-muted">Residencial Aurora · Unidade Centro</p>
