@@ -61,8 +61,9 @@ describe('limpeza de órfãos no storage S3', () => {
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce({ id: 'metadado-criado-durante-scan' })
       .mockResolvedValueOnce(undefined);
+    // O lookup legado só roda quando não há metadado atual (short-circuit),
+    // então o objeto persistido na tabela `anexos` não chega até aqui.
     const findRegistroLegado = vi.fn()
-      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce({ id: 'registro-legado' });
 
@@ -76,7 +77,7 @@ describe('limpeza de órfãos no storage S3', () => {
     await expect(limparOrfaosS3(db)).resolves.toEqual({ removidos: 1, verificados: 4 });
     expect(mocks.removerAnexo).toHaveBeenCalledWith(antigo);
     expect(findAnexo).toHaveBeenCalledTimes(3);
-    expect(findRegistroLegado).toHaveBeenCalledTimes(3);
+    expect(findRegistroLegado).toHaveBeenCalledTimes(2);
     expect(mocks.listarObjetosAnexosS3).toHaveBeenCalledTimes(2);
   });
 });

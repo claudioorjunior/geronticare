@@ -10,18 +10,21 @@ export const TTL_ORFAO_HORAS_PADRAO = 24;
 
 /** Confere referências atuais e legadas imediatamente antes da exclusão. */
 async function anexoPersistido(db: Db, chave: string): Promise<boolean> {
-  const [metadado, registroLegado] = await Promise.all([
-    db.query.anexos.findFirst({
-      where: eq(anexos.chave, chave),
-      columns: { id: true },
-    }),
-    db.query.registros.findFirst({
-      where: sql`${registros.anexos} @> ${JSON.stringify([{ chave }])}::jsonb`,
-      columns: { id: true },
-    }),
-  ]);
+  // A tabela `anexos` tem `chave` indexada: consultamos primeiro e, se houver
+  // metadado atual, encerramos aqui. Só objetos sem metadado atual chegam ao
+  // lookup legado em `registros.anexos`, que percorre o JSONB sem índice GIN e
+  // seria um full scan por objeto se rodasse sempre.
+  const metadado = await db.query.anexos.findFirst({
+    where: eq(anexos.chave, chave),
+    columns: { id: true },
+  });
+  if (metadado) return true;
 
-  return Boolean(metadado || registroLegado);
+  const registroLegado = await db.query.registros.findFirst({
+    where: sql`${registros.anexos} @> ${JSON.stringify([{ chave }])}::jsonb`,
+    columns: { id: true },
+  });
+  return Boolean(registroLegado);
 }
 
 /**
