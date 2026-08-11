@@ -26,6 +26,14 @@
 
 > **⚠️ NOT PRODUCTION READY** — GerontiCare is in early pre-alpha development. **Do not use with real patients or in production environments.** The system may produce incorrect assessments, false positives, or data loss. Use only for development, testing, and evaluation.
 
+### Sponsor
+
+<p align="center">
+  <a href="https://cheaperinference.com"><img src="cheaper-inference-logo.png" alt="Cheaper Inference logo" width="72"></a>
+</p>
+
+GerontiCare is sponsored by [Cheaper Inference](https://cheaperinference.com), an OpenAI-compatible API that provides access to leading AI models from multiple providers with usage-based pricing and discounted rates.
+
 ---
 
 <a name="english"></a>
