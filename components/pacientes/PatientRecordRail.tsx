@@ -54,7 +54,7 @@ export function PatientRecordRail() {
             >
               <Icon className="h-4 w-4 shrink-0" aria-hidden />
               <span className="min-w-0 flex-1 truncate">{section.label}</span>
-              <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
+              <span className="soon-badge soon-badge--warning">
                 em breve
               </span>
             </span>

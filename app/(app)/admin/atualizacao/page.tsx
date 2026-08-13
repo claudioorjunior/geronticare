@@ -100,8 +100,8 @@ export default function AtualizacaoPage() {
   return (
     <div className="mx-auto w-full max-w-container-max px-margin-mobile md:px-margin-desktop py-6">
       <header className="mb-6">
-        <h1 className="text-headline-lg text-slate-900">Atualização</h1>
-        <p className="mt-1 text-sm text-slate-500">Gerencie a versão do GerontiCare neste servidor.</p>
+        <h1 className="page-title">Atualização</h1>
+        <p className="page-lede">Gerencie a versão do GerontiCare neste servidor.</p>
       </header>
 
       <div className="max-w-3xl space-y-6">

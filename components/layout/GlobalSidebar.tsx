@@ -74,7 +74,7 @@ export function GlobalSidebar({
   return (
     <aside
       aria-label="Navegação principal"
-      className={`institution-shell institution-sidebar-shell fixed inset-y-0 left-0 z-40 flex flex-col border-r border-institution-border shadow-[8px_0_28px_-22px_rgba(17,57,53,0.28)] transition-[width] duration-300 ease-out ${collapsed ? 'w-[72px]' : 'w-64'}`}
+      className={`institution-shell institution-sidebar-shell fixed inset-y-0 left-0 z-40 flex flex-col transition-[width] duration-300 ease-out ${collapsed ? 'w-[72px]' : 'w-64'}`}
     >
       {/* Marca fixa da plataforma. A identidade da ILPI pertence ao seletor abaixo. */}
       <div className={`flex h-[72px] items-center border-b border-institution-border ${collapsed ? 'justify-center px-2' : 'px-4'}`}>
@@ -229,7 +229,7 @@ export function GlobalSidebar({
                       />
                       {!collapsed && <span className="min-w-0 flex-1 truncate">{item.label}</span>}
                       {!collapsed && item.status === 'soon' && (
-                        <span className="shrink-0 rounded border border-institution-border bg-institution-surface px-1.5 py-0.5 text-[10px] font-medium text-institution-muted">
+                        <span className="soon-badge soon-badge--warning" aria-label="Em breve">
                           em breve
                         </span>
                       )}

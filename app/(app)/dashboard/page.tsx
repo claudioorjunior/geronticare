@@ -95,8 +95,30 @@ const tipoLabels: Record<string, string> = {
 
 // === KPI Card (M3 tokens) ===
 
+function KpiWash() {
+  return (
+    <svg
+      aria-hidden
+      className="pointer-events-none absolute inset-y-0 right-0 h-full w-2/3"
+      viewBox="0 0 300 200"
+      fill="none"
+    >
+      <circle cx="220" cy="100" r="90" fill="#fff" fillOpacity="0.08" />
+      <circle cx="260" cy="60" r="60" fill="#fff" fillOpacity="0.10" />
+      <circle cx="200" cy="160" r="50" fill="#fff" fillOpacity="0.07" />
+      <circle cx="270" cy="150" r="30" fill="#fff" fillOpacity="0.12" />
+    </svg>
+  );
+}
+
+const KPI_TONE = {
+  primary: 'bg-m3-primary',
+  deep: 'bg-[color-mix(in_oklch,var(--color-m3-primary)_70%,#0b1c30)]',
+  alert: 'bg-institution-alert',
+} as const;
+
 function KpiCardV2({
-  label, value, delta, deltaType, icon, subtitle
+  label, value, delta, deltaType, icon, subtitle, tone = 'primary',
 }: {
   label: string;
   value: string;
@@ -104,29 +126,30 @@ function KpiCardV2({
   deltaType?: 'positive' | 'neutral' | 'negative';
   icon?: React.ReactNode;
   subtitle?: string;
+  tone?: keyof typeof KPI_TONE;
 }) {
-  const deltaClasses = deltaType
-    ? { positive: 'text-m3-primary bg-m3-primary-container/20', neutral: 'text-m3-secondary bg-m3-surface-variant', negative: 'text-m3-error bg-m3-error-container' }[deltaType]
-    : '';
-  const deltaIcon = deltaType
-    ? { positive: <TrendingUp className="text-[14px]" />, neutral: <Minus className="text-[14px]" />, negative: <AlertTriangle className="text-[14px]" /> }[deltaType]
-    : null;
-
   return (
-    <div className="bg-m3-surface-container-lowest border border-m3-outline-variant rounded-m3-xl p-gutter">
-      <div className="flex justify-between items-start mb-4">
-        <h3 className="text-title-lg text-m3-on-surface">{label}</h3>
-        {icon && <div className="p-2 bg-m3-primary-container/10 rounded-m3-lg text-m3-primary">{icon}</div>}
+    <div className={`relative overflow-hidden rounded-m3-xl px-5 py-4 text-white ${KPI_TONE[tone]}`}>
+      <KpiWash />
+      <div className="relative z-10 flex items-start justify-between gap-3">
+        <p className="text-label-md text-white/90">{label}</p>
+        {icon && <span className="text-white/70">{icon}</span>}
       </div>
-      <div className="flex items-baseline gap-2">
-        <span className="text-kpi-lg text-m3-on-surface tabular-nums">{value}</span>
-        {delta && deltaType && (
-          <span className={`text-label-md px-2 py-0.5 rounded-full flex items-center gap-1 ${deltaClasses}`}>
-            {deltaIcon} {delta}
+      <div className="relative z-10 mt-3 flex items-baseline gap-2.5">
+        <span className="text-kpi-lg tabular-nums tracking-tight text-white">{value}</span>
+        {delta && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-label-md font-medium text-white">
+            {deltaType === 'negative' ? <AlertTriangle className="size-3.5" /> : null}
+            {deltaType === 'positive' ? <TrendingUp className="size-3.5" /> : null}
+            {delta}
           </span>
         )}
       </div>
-      {subtitle && <p className="text-body-md text-m3-secondary mt-2">{subtitle}</p>}
+      {subtitle && (
+        <p className="relative z-10 mt-3 border-t border-white/20 pt-2.5 text-body-md text-white/80">
+          {subtitle}
+        </p>
+      )}
     </div>
   );
 }
@@ -135,7 +158,7 @@ function KpiCardV2({
 
 function OccupancyChart() {
   return (
-    <div className="lg:col-span-2 bg-m3-surface-container-lowest border border-m3-outline-variant rounded-m3-xl p-gutter flex flex-col">
+    <div className="surface-card-pattern lg:col-span-2 bg-m3-surface-container-lowest border border-m3-outline-variant rounded-m3-xl p-gutter flex flex-col">
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-title-lg text-m3-on-surface">Tendência de Ocupação</h3>
         <div className="flex gap-2">
@@ -187,7 +210,7 @@ function OccupancyChart() {
 
 function ActivityList() {
   return (
-    <div className="bg-m3-surface-container-lowest border border-m3-outline-variant rounded-m3-xl p-gutter flex flex-col">
+    <div className="surface-card-pattern bg-m3-surface-container-lowest border border-m3-outline-variant rounded-m3-xl p-gutter flex flex-col">
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-title-lg text-m3-on-surface">Próximas Atividades</h3>
         <Link href="/pacientes" className="text-m3-primary text-label-md hover:underline">Ver todas</Link>
@@ -239,17 +262,13 @@ function DashboardAdmin() {
       {/* Header — compact strip */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 shrink-0">
         <div>
-          <h1 className="text-headline-lg text-m3-on-surface">Visão Geral da Instituição</h1>
+          <h1 className="page-title">Visão Geral da Instituição</h1>
           <p className="text-body-md text-m3-secondary mt-1">Acompanhamento em tempo real dos indicadores clínicos.</p>
         </div>
         <div className="flex gap-3">
           <Button variant="outline" className="gap-2 text-label-md border-m3-outline-variant text-m3-on-surface bg-m3-surface-container-lowest hover:bg-m3-surface-variant">
             <Download className="h-[18px] w-[18px]" />
             Exportar Relatório
-          </Button>
-          <Button className="gap-2 text-label-md bg-m3-primary text-m3-on-primary hover:bg-m3-primary-container hover:text-m3-on-primary-container">
-            <Plus className="h-[18px] w-[18px]" />
-            Nova Admissão
           </Button>
         </div>
       </header>
@@ -259,31 +278,30 @@ function DashboardAdmin() {
         <KpiCardV2
           label="Total de Pacientes"
           value={String(resumo.totalPacientes)}
-          delta="+3%"
-          deltaType="positive"
-          icon={<Users className="h-5 w-5" />}
-          subtitle="Referente ao mês anterior"
+          tone="primary"
+          icon={<Users className="h-4 w-4" />}
+          subtitle="Pacientes ativos na instituição"
         />
         <KpiCardV2
           label="Admissões Semanais"
           value={String(resumo.admissoesSemanais)}
-          delta="Estável"
-          deltaType="neutral"
-          icon={<UserPlus className="h-5 w-5" />}
-          subtitle="Média de 2 por dia útil"
+          tone="deep"
+          icon={<UserPlus className="h-4 w-4" />}
+          subtitle="Cadastros nos últimos 7 dias"
         />
         <KpiCardV2
           label="Avaliações Pendentes"
           value={String(resumo.agasPendentes)}
-          delta="Atenção"
-          deltaType="negative"
-          icon={<ClipboardList className="h-5 w-5" />}
-          subtitle="Avaliações Geriátricas (AGA)"
+          tone={resumo.agasPendentes > 0 ? "alert" : "primary"}
+          delta={resumo.agasPendentes > 0 ? "Atenção" : "Em dia"}
+          deltaType={resumo.agasPendentes > 0 ? "negative" : "positive"}
+          icon={<ClipboardList className="h-4 w-4" />}
+          subtitle="Pacientes ativos sem AGA concluída"
         />
       </section>
 
       {/* Visão institucional — métricas operacionais do admin (T-49) */}
-      <MetricasInstitucionais />
+      <MetricasInstitucionais totalPacientes={resumo.totalPacientes} />
 
       {/* Chart + Activity — adaptive blocks */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-gutter flex-1 min-h-0">
@@ -294,8 +312,35 @@ function DashboardAdmin() {
   );
 }
 
+function MetricBar({
+  value,
+  max,
+  tone = 'primary',
+}: {
+  value: number;
+  max: number;
+  tone?: 'primary' | 'alert';
+}) {
+  if (max <= 0) return null;
+  const pct = Math.min(100, Math.round((value / max) * 100));
+  return (
+    <div
+      className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-m3-surface-variant"
+      role="progressbar"
+      aria-valuenow={value}
+      aria-valuemin={0}
+      aria-valuemax={max}
+    >
+      <div
+        className={`h-full rounded-full ${tone === 'alert' ? 'bg-institution-alert' : 'bg-m3-primary'}`}
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  );
+}
+
 // Métricas institucionais (mês corrente): equipe, AGAs e sinais vitais.
-function MetricasInstitucionais() {
+function MetricasInstitucionais({ totalPacientes }: { totalPacientes: number }) {
   const metricasQ = trpc.dashboard.metricasInstituicao.useQuery();
   const m = metricasQ.data;
 
@@ -303,6 +348,7 @@ function MetricasInstitucionais() {
 
   const porPapel = m.usuariosAtivosPorPapel;
   const totalEquipe = Object.values(porPapel).reduce((a, b) => a + b, 0);
+  const comAga = Math.max(0, totalPacientes - m.agasPendentes);
 
   const cards = [
     {
@@ -311,14 +357,16 @@ function MetricasInstitucionais() {
       subtitle: `Admin ${porPapel['admin'] ?? 0} · Profissionais ${porPapel['profissional'] ?? 0} · Leitura ${porPapel['usuario'] ?? 0}`,
     },
     {
-      label: 'AGAs concluídas',
-      value: m.agasConcluidas,
-      subtitle: 'Consolidações no modelo novo',
+      label: 'Cobertura AGA',
+      value: comAga,
+      subtitle: `${comAga} de ${totalPacientes} pacientes ativos`,
+      bar: { value: comAga, max: totalPacientes, tone: 'primary' as const },
     },
     {
       label: 'AGAs pendentes',
       value: m.agasPendentes,
-      subtitle: 'Pacientes ativos sem AGA concluída',
+      subtitle: `${m.agasPendentes} de ${totalPacientes} pacientes ativos`,
+      bar: { value: m.agasPendentes, max: totalPacientes, tone: 'alert' as const },
     },
     {
       label: 'Sinais vitais no mês',
@@ -329,19 +377,20 @@ function MetricasInstitucionais() {
 
   return (
     <section aria-label="Métricas institucionais" className="shrink-0">
-      <h2 className="mb-2 text-label-md text-m3-secondary">Visão Institucional — mês corrente</h2>
-      <div className="grid grid-cols-1 gap-gutter sm:grid-cols-2 lg:grid-cols-4">
+      <h2 className="section-heading mb-3">Visão Institucional</h2>
+      <dl className="grid grid-cols-1 gap-gutter sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => (
           <div
             key={card.label}
-            className="rounded-xl bg-m3-surface-container-low px-4 py-3"
+            className="surface-card-pattern rounded-xl border border-m3-outline-variant/70 bg-m3-surface-container-lowest px-4 py-3.5"
           >
-            <p className="text-label-md text-m3-secondary">{card.label}</p>
-            <p className="mt-1 text-headline-md text-m3-on-surface">{card.value}</p>
-            <p className="mt-0.5 text-body-sm text-m3-outline">{card.subtitle}</p>
+            <dt className="text-label-sm uppercase tracking-[0.06em] text-m3-secondary">{card.label}</dt>
+            <dd className="mt-2 text-headline-md text-m3-on-surface tabular-nums">{card.value}</dd>
+            <p className="mt-1 text-body-md text-m3-secondary">{card.subtitle}</p>
+            {card.bar ? <MetricBar {...card.bar} /> : null}
           </div>
         ))}
-      </div>
+      </dl>
     </section>
   );
 }
@@ -469,7 +518,7 @@ function DashboardProfissional() {
       {/* Header — compact strip */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 shrink-0">
         <div>
-          <h1 className="text-headline-lg text-m3-on-surface">Meus Atendimentos</h1>
+          <h1 className="page-title">Meus Atendimentos</h1>
           <p className="text-body-md text-m3-secondary mt-1">Dra. Helena Costa - Geriatria</p>
         </div>
       </header>
@@ -661,7 +710,7 @@ function DashboardUsuario() {
   return (
     <div className="px-margin-mobile md:px-margin-desktop max-w-container-max mx-auto pt-gutter pb-section-gap">
       <div className="mb-gutter">
-        <h1 className="text-headline-lg text-m3-on-surface">Painel de Cadastro</h1>
+        <h1 className="page-title">Painel de Cadastro</h1>
         <p className="text-body-lg text-m3-secondary mt-2">Casa de Repouso Vila Nova</p>
       </div>
 

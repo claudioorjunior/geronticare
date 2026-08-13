@@ -50,7 +50,7 @@ export function GlobalHeader({ collapsed }: { collapsed: boolean }) {
 
   return (
     <header
-      className={`institution-shell sticky top-0 z-30 flex h-14 items-center gap-3 pr-4 transition-[padding] duration-300 ease-out ${
+      className={`institution-shell header-shell-pattern sticky top-0 z-30 flex h-14 items-center gap-3 pr-4 transition-[padding] duration-300 ease-out ${
         collapsed ? 'md:pl-[72px]' : 'md:pl-64'
       } pl-4`}
     >
@@ -76,7 +76,7 @@ export function GlobalHeader({ collapsed }: { collapsed: boolean }) {
           onChange={(e) => { setSearchTerm(e.target.value); setSearchOpen(true); }}
           onFocus={() => setSearchOpen(true)}
           onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
-          className="h-9 w-full rounded-lg bg-institution-hover pl-9 pr-3 text-sm text-institution-fg placeholder:text-institution-muted focus:outline-none focus:ring-2 focus:ring-institution-active"
+          className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-institution-active"
         />
         {searchOpen && searchTerm.length > 1 && (
           <div className="absolute left-0 right-0 top-full mt-1 rounded-lg border border-institution-border bg-white p-3 text-sm text-slate-600 shadow-lg">

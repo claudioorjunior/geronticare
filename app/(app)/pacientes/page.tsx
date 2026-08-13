@@ -151,8 +151,8 @@ export default function PacientesPage() {
             <Users className="h-5 w-5 text-teal-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Pacientes</h1>
-            <p className="text-sm text-slate-500 mt-0.5">
+            <h1 className="page-title">Pacientes</h1>
+            <p className="page-lede">
               {totalCliente} cadastrad{totalCliente === 1 ? 'o' : 'os'}
             </p>
           </div>

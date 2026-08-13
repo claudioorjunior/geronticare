@@ -64,9 +64,9 @@ function Kpi({
     <div className="border-b border-slate-200 pb-4">
       <div className="flex items-center gap-2 text-slate-500">
         <span className="text-slate-400">{icon}</span>
-        <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">{label}</span>
       </div>
-      <p className="mt-1.5 text-2xl font-semibold tabular-nums text-slate-900">{value}</p>
+      <p className="kpi-value mt-1.5">{value}</p>
       {hint && <p className="mt-0.5 text-xs text-slate-400">{hint}</p>}
     </div>
   );
@@ -76,7 +76,7 @@ function AtencaoHoje() {
   return (
     <section aria-label="Atenção para hoje" className="rounded-xl border border-slate-200 bg-white p-5">
       <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+        <h2 className="section-heading flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-amber-600" />
           Atenção para hoje
         </h2>
@@ -115,7 +115,7 @@ function Ocupacao() {
   return (
     <section aria-label="Tendência de ocupação" className="rounded-xl border border-slate-200 bg-white p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-slate-900">Tendência de ocupação</h2>
+        <h2 className="section-heading">Tendência de ocupação</h2>
         <div className="flex gap-1">
           {(['7D', '30D', '3M'] as const).map((p, i) => (
             <button
@@ -161,7 +161,7 @@ function AtividadeRecente({ resumo }: { resumo: { pacientesRecentes: { id: strin
   return (
     <section aria-label="Atividade recente" className="rounded-xl border border-slate-200 bg-white p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-slate-900">Atividade recente</h2>
+        <h2 className="section-heading">Atividade recente</h2>
         <Link href="/pacientes" className="text-xs font-medium text-teal-700 hover:underline">Ver todos</Link>
       </div>
       <div className="mt-3 divide-y divide-slate-100">
@@ -214,10 +214,10 @@ export default function NovoDashboardPage() {
       {/* Cabeçalho */}
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+          <h1 className="page-title">
             Visão geral da instituição
           </h1>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="page-lede">
             Residencial Aurora · acompanhamento em tempo real dos indicadores clínicos.
           </p>
         </div>
