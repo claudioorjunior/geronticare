@@ -8,15 +8,18 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  --shadow-input: 0px 2px 3px -1px rgba(0, 0, 0, 0.1), 0px 1px 0px 0px rgba(25, 28, 33, 0.02), 0px 0px 0px 1px rgba(25, 28, 33, 0.08);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-institution-fg: var(--institution-shell-foreground);
   --color-institution-muted: var(--institution-shell-muted);
   --color-institution-active: var(--institution-shell-active);
   --color-institution-active-fg: var(--institution-shell-active-foreground);
+  --color-institution-active-surface: var(--institution-shell-active-surface);
   --color-institution-hover: var(--institution-shell-hover);
   --color-institution-border: var(--institution-shell-border);
   --color-institution-alert: var(--institution-shell-alert);
+  --color-institution-surface: var(--institution-shell-surface);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
@@ -220,16 +223,110 @@
 @utility institution-shell {
   background: var(--institution-shell-bg);
 }
+
+/* O grid do shell fica restrito à sidebar: dá profundidade sem competir com a leitura clínica. */
+.institution-sidebar-shell {
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in oklch, var(--institution-shell-active) 8%, var(--institution-shell-bg)),
+      var(--institution-shell-bg) 48%,
+      color-mix(in oklch, var(--institution-shell-active) 4%, var(--institution-shell-bg))
+    );
+}
+
+.institution-sidebar-shell::before {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  content: '';
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, color-mix(in oklch, var(--institution-shell-active), transparent 90%) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklch, var(--institution-shell-active), transparent 90%) 1px, transparent 1px);
+  background-size: 28px 28px;
+  filter: blur(0.7px);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 5rem, rgba(0, 0, 0, 0.72) 7rem, rgba(0, 0, 0, 0.24) 11rem, transparent 17rem);
+  mask-image: linear-gradient(to bottom, #000 0, #000 5rem, rgba(0, 0, 0, 0.72) 7rem, rgba(0, 0, 0, 0.24) 11rem, transparent 17rem);
+}
+
+.institution-sidebar-shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Login circuit background (Uiverse + degradê branco→verde com blur leve) ── */
+.circuit-wrapper {
+  min-height: 100dvh;
+  width: 100%;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: linear-gradient(to bottom, #ffffff 0%, #f8fbf9 42%, #edf5f3 74%, #dff0ea 100%);
+}
+
+.circuit-background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 19px,
+      rgba(75, 85, 99, 0.08) 19px,
+      rgba(75, 85, 99, 0.08) 20px,
+      transparent 20px,
+      transparent 39px,
+      rgba(75, 85, 99, 0.08) 39px,
+      rgba(75, 85, 99, 0.08) 40px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 19px,
+      rgba(75, 85, 99, 0.08) 19px,
+      rgba(75, 85, 99, 0.08) 20px,
+      transparent 20px,
+      transparent 39px,
+      rgba(75, 85, 99, 0.08) 39px,
+      rgba(75, 85, 99, 0.08) 40px
+    ),
+    radial-gradient(circle at 20px 20px, rgba(55, 65, 81, 0.12) 2px, transparent 2px),
+    radial-gradient(circle at 40px 40px, rgba(55, 65, 81, 0.12) 2px, transparent 2px);
+  background-size:
+    40px 40px,
+    40px 40px,
+    40px 40px,
+    40px 40px;
+  filter: blur(0.6px);
+  opacity: 0.5;
+}
+
+.circuit-background::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.35) 38%, rgba(237, 245, 243, 0.18) 68%, rgba(222, 243, 238, 0.32) 100%);
+  backdrop-filter: blur(0.8px);
+  -webkit-backdrop-filter: blur(0.8px);
+}
+
 /* Valores padrão (grafite) — sobrescritos via JS no tema institucional. */
 :root {
-  --institution-shell-bg: #18232a;
-  --institution-shell-foreground: #f6f7f8;
-  --institution-shell-muted: #aab8b7;
-  --institution-shell-hover: #2a3a42;
-  --institution-shell-border: #314047;
-  --institution-shell-active: #2f8179;
+  --institution-shell-bg: #edf5f3;
+  --institution-shell-foreground: #173b37;
+  --institution-shell-muted: #607a76;
+  --institution-shell-hover: #e8f3f0;
+  --institution-shell-border: #cfe1dd;
+  --institution-shell-active: #087f73;
   --institution-shell-active-foreground: #ffffff;
+  --institution-shell-active-surface: #def3ee;
   --institution-shell-alert: #b4533e;
+  --institution-shell-surface: #f8fbfa;
 }
 
 /* ── M3 Type Scale — native --text-* utilities, see @theme block above ── */

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import {
-  Users, UserPlus, ClipboardList, Download, Plus,
+  Users, UserPlus, ClipboardList, Download,
   Pill, Calendar,
   AlertTriangle,
 } from 'lucide-react';
@@ -225,9 +225,6 @@ export default function NovoDashboardPage() {
           <button type="button" className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 text-sm text-slate-700 hover:bg-slate-50">
             <Download className="h-4 w-4" /> Exportar relatório
           </button>
-          <Link href="/pacientes" className="inline-flex h-9 items-center gap-2 rounded-lg bg-teal-700 px-3.5 text-sm font-medium text-white hover:bg-teal-800">
-            <Plus className="h-4 w-4" /> Nova admissão
-          </Link>
         </div>
       </header>
 

@@ -1,13 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useSyncExternalStore, useState } from 'react';
 import { Palette } from 'lucide-react';
 import {
   INSTITUTION_PRESETS,
+  deriveInstitutionTokens,
   type InstitutionThemePreset,
+  getInstitutionThemeServerSnapshot,
   loadInstitutionTheme,
   presetLabel,
   saveInstitutionTheme,
+  subscribeInstitutionTheme,
 } from '@/lib/institution-theme';
 
 /**
@@ -17,18 +20,27 @@ import {
  */
 export function InstitutionThemePicker({ collapsed }: { collapsed: boolean }) {
   const [open, setOpen] = useState(false);
-  const [preset, setPreset] = useState<InstitutionThemePreset>(() => loadInstitutionTheme());
+  const preset = useSyncExternalStore(
+    subscribeInstitutionTheme,
+    loadInstitutionTheme,
+    getInstitutionThemeServerSnapshot,
+  );
 
   const apply = (p: InstitutionThemePreset) => {
-    setPreset(p);
     saveInstitutionTheme(p);
     const base = p === 'personalizada' ? '#7C3A1D' : INSTITUTION_PRESETS[p];
+    const tokens = deriveInstitutionTokens(base);
     const root = document.documentElement;
-    root.style.setProperty('--institution-shell-bg', base);
-    root.style.setProperty('--institution-shell-foreground', `color-mix(in oklch, ${base}, white 92%)`);
-    root.style.setProperty('--institution-shell-muted', `color-mix(in oklch, ${base}, white 68%)`);
-    root.style.setProperty('--institution-shell-hover', `color-mix(in oklch, ${base}, white 16%)`);
-    root.style.setProperty('--institution-shell-border', `color-mix(in oklch, ${base}, white 20%)`);
+    root.style.setProperty('--institution-shell-bg', tokens.bg);
+    root.style.setProperty('--institution-shell-foreground', tokens.foreground);
+    root.style.setProperty('--institution-shell-muted', tokens.muted);
+    root.style.setProperty('--institution-shell-hover', tokens.hover);
+    root.style.setProperty('--institution-shell-border', tokens.border);
+    root.style.setProperty('--institution-shell-active', tokens.active);
+    root.style.setProperty('--institution-shell-active-foreground', tokens.activeForeground);
+    root.style.setProperty('--institution-shell-active-surface', tokens.activeSurface);
+    root.style.setProperty('--institution-shell-alert', tokens.alert);
+    root.style.setProperty('--institution-shell-surface', tokens.shellSurface);
     setOpen(false);
   };
 
@@ -41,7 +53,7 @@ export function InstitutionThemePicker({ collapsed }: { collapsed: boolean }) {
           type="button"
           aria-label="Trocar tema institucional"
           onClick={() => setOpen((v) => !v)}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-institution-muted hover:bg-institution-hover hover:text-institution-fg"
+          className="flex h-8 w-8 items-center justify-center rounded-md text-institution-muted transition-colors hover:bg-institution-hover hover:text-institution-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-institution-active/50"
         >
           <Palette className="h-4 w-4" />
         </button>
@@ -74,7 +86,7 @@ export function InstitutionThemePicker({ collapsed }: { collapsed: boolean }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-institution-muted hover:bg-institution-hover hover:text-institution-fg"
+        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-institution-muted transition-colors hover:bg-institution-hover hover:text-institution-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-institution-active/50"
       >
         <Palette className="h-4 w-4" />
         Tema: {presetLabel(preset)}

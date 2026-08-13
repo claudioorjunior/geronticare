@@ -55,7 +55,7 @@ export function GlobalHeader({ collapsed }: { collapsed: boolean }) {
       } pl-4`}
     >
       {/* Contexto institucional */}
-      <div className="min-w-0">
+      <div className="min-w-0 pl-2">
         <p className="truncate text-xs text-institution-muted">Residencial Aurora · Unidade Centro</p>
         <p className="truncate text-sm font-semibold text-institution-fg">{currentSection}</p>
       </div>

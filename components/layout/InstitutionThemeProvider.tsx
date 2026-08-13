@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import {
   INSTITUTION_PRESETS,
   deriveInstitutionTokens,
+  getInstitutionThemeServerSnapshot,
   loadInstitutionTheme,
-  type InstitutionThemePreset,
+  subscribeInstitutionTheme,
 } from '@/lib/institution-theme';
 
 /**
@@ -13,7 +14,11 @@ import {
  * Sem persistência em banco nesta fatia — estado local + localStorage.
  */
 export function InstitutionThemeProvider({ children }: { children: React.ReactNode }) {
-  const [preset] = useState<InstitutionThemePreset>(() => loadInstitutionTheme());
+  const preset = useSyncExternalStore(
+    subscribeInstitutionTheme,
+    loadInstitutionTheme,
+    getInstitutionThemeServerSnapshot,
+  );
 
   useEffect(() => {
     const base = preset === 'personalizada' ? '#7C3A1D' : INSTITUTION_PRESETS[preset];
@@ -26,7 +31,9 @@ export function InstitutionThemeProvider({ children }: { children: React.ReactNo
     root.style.setProperty('--institution-shell-border', tokens.border);
     root.style.setProperty('--institution-shell-active', tokens.active);
     root.style.setProperty('--institution-shell-active-foreground', tokens.activeForeground);
+    root.style.setProperty('--institution-shell-active-surface', tokens.activeSurface);
     root.style.setProperty('--institution-shell-alert', tokens.alert);
+    root.style.setProperty('--institution-shell-surface', tokens.shellSurface);
   }, [preset]);
 
   return <>{children}</>;

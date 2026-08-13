@@ -1,21 +1,21 @@
 import {
-  LayoutDashboard,
-  Users,
-  ClipboardList,
-  FileText,
-  HeartPulse,
-  CalendarDays,
-  ListTodo,
-  Pill,
-  Package,
+  PanelsTopLeft,
+  ContactRound,
+  ClipboardCheck,
+  FileHeart,
+  Activity,
+  CalendarClock,
+  ListChecks,
+  PillBottle,
+  Boxes,
   UsersRound,
-  MessageSquareText,
-  UserCog,
-  BarChart3,
-  Wallet,
-  Settings,
+  MessagesSquare,
+  UserRoundCog,
+  ChartNoAxesCombined,
+  WalletCards,
+  Settings2,
   ShieldCheck,
-  Plug,
+  Cable,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { UserRole } from '@/lib/auth/use-user-role';
@@ -49,48 +49,48 @@ export const NAVIGATION_GROUPS: NavigationGroup[] = [
   {
     label: 'Visão geral',
     items: [
-      { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'profissional', 'usuario'], permission: 'clinico:ler' },
+      { label: 'Dashboard', href: '/dashboard', icon: PanelsTopLeft, roles: ['admin', 'profissional', 'usuario'], permission: 'clinico:ler' },
     ],
   },
   {
     label: 'Cuidado',
     items: [
-      { label: 'Pacientes', href: '/pacientes', icon: Users, roles: ['admin', 'profissional', 'usuario'], permission: 'clinico:ler' },
-      { label: 'Avaliações', href: '/pacientes', icon: ClipboardList, roles: ['admin', 'profissional', 'usuario'], permission: 'clinico:ler', status: 'soon' },
-      { label: 'Registros clínicos', href: '/pacientes', icon: FileText, roles: ['admin', 'profissional', 'usuario'], permission: 'clinico:ler', status: 'soon' },
-      { label: 'Sinais vitais', href: '/pacientes', icon: HeartPulse, roles: ['admin', 'profissional', 'usuario'], permission: 'clinico:ler', status: 'soon' },
+      { label: 'Pacientes', href: '/pacientes', icon: ContactRound, roles: ['admin', 'profissional', 'usuario'], permission: 'clinico:ler' },
+      { label: 'Avaliações', href: '/pacientes', icon: ClipboardCheck, roles: ['admin', 'profissional', 'usuario'], permission: 'clinico:ler', status: 'soon' },
+      { label: 'Registros clínicos', href: '/pacientes', icon: FileHeart, roles: ['admin', 'profissional', 'usuario'], permission: 'clinico:ler', status: 'soon' },
+      { label: 'Sinais vitais', href: '/pacientes', icon: Activity, roles: ['admin', 'profissional', 'usuario'], permission: 'clinico:ler', status: 'soon' },
     ],
   },
   {
     label: 'Operação',
     items: [
-      { label: 'Agenda', href: '/pacientes', icon: CalendarDays, roles: ['admin', 'profissional'], permission: 'clinico:ler', status: 'soon' },
-      { label: 'Tarefas', href: '/pacientes', icon: ListTodo, roles: ['admin', 'profissional'], permission: 'clinico:ler', status: 'soon' },
-      { label: 'Medicamentos', href: '/pacientes', icon: Pill, roles: ['admin', 'profissional'], permission: 'clinico:editar', status: 'soon' },
-      { label: 'Estoque', href: '/pacientes', icon: Package, roles: ['admin'], permission: 'admin:administrar', status: 'soon' },
+      { label: 'Agenda', href: '/pacientes', icon: CalendarClock, roles: ['admin', 'profissional'], permission: 'clinico:ler', status: 'soon' },
+      { label: 'Tarefas', href: '/pacientes', icon: ListChecks, roles: ['admin', 'profissional'], permission: 'clinico:ler', status: 'soon' },
+      { label: 'Medicamentos', href: '/pacientes', icon: PillBottle, roles: ['admin', 'profissional'], permission: 'clinico:editar', status: 'soon' },
+      { label: 'Estoque', href: '/pacientes', icon: Boxes, roles: ['admin'], permission: 'admin:administrar', status: 'soon' },
     ],
   },
   {
     label: 'Relações',
     items: [
       { label: 'Famílias', href: '/pacientes', icon: UsersRound, roles: ['admin', 'profissional'], permission: 'clinico:ler', status: 'soon' },
-      { label: 'Comunicação', href: '/pacientes', icon: MessageSquareText, roles: ['admin', 'profissional'], permission: 'clinico:ler', status: 'soon' },
+      { label: 'Comunicação', href: '/pacientes', icon: MessagesSquare, roles: ['admin', 'profissional'], permission: 'clinico:ler', status: 'soon' },
     ],
   },
   {
     label: 'Gestão',
     items: [
-      { label: 'Equipe', href: '/profissionais', icon: UserCog, roles: ['admin'], permission: 'admin:administrar' },
-      { label: 'Relatórios', href: '/dashboard', icon: BarChart3, roles: ['admin'], permission: 'admin:administrar', status: 'soon' },
-      { label: 'Financeiro', href: '/dashboard', icon: Wallet, roles: ['admin'], permission: 'admin:administrar', status: 'soon' },
+      { label: 'Equipe', href: '/profissionais', icon: UserRoundCog, roles: ['admin'], permission: 'admin:administrar' },
+      { label: 'Relatórios', href: '/dashboard', icon: ChartNoAxesCombined, roles: ['admin'], permission: 'admin:administrar', status: 'soon' },
+      { label: 'Financeiro', href: '/dashboard', icon: WalletCards, roles: ['admin'], permission: 'admin:administrar', status: 'soon' },
     ],
   },
   {
     label: 'Sistema',
     items: [
-      { label: 'Configurações', href: '/configuracoes', icon: Settings, roles: ['admin'], permission: 'admin:administrar' },
+      { label: 'Configurações', href: '/configuracoes', icon: Settings2, roles: ['admin'], permission: 'admin:administrar' },
       { label: 'Auditoria', href: '/configuracoes', icon: ShieldCheck, roles: ['admin'], permission: 'admin:administrar', status: 'soon' },
-      { label: 'Integrações', href: '/configuracoes', icon: Plug, roles: ['admin'], permission: 'admin:administrar', status: 'soon' },
+      { label: 'Integrações', href: '/configuracoes', icon: Cable, roles: ['admin'], permission: 'admin:administrar', status: 'soon' },
     ],
   },
 ];
@@ -114,6 +114,12 @@ export function filtrarPorPermissao(
       }),
     }))
     .filter((group) => group.items.length > 0);
+}
+
+export function isNavigationItemActive(item: NavigationItem, pathname: string): boolean {
+  if (item.status === 'soon') return false;
+
+  return isItemActive(item.href, pathname);
 }
 
 export function isItemActive(href: string, pathname: string): boolean {
