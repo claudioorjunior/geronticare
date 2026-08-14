@@ -59,17 +59,15 @@ export default function LoginPage() {
       <div className="relative z-10 w-full max-w-[420px]">
         <div className="rounded-[16px] border border-[#e5eeff] bg-white p-8 shadow-[0_8px_40px_-16px_rgba(11,28,48,.18),0_1px_0_1px_rgba(11,28,48,.04)]">
           <div className="mb-7 flex flex-col items-center gap-3">
-            <div className="flex h-24 w-full max-w-[380px] items-center justify-center overflow-hidden">
-              <Image
-                src="/geronticare-logo.png"
-                alt="GerontiCare"
-                width={363}
-                height={79}
-                priority
-                sizes="380px"
-                className="h-24 max-h-24 w-auto max-w-[380px] object-contain"
-              />
-            </div>
+            <Image
+              src="/geronticare-logo.png"
+              alt="GerontiCare"
+              width={363}
+              height={79}
+              priority
+              sizes="356px"
+              className="h-auto w-full object-contain"
+            />
             <div className="text-center">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#607a76]">GerontiCare</p>
               <h1 className="mt-1 text-[22px] font-semibold leading-none tracking-[-0.02em] text-[#0b1c30]">

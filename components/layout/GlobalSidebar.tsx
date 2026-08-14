@@ -9,7 +9,6 @@ import { Check, Activity, ChevronsLeft, ChevronsRight, ChevronDown, CircleHelp, 
 import { useUserRole } from '@/lib/auth/use-user-role';
 import { NAVIGATION_GROUPS, filtrarPorPermissao, isNavigationItemActive } from '@/lib/navigation';
 import { PERMISSOES_BASE } from '@/lib/trpc/autorizacao';
-import { InstitutionThemePicker } from './InstitutionThemePicker';
 
 const INSTITUTION = {
   initials: 'RA',
@@ -86,8 +85,8 @@ export function GlobalSidebar({
           priority
           sizes={collapsed ? '40px' : '224px'}
           className={collapsed
-            ? 'h-10 w-auto max-w-[40px] object-contain'
-            : 'h-auto w-full max-h-10 object-contain'}
+            ? 'h-10 w-auto max-w-[40px] object-contain brightness-0 invert'
+            : 'h-auto w-full max-h-10 object-contain brightness-0 invert'}
         />
       </div>
 
@@ -101,7 +100,7 @@ export function GlobalSidebar({
           >
             <Menu.Trigger
               aria-label="Selecionar instituição e unidade"
-              className="group flex w-full items-center gap-2.5 rounded-md border border-institution-border bg-institution-surface px-2.5 py-2 text-left shadow-[0_1px_1px_rgba(17,57,53,0.04)] transition-[background-color,border-color,box-shadow] duration-150 hover:border-institution-active/30 hover:bg-institution-hover aria-expanded:border-institution-active/35 aria-expanded:bg-institution-active-surface aria-expanded:shadow-[0_3px_8px_-7px_rgba(17,57,53,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-institution-active/50"
+              className="sidebar-lift group flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-institution-active/50"
             >
               <InstitutionMark />
               <span className="min-w-0 flex-1">
@@ -122,7 +121,7 @@ export function GlobalSidebar({
               <Menu.Positioner side="bottom" align="start" sideOffset={6} className="z-50">
                 <Menu.Popup
                   aria-label={`Unidades de ${INSTITUTION.name}`}
-                  className="w-[var(--anchor-width)] origin-[var(--transform-origin)] overflow-hidden rounded-lg border border-institution-border bg-institution-surface p-1 text-institution-fg shadow-[0_14px_30px_-16px_rgba(17,57,53,0.28)] outline-none transition-[opacity,transform] duration-150 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0 data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0"
+                  className="institution-menu-popup w-[var(--anchor-width)] origin-[var(--transform-origin)] rounded-lg border p-1 outline-none transition-[opacity,transform] duration-150 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0 data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0"
                 >
                   <Menu.Group>
                     <div className="flex items-center gap-2.5 px-2.5 py-2.5">
@@ -218,7 +217,7 @@ export function GlobalSidebar({
                         collapsed ? 'tooltip tooltip-right justify-center px-0' : ''
                       } ${
                         active
-                          ? 'border border-institution-active/25 bg-[linear-gradient(135deg,color-mix(in_oklch,var(--institution-shell-active),white_88%),var(--institution-shell-active-surface)_58%,color-mix(in_oklch,var(--institution-shell-active),white_94%))] font-semibold text-institution-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.72),inset_0_0_0_1px_color-mix(in_oklch,var(--institution-shell-active),transparent_86%)] after:absolute after:inset-y-1.5 after:left-0 after:w-0.5 after:rounded-r-full after:bg-institution-active after:content-[""]'
+                          ? 'sidebar-lift font-semibold text-institution-fg after:absolute after:inset-y-1.5 after:left-0 after:w-0.5 after:rounded-r-full after:bg-institution-active after:content-[\"\"]'
                           : 'text-institution-fg hover:bg-institution-hover'
                       }`}
                     >
@@ -247,7 +246,7 @@ export function GlobalSidebar({
         ))}
       </nav>
 
-      {/* Tema + rodapé */}
+      {/* Rodapé */}
       <div className="border-t border-institution-border p-3">
         {!collapsed && (
           <div className="mb-2 flex items-center gap-2 px-2 text-[11px] text-institution-muted">
@@ -259,7 +258,6 @@ export function GlobalSidebar({
             </span>
           </div>
         )}
-        <InstitutionThemePicker collapsed={collapsed} />
         {!collapsed && (
           <button type="button" aria-label="Abrir central de ajuda" className="mt-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[11px] text-institution-muted transition-colors hover:bg-institution-hover hover:text-institution-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-institution-active/50">
             <CircleHelp className="h-3.5 w-3.5" /> Central de ajuda

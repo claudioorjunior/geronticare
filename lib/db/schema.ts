@@ -26,6 +26,11 @@ export const instituicoes = pgTable('instituicoes', {
     estado: string;
     cep: string;
   }>(),
+  dashboardLayout: jsonb('dashboard_layout').$type<Array<{
+    id: string;
+    type: string;
+    size: 'sm' | 'md' | 'lg';
+  }>>(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

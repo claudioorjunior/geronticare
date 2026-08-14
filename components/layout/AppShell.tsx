@@ -1,8 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { GlobalSidebar } from './GlobalSidebar';
 import { GlobalHeader } from './GlobalHeader';
+
+const LEGACY_THEME_VARS = [
+  '--institution-shell-bg',
+  '--institution-shell-foreground',
+  '--institution-shell-muted',
+  '--institution-shell-hover',
+  '--institution-shell-border',
+  '--institution-shell-active',
+  '--institution-shell-active-foreground',
+  '--institution-shell-active-surface',
+  '--institution-shell-alert',
+  '--institution-shell-surface',
+] as const;
 
 /**
  * Casca do novo shell (handoff §5): sidebar + header + área principal.
@@ -14,6 +27,12 @@ import { GlobalHeader } from './GlobalHeader';
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    for (const key of LEGACY_THEME_VARS) root.style.removeProperty(key);
+    localStorage.removeItem('geronticare:institution-theme');
+  }, []);
 
   return (
     <div className="min-h-dvh">

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useMemo, useState } from 'react';
 import {
   Users, UserPlus, ClipboardList, Download, Plus,
   Pill, Calendar, ChevronRight,
@@ -10,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useUserRole } from '@/lib/auth/use-user-role';
 import { trpc } from '@/lib/trpc/client';
+import type { WidgetType } from '@/lib/dashboard/catalog';
 
 // === Mock Data (ocupação e atividades não têm query no DB — permanecem mock) ===
 
@@ -95,22 +97,6 @@ const tipoLabels: Record<string, string> = {
 
 // === KPI Card (M3 tokens) ===
 
-function KpiWash() {
-  return (
-    <svg
-      aria-hidden
-      className="pointer-events-none absolute inset-y-0 right-0 h-full w-2/3"
-      viewBox="0 0 300 200"
-      fill="none"
-    >
-      <circle cx="220" cy="100" r="90" fill="#fff" fillOpacity="0.08" />
-      <circle cx="260" cy="60" r="60" fill="#fff" fillOpacity="0.10" />
-      <circle cx="200" cy="160" r="50" fill="#fff" fillOpacity="0.07" />
-      <circle cx="270" cy="150" r="30" fill="#fff" fillOpacity="0.12" />
-    </svg>
-  );
-}
-
 const KPI_TONE = {
   primary: 'bg-m3-primary',
   deep: 'bg-[color-mix(in_oklch,var(--color-m3-primary)_70%,#0b1c30)]',
@@ -129,13 +115,12 @@ function KpiCardV2({
   tone?: keyof typeof KPI_TONE;
 }) {
   return (
-    <div className={`relative overflow-hidden rounded-m3-xl px-5 py-4 text-white ${KPI_TONE[tone]}`}>
-      <KpiWash />
-      <div className="relative z-10 flex items-start justify-between gap-3">
+    <div className={`kpi-card-grain relative isolate overflow-hidden rounded-m3-xl px-5 py-4 text-white ${KPI_TONE[tone]}`}>
+      <div className="flex items-start justify-between gap-3">
         <p className="text-label-md text-white/90">{label}</p>
         {icon && <span className="text-white/70">{icon}</span>}
       </div>
-      <div className="relative z-10 mt-3 flex items-baseline gap-2.5">
+      <div className="mt-3 flex items-baseline gap-2.5">
         <span className="text-kpi-lg tabular-nums tracking-tight text-white">{value}</span>
         {delta && (
           <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-label-md font-medium text-white">
@@ -146,7 +131,7 @@ function KpiCardV2({
         )}
       </div>
       {subtitle && (
-        <p className="relative z-10 mt-3 border-t border-white/20 pt-2.5 text-body-md text-white/80">
+        <p className="mt-3 border-t border-white/20 pt-2.5 text-body-md text-white/80">
           {subtitle}
         </p>
       )}
@@ -157,6 +142,7 @@ function KpiCardV2({
 // === Bar Chart (M3 tokens) ===
 
 function OccupancyChart() {
+  const peak = useMemo(() => Math.max(...occupancyData.map((d) => d.value)), []);
   return (
     <div className="surface-card-pattern lg:col-span-2 bg-m3-surface-container-lowest border border-m3-outline-variant rounded-m3-xl p-gutter flex flex-col">
       <div className="flex justify-between items-center mb-6">
@@ -175,28 +161,47 @@ function OccupancyChart() {
         </div>
       </div>
       <div className="flex-grow relative min-h-[280px] flex items-end gap-2 pt-4">
-        {/* Grid lines */}
-        <div className="absolute inset-0 flex flex-col justify-between z-0 pb-[30px] opacity-20 pointer-events-none">
+        {/* Grid lines — soft, with a firm baseline */}
+        <div className="absolute inset-x-0 top-0 bottom-[30px] flex flex-col justify-between z-0 opacity-10 pointer-events-none">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="w-full border-b border-m3-outline-variant" />
           ))}
         </div>
+        <div className="absolute inset-x-0 bottom-[30px] z-0 h-px bg-m3-outline-variant pointer-events-none" />
         {/* Bars */}
         <div className="w-full flex justify-between items-end h-full z-10 pb-[30px] px-4">
-          {occupancyData.map((item) => (
-            <div
-              key={item.day}
-              className="w-[8%] bg-m3-secondary-container hover:bg-m3-primary-container rounded-t-m3-lg transition-colors relative group cursor-pointer"
-              style={{ height: `${item.value}%` }}
-            >
-              <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-m3-inverse-surface text-m3-inverse-on-surface text-label-sm px-2 py-1 rounded-m3-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                {item.value}%
+          {occupancyData.map((item, i) => {
+            const isPeak = item.value === peak;
+            return (
+              <div
+                key={item.day}
+                className="relative group cursor-pointer w-[8%]"
+                style={{ height: `${item.value}%` }}
+              >
+                {/* Colored layer — grows from baseline, carries the inner light */}
+                <div
+                  className={`bar-rise absolute inset-0 rounded-t-m3-lg transition-colors duration-200 ${
+                    isPeak
+                      ? 'bg-m3-primary'
+                      : 'bg-m3-secondary-container group-hover:bg-m3-primary-container'
+                  }`}
+                  style={{
+                    animationDelay: `${i * 60}ms`,
+                    boxShadow: isPeak
+                      ? 'inset 0 1px 0 0 rgba(255,255,255,0.32), inset 0 0 0 1px rgba(255,255,255,0.10), 0 0 16px -2px rgba(0,104,95,0.5)'
+                      : 'inset 0 1px 0 0 rgba(255,255,255,0.38), inset 0 0 0 1px rgba(255,255,255,0.14)',
+                  }}
+                />
+                {/* Value label — always visible, above the bar */}
+                <span className="absolute inset-x-0 -top-5 text-center text-label-sm font-semibold text-m3-on-surface">
+                  {item.value}%
+                </span>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
         {/* X axis labels */}
-        <div className="absolute bottom-0 left-0 w-full flex justify-between px-4 text-label-sm text-m3-secondary">
+        <div className="absolute bottom-0 left-0 w-full flex justify-between px-4 text-label-md text-m3-secondary">
           {occupancyData.map((item) => (
             <span key={item.day}>{item.day}</span>
           ))}
@@ -244,8 +249,124 @@ function ActivityList() {
 
 // === Admin Dashboard (Stitch v2 — M3 tokens) ===
 
+// Seções do visual original que o gestor pode ligar/desligar.
+// Cada chave é um bloco real da página (KPI row, métricas, gráfico, atividades).
+const SECOES = [
+  { id: 'kpis', label: 'Indicadores principais', desc: 'Total de pacientes, admissões e AGAs pendentes' },
+  { id: 'metricas', label: 'Visão institucional', desc: 'Equipe ativa, cobertura AGA, sinais vitais' },
+  { id: 'ocupacao', label: 'Tendência de ocupação', desc: 'Gráfico de barras da ocupação' },
+  { id: 'atividades', label: 'Próximas atividades', desc: 'Agenda de atividades e avaliações' },
+] as const;
+
+type SecaoId = (typeof SECOES)[number]['id'];
+
+const SECAO_DEFAULT: SecaoId[] = ['kpis', 'metricas', 'ocupacao', 'atividades'];
+
+function SeletorSecoes({
+  selecionadas,
+  onChange,
+  onClose,
+  onAplicar,
+  salvar,
+}: {
+  selecionadas: SecaoId[];
+  onChange: (secoes: SecaoId[]) => void;
+  onClose: () => void;
+  onAplicar: (secoes: SecaoId[]) => void;
+  salvar: boolean;
+}) {
+  const toggle = (id: SecaoId) => {
+    if (selecionadas.includes(id)) {
+      onChange(selecionadas.filter((s) => s !== id));
+    } else {
+      onChange([...selecionadas, id]);
+    }
+  };
+
+  return (
+    <div className="rounded-m3-xl border border-m3-outline-variant bg-m3-surface-container-lowest p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-label-md font-medium text-m3-on-surface">Personalizar painel</p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-label-sm text-m3-secondary hover:text-m3-on-surface"
+        >
+          Fechar
+        </button>
+      </div>
+      <div className="space-y-1.5">
+        {SECOES.map((secao) => {
+          const ativa = selecionadas.includes(secao.id);
+          return (
+            <label
+              key={secao.id}
+              className="flex items-start gap-3 rounded-lg border border-m3-outline-variant/60 p-2.5 hover:bg-m3-surface-container-low/60 cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                checked={ativa}
+                onChange={() => toggle(secao.id)}
+                className="mt-0.5 h-4 w-4 rounded border-m3-outline-variant accent-m3-primary"
+              />
+              <span className="min-w-0">
+                <span className="block text-label-md text-m3-on-surface">{secao.label}</span>
+                <span className="block text-label-sm text-m3-secondary mt-0.5">{secao.desc}</span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
+      <div className="mt-4 flex justify-end gap-2">
+        <Button
+          variant="outline"
+          className="text-label-md border-m3-outline-variant text-m3-on-surface bg-m3-surface-container-lowest hover:bg-m3-surface-variant"
+          onClick={() => onChange([...SECAO_DEFAULT])}
+        >
+          Restaurar padrão
+        </Button>
+        <Button
+          className="text-label-md bg-m3-primary text-m3-on-primary hover:bg-m3-primary-container hover:text-m3-on-primary-container disabled:opacity-60"
+          disabled={salvar}
+          onClick={() => onAplicar(selecionadas)}
+        >
+          {salvar ? 'Salvando…' : 'Aplicar'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function DashboardAdmin() {
   const { data: resumo, isLoading } = trpc.dashboard.resumo.useQuery();
+  const layoutQ = trpc.dashboard.layout.useQuery();
+  const salvar = trpc.dashboard.salvarLayout.useMutation();
+  const utils = trpc.useUtils();
+
+  // Seções visíveis — estado local (edição) > layout salvo > padrão.
+  const [secoes, setSecoes] = useState<SecaoId[] | null>(null);
+  const [personalizando, setPersonalizando] = useState(false);
+
+  const layoutCarregado = layoutQ.data;
+  const secoesDoLayout = useMemo<SecaoId[] | null>(() => {
+    if (!layoutCarregado) return null;
+    const ids = layoutCarregado
+      .map((w) => w.id.replace(/^secao-/, ''))
+      .filter((id): id is SecaoId => (SECOES as readonly { id: string }[]).some((s) => s.id === id));
+    return ids.length > 0 ? ids : null;
+  }, [layoutCarregado]);
+
+  const secoesVisiveis = secoes ?? secoesDoLayout ?? SECAO_DEFAULT;
+
+  const aplicar = async (proximas: SecaoId[]) => {
+    setSecoes(proximas);
+    setPersonalizando(false);
+    // Persiste como widgets do catálogo (cada seção vira um widget com size sm).
+    await salvar.mutateAsync({
+      widgets: proximas.map((id) => ({ id: `secao-${id}`, type: secaoToWidget(id), size: 'sm' })),
+    });
+    await utils.dashboard.layout.invalidate();
+  };
 
   if (isLoading) {
     return (
@@ -270,46 +391,81 @@ function DashboardAdmin() {
             <Download className="h-[18px] w-[18px]" />
             Exportar Relatório
           </Button>
+          <Button
+            variant="outline"
+            onClick={() => setPersonalizando(true)}
+            className="gap-2 text-label-md border-m3-outline-variant text-m3-on-surface bg-m3-surface-container-lowest hover:bg-m3-surface-variant"
+          >
+            <ClipboardList className="h-[18px] w-[18px]" />
+            Personalizar
+          </Button>
         </div>
       </header>
 
+      {personalizando && (
+        <div className="shrink-0">
+          <SeletorSecoes
+            selecionadas={secoesVisiveis}
+            onChange={setSecoes}
+            onClose={() => setPersonalizando(false)}
+            onAplicar={aplicar}
+            salvar={salvar.isPending}
+          />
+        </div>
+      )}
+
       {/* KPI Cards — one row */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-gutter shrink-0">
-        <KpiCardV2
-          label="Total de Pacientes"
-          value={String(resumo.totalPacientes)}
-          tone="primary"
-          icon={<Users className="h-4 w-4" />}
-          subtitle="Pacientes ativos na instituição"
-        />
-        <KpiCardV2
-          label="Admissões Semanais"
-          value={String(resumo.admissoesSemanais)}
-          tone="deep"
-          icon={<UserPlus className="h-4 w-4" />}
-          subtitle="Cadastros nos últimos 7 dias"
-        />
-        <KpiCardV2
-          label="Avaliações Pendentes"
-          value={String(resumo.agasPendentes)}
-          tone={resumo.agasPendentes > 0 ? "alert" : "primary"}
-          delta={resumo.agasPendentes > 0 ? "Atenção" : "Em dia"}
-          deltaType={resumo.agasPendentes > 0 ? "negative" : "positive"}
-          icon={<ClipboardList className="h-4 w-4" />}
-          subtitle="Pacientes ativos sem AGA concluída"
-        />
-      </section>
+      {secoesVisiveis.includes('kpis') && (
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-gutter shrink-0">
+          <KpiCardV2
+            label="Total de Pacientes"
+            value={String(resumo.totalPacientes)}
+            tone="primary"
+            icon={<Users className="h-4 w-4" />}
+            subtitle="Pacientes ativos na instituição"
+          />
+          <KpiCardV2
+            label="Admissões Semanais"
+            value={String(resumo.admissoesSemanais)}
+            tone="deep"
+            icon={<UserPlus className="h-4 w-4" />}
+            subtitle="Cadastros nos últimos 7 dias"
+          />
+          <KpiCardV2
+            label="Avaliações Pendentes"
+            value={String(resumo.agasPendentes)}
+            tone={resumo.agasPendentes > 0 ? "alert" : "primary"}
+            delta={resumo.agasPendentes > 0 ? "Atenção" : "Em dia"}
+            deltaType={resumo.agasPendentes > 0 ? "negative" : "positive"}
+            icon={<ClipboardList className="h-4 w-4" />}
+            subtitle="Pacientes ativos sem AGA concluída"
+          />
+        </section>
+      )}
 
       {/* Visão institucional — métricas operacionais do admin (T-49) */}
-      <MetricasInstitucionais totalPacientes={resumo.totalPacientes} />
+      {secoesVisiveis.includes('metricas') && (
+        <MetricasInstitucionais totalPacientes={resumo.totalPacientes} />
+      )}
 
       {/* Chart + Activity — adaptive blocks */}
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-gutter flex-1 min-h-0">
-        <OccupancyChart />
-        <ActivityList />
-      </section>
+      {(secoesVisiveis.includes('ocupacao') || secoesVisiveis.includes('atividades')) && (
+        <section className="grid grid-cols-1 lg:grid-cols-3 gap-gutter flex-1 min-h-0">
+          {secoesVisiveis.includes('ocupacao') && <OccupancyChart />}
+          {secoesVisiveis.includes('atividades') && <ActivityList />}
+        </section>
+      )}
     </div>
   );
+}
+
+// Mapeia seção visual → widget do catálogo (persistência em dashboard_layout).
+function secaoToWidget(secao: SecaoId): WidgetType {
+  if (secao === 'kpis') return 'kpi.pacientesAtivos';
+  if (secao === 'metricas') return 'kpi.equipeAtiva';
+  if (secao === 'ocupacao') return 'kpi.registrosHoje';
+  if (secao === 'atividades') return 'list.registrosHoje';
+  return 'kpi.pacientesAtivos';
 }
 
 function MetricBar({

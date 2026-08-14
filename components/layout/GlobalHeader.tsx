@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Search, Bell, User, LogOut, ChevronDown } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUserRole } from '@/lib/auth/use-user-role';
@@ -25,6 +25,16 @@ export function GlobalHeader({ collapsed }: { collapsed: boolean }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [menuOpen]);
 
   const isAdmin = role === 'admin';
 
@@ -106,7 +116,7 @@ export function GlobalHeader({ collapsed }: { collapsed: boolean }) {
       )}
 
       {/* Menu do usuário */}
-      <div className="relative">
+      <div className="relative" ref={menuRef}>
         <button
           type="button"
           aria-label="Abrir menu do usuário"
@@ -115,36 +125,46 @@ export function GlobalHeader({ collapsed }: { collapsed: boolean }) {
           onClick={() => setMenuOpen((v) => !v)}
           className="flex h-9 items-center gap-2 rounded-full pl-1 pr-2 text-institution-fg hover:bg-institution-hover"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-institution-active text-xs font-semibold text-institution-active-fg">
-            {(perfil?.nome ?? 'U').slice(0, 1).toUpperCase()}
+          <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-institution-active text-xs font-semibold text-institution-active-fg">
+            {perfil?.image
+              ? <img src={perfil.image} alt="" className="h-full w-full object-cover" />
+              : (perfil?.nome ?? 'U').slice(0, 1).toUpperCase()}
           </span>
           <ChevronDown className={`h-4 w-4 text-institution-muted transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
         </button>
         {menuOpen && (
           <div
             role="menu"
-            className="absolute right-0 top-full mt-2 w-52 rounded-lg border border-institution-border bg-white p-1 text-sm text-slate-700 shadow-lg"
+            className="absolute right-0 top-full mt-2 w-72 rounded-xl border border-slate-200 bg-white p-1.5 text-sm shadow-[0_14px_30px_-16px_rgba(15,23,42,0.28)]"
           >
-            <div className="px-3 py-2">
-              <p className="truncate font-medium text-slate-900">{perfil?.nome ?? 'Usuário'}</p>
-              <p className="text-xs capitalize text-slate-500">{perfil?.role ?? role ?? ''}</p>
+            <div className="flex items-center gap-3 px-2.5 py-2.5">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-institution-active text-sm font-semibold text-institution-active-fg">
+                {perfil?.image
+                  ? <img src={perfil.image} alt="" className="h-full w-full object-cover" />
+                  : (perfil?.nome ?? 'U').slice(0, 1).toUpperCase()}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-slate-900">{perfil?.nome ?? 'Usuário'}</p>
+                <p className="truncate text-[11px] text-slate-500">{perfil?.email ?? ''}</p>
+              </div>
             </div>
-            <div className="my-1 h-px bg-slate-100" />
+            <div className="mx-1 my-1 h-px bg-slate-900/10" />
             <Link
               href="/perfil"
               role="menuitem"
               onClick={() => setMenuOpen(false)}
-              className="flex items-center gap-2 rounded-md px-3 py-2 hover:bg-slate-50"
+              className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-slate-800 hover:bg-slate-900/5"
             >
               <User className="h-4 w-4 text-slate-400" /> Meu Perfil
             </Link>
+            <div className="mx-1 my-1 h-px bg-slate-900/10" />
             <button
               type="button"
               role="menuitem"
               onClick={handleLogout}
-              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left hover:bg-slate-50"
+              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-red-700 hover:bg-red-50/70"
             >
-              <LogOut className="h-4 w-4 text-slate-400" /> Deslogar
+              <LogOut className="h-4 w-4" /> Deslogar
             </button>
           </div>
         )}

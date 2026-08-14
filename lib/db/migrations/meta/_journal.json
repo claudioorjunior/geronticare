@@ -43,6 +43,13 @@
       "when": 1786073280060,
       "tag": "0005_bootstrap_installation",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786636800000,
+      "tag": "0006_dashboard_layout",
+      "breakpoints": true
     }
   ]
 }
