@@ -8,7 +8,8 @@ import {
 } from '../server';
 import { anexos, registros } from '@/lib/db/schema';
 import { verificarOwnershipPaciente } from '../ownership';
-import { storageConfigurado } from '@/lib/storage';
+import { objetoExiste, storageConfigurado } from '@/lib/storage';
+import { bloquearChavesAnexo } from '@/lib/storage/lock';
 
 const TAMANHO_MAXIMO = 50 * 1024 * 1024;
 
@@ -61,21 +62,31 @@ export const anexosRouter = createTRPCRouter({
         });
       }
 
-      // ADR 0001: mutations devolvem só `{ id }` — nunca ecoam a linha.
-      const [novo] = await ctx.db
-        .insert(anexos)
-        .values({
-          instituicaoId: ctx.instituicaoId,
-          pacienteId: input.pacienteId,
-          criadoPorId: ctx.userId,
-          chave: input.chave,
-          nome: input.nome,
-          tipo: input.tipo,
-          tamanhoBytes: input.tamanhoBytes,
-        })
-        .returning({ id: anexos.id });
+      return ctx.db.transaction(async (tx) => {
+        await bloquearChavesAnexo(tx, [input.chave]);
+        if (!(await objetoExiste(input.chave))) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Arquivo de anexo não encontrado no storage',
+          });
+        }
 
-      return { id: novo.id };
+        // ADR 0001: mutations devolvem só `{ id }` — nunca ecoam a linha.
+        const [novo] = await tx
+          .insert(anexos)
+          .values({
+            instituicaoId: ctx.instituicaoId,
+            pacienteId: input.pacienteId,
+            criadoPorId: ctx.userId,
+            chave: input.chave,
+            nome: input.nome,
+            tipo: input.tipo,
+            tamanhoBytes: input.tamanhoBytes,
+          })
+          .returning({ id: anexos.id });
+
+        return { id: novo.id };
+      });
     }),
 
   /** Lista os metadados de anexos de um paciente (sem conteúdo). */

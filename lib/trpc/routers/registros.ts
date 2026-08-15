@@ -5,7 +5,8 @@ import { eq, and, gte, lte, inArray } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { verificarOwnershipPaciente } from '../ownership';
 import { urlHttpSchema } from '@/lib/validations/url';
-import { storageConfigurado } from '@/lib/storage';
+import { objetoExiste, storageConfigurado } from '@/lib/storage';
+import { bloquearChavesAnexo } from '@/lib/storage/lock';
 import { temPermissao } from '../autorizacao';
 
 const anexoSchema = z.object({
@@ -149,6 +150,17 @@ export const registrosRouter = createTRPCRouter({
       // Registro + metadados de anexos na mesma transação — falha reverte tudo.
       // ADR 0001: a mutation devolve só `{ id }` — nunca ecoa a linha.
       return ctx.db.transaction(async (tx) => {
+        await bloquearChavesAnexo(tx, anexosNovos.map((anexo) => anexo.chave));
+        const objetosExistem = await Promise.all(
+          anexosNovos.map((anexo) => objetoExiste(anexo.chave)),
+        );
+        if (objetosExistem.some((existe) => !existe)) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Arquivo de anexo não encontrado no storage',
+          });
+        }
+
         const [novoRegistro] = await tx
           .insert(registros)
           .values({

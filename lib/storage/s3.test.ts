@@ -11,8 +11,15 @@ const mocks = vi.hoisted(() => ({
   DeleteObjectCommand: vi.fn().mockImplementation(function (input: unknown) {
     return { input };
   }),
+  HeadObjectCommand: vi.fn().mockImplementation(function (input: unknown) {
+    return { input };
+  }),
+  ListObjectsV2Command: vi.fn().mockImplementation(function (input: unknown) {
+    return { input };
+  }),
+  send: vi.fn(),
   S3Client: vi.fn().mockImplementation(function (config: unknown) {
-    return { config };
+    return { config, send: mocks.send };
   }),
 }));
 
@@ -21,6 +28,8 @@ vi.mock('@aws-sdk/client-s3', () => ({
   GetObjectCommand: mocks.GetObjectCommand,
   PutObjectCommand: mocks.PutObjectCommand,
   DeleteObjectCommand: mocks.DeleteObjectCommand,
+  HeadObjectCommand: mocks.HeadObjectCommand,
+  ListObjectsV2Command: mocks.ListObjectsV2Command,
 }));
 
 vi.mock('@aws-sdk/s3-request-presigner', () => ({
@@ -42,6 +51,7 @@ describe('S3 upload capability', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getSignedUrl.mockResolvedValue('https://storage.test/upload');
+    mocks.send.mockResolvedValue({});
   });
 
   it('assina o Content-Length exato da URL de upload', async () => {
@@ -108,5 +118,61 @@ describe('S3 upload capability', () => {
         'instituicoes/outra/pacientes/420471aa-5994-4886-9ee6-1cee8e7aa810/arquivo.pdf',
       ),
     ).toBeNull();
+  });
+
+  it('verifica a existência do objeto sem baixar o arquivo', async () => {
+    const { anexoExisteS3 } = await import('./s3');
+    const chave =
+      'instituicoes/320471aa-5994-4886-9ee6-1cee8e7aa810/pacientes/420471aa-5994-4886-9ee6-1cee8e7aa810/' +
+      '520471aa-5994-4886-9ee6-1cee8e7aa810-exame.pdf';
+
+    await expect(anexoExisteS3(chave)).resolves.toBe(true);
+    expect(mocks.HeadObjectCommand).toHaveBeenCalledWith({
+      Bucket: 'geronticare-test',
+      Key: chave,
+    });
+
+    mocks.send.mockRejectedValueOnce({
+      name: 'NotFound',
+      $metadata: { httpStatusCode: 404 },
+    });
+    await expect(anexoExisteS3(chave)).resolves.toBe(false);
+
+    const indisponivel = Object.assign(new Error('Storage indisponível'), {
+      name: 'TimeoutError',
+      $metadata: { httpStatusCode: 503 },
+    });
+    mocks.send.mockRejectedValueOnce(indisponivel);
+    await expect(anexoExisteS3(chave)).rejects.toBe(indisponivel);
+  });
+
+  it('lista objetos de anexos por página', async () => {
+    const { listarObjetosAnexosS3 } = await import('./s3');
+    const atualizadoEm = new Date('2026-08-08T00:00:00Z');
+    mocks.send.mockResolvedValueOnce({
+      Contents: [{ Key: 'arquivo.pdf', LastModified: atualizadoEm }, { Key: undefined }],
+      IsTruncated: true,
+      NextContinuationToken: 'pagina-2',
+    });
+
+    await expect(listarObjetosAnexosS3()).resolves.toEqual({
+      objetos: [{ chave: 'arquivo.pdf', atualizadoEm }],
+      proximaPagina: 'pagina-2',
+    });
+    expect(mocks.ListObjectsV2Command).toHaveBeenCalledWith({
+      Bucket: 'geronticare-test',
+      Prefix: 'instituicoes/',
+      ContinuationToken: undefined,
+    });
+  });
+
+  it('aceita nomes com pontos consecutivos na URL de download', async () => {
+    const { gerarUrlDownload } = await import('./s3');
+    mocks.getSignedUrl.mockResolvedValue('https://storage.test/download');
+    const chave =
+      'instituicoes/320471aa-5994-4886-9ee6-1cee8e7aa810/pacientes/420471aa-5994-4886-9ee6-1cee8e7aa810/' +
+      '520471aa-5994-4886-9ee6-1cee8e7aa810-resultado..final.pdf';
+
+    await expect(gerarUrlDownload(chave)).resolves.toBe('https://storage.test/download');
   });
 });

@@ -3,7 +3,7 @@ import { mkdtemp, writeFile, mkdir, readdir, rm, utimes } from 'node:fs/promises
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Db } from '@/lib/db';
-import { anexos } from '@/lib/db/schema';
+import { anexos, registros } from '@/lib/db/schema';
 
 // Mock do env: diretório local aponta para um tmpdir isolado.
 let DIR: string;
@@ -80,6 +80,35 @@ describe('limpeza de órfãos no storage local', () => {
     const restantes = await arquivosEm();
     expect(restantes).toContain('620471aa-5994-4886-9ee6-1cee8e7aa810-anexo-ok.pdf');
     expect(restantes).not.toContain('520471aa-5994-4886-9ee6-1cee8e7aa810-upload-abortado.pdf');
+  });
+
+  it('preserva arquivo referenciado pelo JSON legado de registros', async () => {
+    const chaveLegada =
+      `${SUBDIR}/920471aa-5994-4886-9ee6-1cee8e7aa810-legado.pdf`;
+    await criarArquivo(chaveLegada);
+    const ontem = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    await utimes(join(DIR, chaveLegada), ontem, ontem);
+
+    await db.insert(registros).values({
+      pacienteId: PACIENTE,
+      profissionalId: MEDICO,
+      especialidade: 'medicina',
+      tipo: 'exame',
+      titulo: 'Registro legado com anexo',
+      conteudo: 'Mantém a referência anterior à tabela dedicada.',
+      anexos: [{
+        chave: chaveLegada,
+        nome: 'legado.pdf',
+        tipo: 'application/pdf',
+      }],
+    });
+
+    const { limparOrfaosLocais } = await import('./limpeza');
+    await limparOrfaosLocais(db);
+
+    expect(await arquivosEm()).toContain(
+      '920471aa-5994-4886-9ee6-1cee8e7aa810-legado.pdf',
+    );
   });
 
   it('preserva órfãos recentes e ignora .part', async () => {

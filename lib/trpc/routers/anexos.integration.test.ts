@@ -22,6 +22,7 @@ function chaveValida(paciente = PACIENTE): string {
 
 let caller: Caller;
 let db!: Db;
+let objetoExiste: ReturnType<typeof vi.spyOn>;
 
 beforeAll(async () => {
   (process.env as { NODE_ENV?: string }).NODE_ENV = 'development';
@@ -30,7 +31,9 @@ beforeAll(async () => {
   delete (process.env as Record<string, string | undefined>).DATABASE_URL;
   const { getDb } = await import('@/lib/db');
   const { appRouter } = await import('@/lib/trpc/root');
+  const storage = await import('@/lib/storage');
   db = await getDb<Db>();
+  objetoExiste = vi.spyOn(storage, 'objetoExiste').mockResolvedValue(true);
   caller = appRouter.createCaller({
     db,
     session: null,
@@ -71,6 +74,31 @@ describe('integração anexos (PGlite real) — v0.6.0', () => {
       tipo: 'application/pdf',
       tamanhoBytes: 4096,
     });
+  });
+
+  it('registros.criar confere o objeto dentro da transação coordenada', async () => {
+    const transaction = vi.spyOn(db, 'transaction');
+    objetoExiste.mockClear();
+
+    try {
+      await caller.registros.criar({
+        pacienteId: PACIENTE,
+        especialidade: 'medicina',
+        tipo: 'exame',
+        titulo: 'Exame coordenado',
+        conteudo: 'Finalização protegida contra limpeza concorrente.',
+        anexosNovos: [
+          { chave: chaveValida(), nome: 'coordenado.pdf', tipo: 'application/pdf', tamanhoBytes: 1024 },
+        ],
+      });
+
+      expect(transaction).toHaveBeenCalledOnce();
+      expect(transaction.mock.invocationCallOrder[0]).toBeLessThan(
+        objetoExiste.mock.invocationCallOrder[0],
+      );
+    } finally {
+      transaction.mockRestore();
+    }
   });
 
   it('registros.criar sem anexos funciona normalmente', async () => {
@@ -134,6 +162,26 @@ describe('integração anexos (PGlite real) — v0.6.0', () => {
         ],
       }),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('registros.criar rejeita metadados quando o objeto não existe no storage', async () => {
+    objetoExiste.mockResolvedValue(false);
+    try {
+      await expect(
+        caller.registros.criar({
+          pacienteId: PACIENTE,
+          especialidade: 'medicina',
+          tipo: 'exame',
+          titulo: 'Exame sem objeto',
+          conteudo: 'O arquivo ainda não existe.',
+          anexosNovos: [
+            { chave: chaveValida(), nome: 'x.pdf', tipo: 'application/pdf', tamanhoBytes: 100 },
+          ],
+        }),
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    } finally {
+      objetoExiste.mockResolvedValue(true);
+    }
   });
 
   it('rejeita chave de anexo de outro paciente/instituição (fail-closed)', async () => {
@@ -283,6 +331,28 @@ describe('integração anexos (PGlite real) — v0.6.0', () => {
     expect(restante).toHaveLength(0);
   });
 
+  it('anexos.criar confere o objeto dentro da transação coordenada', async () => {
+    const transaction = vi.spyOn(db, 'transaction');
+    objetoExiste.mockClear();
+
+    try {
+      await caller.anexos.criar({
+        pacienteId: PACIENTE,
+        chave: chaveValida(),
+        nome: 'avulso-coordenado.pdf',
+        tipo: 'application/pdf',
+        tamanhoBytes: 2048,
+      });
+
+      expect(transaction).toHaveBeenCalledOnce();
+      expect(transaction.mock.invocationCallOrder[0]).toBeLessThan(
+        objetoExiste.mock.invocationCallOrder[0],
+      );
+    } finally {
+      transaction.mockRestore();
+    }
+  });
+
   it('anexos.criar persiste documento avulso (sem registro)', async () => {
     const chave = chaveValida();
     const criado = await caller.anexos.criar({
@@ -319,6 +389,23 @@ describe('integração anexos (PGlite real) — v0.6.0', () => {
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     } finally {
       spy.mockRestore();
+    }
+  });
+
+  it('anexos.criar rejeita metadados quando o objeto não existe no storage', async () => {
+    objetoExiste.mockResolvedValue(false);
+    try {
+      await expect(
+        caller.anexos.criar({
+          pacienteId: PACIENTE,
+          chave: chaveValida(),
+          nome: 'fantasma.pdf',
+          tipo: 'application/pdf',
+          tamanhoBytes: 2048,
+        }),
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    } finally {
+      objetoExiste.mockResolvedValue(true);
     }
   });
 

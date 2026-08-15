@@ -1,9 +1,9 @@
 #!/usr/bin/env tsx
 /**
- * Job de limpeza de anexos órfãos no storage local.
+ * Job de limpeza de anexos órfãos no storage local ou S3.
  *
- * Remove arquivos em STORAGE_LOCAL_DIR que não têm metadados correspondentes
- * na tabela `anexos`, respeitando uma janela de segurança para uploads recém-
+ * Remove objetos no driver ativo que não têm metadados correspondentes na
+ * tabela `anexos`, respeitando uma janela de segurança para uploads recém-
  * concluídos. O TTL padrão é de 24 horas e pode ser alterado com
  * STORAGE_ORPHAN_TTL_HOURS.
  *
@@ -14,7 +14,7 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from '@/lib/db/schema';
-import { limparOrfaosLocais, TTL_ORFAO_HORAS_PADRAO } from '@/lib/storage/limpeza';
+import { limparOrfaos, TTL_ORFAO_HORAS_PADRAO } from '@/lib/storage/limpeza';
 
 function requireDatabaseUrl(): string {
   const value = process.env.DATABASE_URL;
@@ -37,7 +37,7 @@ async function main(databaseUrl: string) {
   const db = drizzle(client, { schema });
 
   try {
-    const resultado = await limparOrfaosLocais(db, { ttlHoras });
+    const resultado = await limparOrfaos(db, { ttlHoras });
     console.log(
       `Limpeza concluída: ${resultado.removidos} órfão(s) removido(s) `
         + `de ${resultado.verificados} arquivo(s), após TTL de ${ttlHoras}h.`,

@@ -3,6 +3,8 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
@@ -101,7 +103,13 @@ export async function gerarUrlUpload(
  * A autorização do recurso deve ser feita antes desta função.
  */
 export async function gerarUrlDownload(chave: string): Promise<string> {
-  if (!chave || chave.includes('..') || chave.startsWith('/')) {
+  const segmentos = chave.split('/');
+  if (
+    !chave ||
+    chave.startsWith('/') ||
+    chave.includes('\\') ||
+    segmentos.some((segmento) => !segmento || segmento === '.' || segmento === '..')
+  ) {
     throw new Error('Chave de armazenamento inválida');
   }
 
@@ -155,6 +163,39 @@ export async function removerAnexo(chave: string): Promise<void> {
     Key: chave,
   });
   await obterS3Client().send(comando);
+}
+
+/** Verifica a existência de um objeto S3 sem baixar seu conteúdo. */
+export async function anexoExisteS3(chave: string): Promise<boolean> {
+  try {
+    await obterS3Client().send(new HeadObjectCommand({ Bucket: bucket, Key: chave }));
+    return true;
+  } catch (error) {
+    const status = typeof error === 'object' && error !== null && '$metadata' in error
+      ? (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode
+      : undefined;
+    if (status === 404) return false;
+    throw error;
+  }
+}
+
+/** Lista uma página de objetos da área de anexos para o job de limpeza. */
+export async function listarObjetosAnexosS3(continuationToken?: string): Promise<{
+  objetos: Array<{ chave: string; atualizadoEm: Date | undefined }>;
+  proximaPagina?: string;
+}> {
+  const resposta = await obterS3Client().send(new ListObjectsV2Command({
+    Bucket: bucket,
+    Prefix: 'instituicoes/',
+    ContinuationToken: continuationToken,
+  }));
+
+  return {
+    objetos: (resposta.Contents ?? []).flatMap((objeto) =>
+      objeto.Key ? [{ chave: objeto.Key, atualizadoEm: objeto.LastModified }] : [],
+    ),
+    proximaPagina: resposta.IsTruncated ? resposta.NextContinuationToken : undefined,
+  };
 }
 
 /**

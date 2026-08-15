@@ -26,4 +26,18 @@ export function driverAtivo(): StorageDriver {
   return 'none';
 }
 
+/** Verifica que o objeto físico exista antes de persistir seus metadados. */
+export async function objetoExiste(chave: string): Promise<boolean> {
+  const driver = driverAtivo();
+  if (driver === 'local') {
+    const { anexoExisteLocal } = await import('./local');
+    return anexoExisteLocal(chave);
+  }
+  if (driver === 's3') {
+    const { anexoExisteS3 } = await import('./s3');
+    return anexoExisteS3(chave);
+  }
+  return false;
+}
+
 export { TAMANHO_MAXIMO_UPLOAD_BYTES } from './s3';
