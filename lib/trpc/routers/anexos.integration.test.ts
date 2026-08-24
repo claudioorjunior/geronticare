@@ -101,6 +101,36 @@ describe('integração anexos (PGlite real) — v0.6.0', () => {
     }
   });
 
+  it('registros.criar persiste chave legada e coordena o lock com a transação', async () => {
+    const transaction = vi.spyOn(db, 'transaction');
+    const chaveLegada = chaveValida();
+
+    try {
+      const registro = await caller.registros.criar({
+        pacienteId: PACIENTE,
+        especialidade: 'medicina',
+        tipo: 'exame',
+        titulo: 'Exame com chave JSON legada',
+        conteudo: 'Referência persistida em registros.anexos[].chave.',
+        anexos: [
+          { nome: 'legado.pdf', chave: chaveLegada, tipo: 'application/pdf' },
+        ],
+      });
+
+      const persistido = await db.query.registros.findFirst({
+        where: eq(registros.id, registro.id),
+        columns: { anexos: true },
+      });
+
+      expect(persistido?.anexos).toEqual([
+        { nome: 'legado.pdf', chave: chaveLegada, tipo: 'application/pdf' },
+      ]);
+      expect(transaction).toHaveBeenCalledOnce();
+    } finally {
+      transaction.mockRestore();
+    }
+  });
+
   it('registros.criar sem anexos funciona normalmente', async () => {
     const registro = await caller.registros.criar({
       pacienteId: PACIENTE,

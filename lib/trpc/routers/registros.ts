@@ -149,8 +149,18 @@ export const registrosRouter = createTRPCRouter({
 
       // Registro + metadados de anexos na mesma transação — falha reverte tudo.
       // ADR 0001: a mutation devolve só `{ id }` — nunca ecoa a linha.
+      // `input.anexos[].chave` ainda é persistido no JSON legado via `...input`.
+      // Sem lock nessas chaves, a limpeza de órfãos pode apagar o objeto
+      // enquanto esta transação grava a referência.
+      const chavesLegadas = (input.anexos ?? [])
+        .map((anexo) => anexo.chave)
+        .filter((chave): chave is string => Boolean(chave));
+
       return ctx.db.transaction(async (tx) => {
-        await bloquearChavesAnexo(tx, anexosNovos.map((anexo) => anexo.chave));
+        await bloquearChavesAnexo(tx, [
+          ...anexosNovos.map((anexo) => anexo.chave),
+          ...chavesLegadas,
+        ]);
         const objetosExistem = await Promise.all(
           anexosNovos.map((anexo) => objetoExiste(anexo.chave)),
         );
