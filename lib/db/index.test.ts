@@ -34,7 +34,7 @@ describe('getDb in production', () => {
     await expect(getDb()).resolves.toBe(mocks.db);
     expect(mocks.postgres).toHaveBeenCalledWith(
       'postgresql://user:password@localhost:5432/geronticare',
-      { prepare: false },
+      { prepare: false, max: 5, idle_timeout: 20 },
     );
     expect(mocks.migrate).not.toHaveBeenCalled();
   });

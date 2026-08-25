@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { GlobalSidebar } from './GlobalSidebar';
 import { GlobalHeader } from './GlobalHeader';
+import { PatientForm } from '@/components/pacientes/PatientForm';
+import { PatientFormContext } from '@/components/pacientes/patient-form-context';
 
 const LEGACY_THEME_VARS = [
   '--institution-shell-bg',
@@ -27,6 +29,7 @@ const LEGACY_THEME_VARS = [
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [patientFormOpen, setPatientFormOpen] = useState(false);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -35,16 +38,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <div className="min-h-dvh">
-      <GlobalSidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
-      <GlobalHeader collapsed={collapsed} />
-      <main
-        className={`transition-[padding] duration-300 ease-out ${
-          collapsed ? 'md:pl-[72px]' : 'md:pl-64'
-        }`}
-      >
-        {children}
-      </main>
-    </div>
+    <PatientFormContext.Provider
+      value={{
+        open: patientFormOpen,
+        setOpen: setPatientFormOpen,
+        abrir: () => setPatientFormOpen(true),
+      }}
+    >
+      <div className="min-h-dvh">
+        <GlobalSidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
+        <GlobalHeader collapsed={collapsed} />
+        <main
+          className={`transition-[padding] duration-300 ease-out ${
+            collapsed ? 'md:pl-[72px]' : 'md:pl-64'
+          }`}
+        >
+          {children}
+        </main>
+      </div>
+      <PatientForm open={patientFormOpen} onCloseAction={() => setPatientFormOpen(false)} />
+    </PatientFormContext.Provider>
   );
 }

@@ -9,21 +9,12 @@ import {
   Activity, Heart, Thermometer, Stethoscope, Bell
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useUserRole } from '@/lib/auth/use-user-role';
 import { trpc } from '@/lib/trpc/client';
 import type { WidgetType } from '@/lib/dashboard/catalog';
 
-// === Mock Data (ocupação e atividades não têm query no DB — permanecem mock) ===
-
-const occupancyData = [
-  { day: 'Seg', value: 45 },
-  { day: 'Ter', value: 52 },
-  { day: 'Qua', value: 60 },
-  { day: 'Qui', value: 75 },
-  { day: 'Sex', value: 68 },
-  { day: 'Sáb', value: 82 },
-  { day: 'Dom', value: 90 },
-];
+// === Mock Data (atividades não têm query no DB — permanecem mock) ===
 
 const upcomingActivities = [
   {
@@ -93,6 +84,19 @@ const tipoLabels: Record<string, string> = {
   terapia_ocupacional: 'T. Ocupacional',
   fonoaudiologia: 'Fonoaudiologia',
   nutricao: 'Nutrição',
+  psicologia: 'Psicologia',
+  servico_social: 'Serviço Social',
+};
+
+const espLabelsCurto: Record<string, string> = {
+  medicina: 'Med',
+  enfermagem: 'Enf',
+  fisioterapia: 'Fisio',
+  terapia_ocupacional: 'T.O.',
+  fonoaudiologia: 'Fono',
+  nutricao: 'Nutr',
+  psicologia: 'Psico',
+  servico_social: 'S.S.',
 };
 
 // === KPI Card (M3 tokens) ===
@@ -139,44 +143,118 @@ function KpiCardV2({
   );
 }
 
-// === Bar Chart (M3 tokens) ===
+// === Chart de cuidado (M3 tokens) — toggle: especialidade | evolução × intercorrência ===
 
-function OccupancyChart() {
-  const peak = useMemo(() => Math.max(...occupancyData.map((d) => d.value)), []);
+const PERIODOS = [
+  { label: '7D', dias: 7 },
+  { label: '30D', dias: 30 },
+  { label: '3M', dias: 90 },
+] as const;
+
+type ModoChart = 'especialidade' | 'evolucoes';
+
+const MODOS = [
+  { value: 'especialidade', label: 'Especialidades' },
+  { value: 'evolucoes', label: 'Evolução × Intercorrência' },
+] as const;
+
+function ChartLoading() {
+  return (
+    <div className="flex-grow min-h-[280px] flex items-center justify-center text-body-md text-m3-secondary">
+      Carregando...
+    </div>
+  );
+}
+
+function ChartCuidado() {
+  const [modo, setModo] = useState<ModoChart>('especialidade');
+  const [dias, setDias] = useState(30);
+
+  const espQ = trpc.dashboard.registrosPorEspecialidade.useQuery(
+    { dias },
+    { enabled: modo === 'especialidade' },
+  );
+  const evolQ = trpc.dashboard.evolucoesIntercorrencias.useQuery(
+    { dias },
+    { enabled: modo === 'evolucoes' },
+  );
+
+  const periodoAtivo = PERIODOS.find((p) => p.dias === dias)?.label ?? `${dias}D`;
+  const subtitulo =
+    modo === 'especialidade'
+      ? `Registros clínicos por especialidade · últimos ${periodoAtivo}`
+      : `Evoluções e intercorrências por dia · últimos ${periodoAtivo}`;
+
   return (
     <div className="surface-card-pattern lg:col-span-2 bg-m3-surface-container-lowest border border-m3-outline-variant rounded-m3-xl p-gutter flex flex-col">
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-title-lg text-m3-on-surface">Tendência de Ocupação</h3>
-        <div className="flex gap-2">
-          {(['7D', '30D', '3M'] as const).map((period, i) => (
-            <button
-              key={period}
-              className={`px-3 py-1 text-label-sm rounded-m3-lg transition-colors ${
-                i === 0 ? 'bg-m3-surface-variant text-m3-on-surface' : 'text-m3-secondary hover:bg-m3-surface-variant'
-              }`}
-            >
-              {period}
-            </button>
-          ))}
-        </div>
+      <div className="flex flex-wrap justify-between items-center gap-2 mb-1">
+        <Select value={modo} onValueChange={(v) => setModo(v as ModoChart)}>
+          <SelectTrigger aria-label="Tipo de gráfico" className="rounded-[10px]">
+            <SelectValue>{MODOS.find((m) => m.value === modo)?.label}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {MODOS.map((m) => (
+              <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={String(dias)} onValueChange={(v) => setDias(Number(v))}>
+          <SelectTrigger aria-label="Período" className="w-[76px] rounded-[10px]">
+            <SelectValue>{PERIODOS.find((p) => p.dias === dias)?.label}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {PERIODOS.map((p) => (
+              <SelectItem key={p.dias} value={String(p.dias)}>{p.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
-      <div className="flex-grow relative min-h-[280px] flex items-end gap-2 pt-4">
-        {/* Grid lines — soft, with a firm baseline */}
-        <div className="absolute inset-x-0 top-0 bottom-[30px] flex flex-col justify-between z-0 opacity-10 pointer-events-none">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="w-full border-b border-m3-outline-variant" />
-          ))}
+      <p className="text-label-md text-m3-secondary mb-4">{subtitulo}</p>
+      {modo === 'especialidade' ? (
+        <BarrasEspecialidade data={espQ.data} isPending={espQ.isPending} />
+      ) : (
+        <LinhaEvolucoes data={evolQ.data} isPending={evolQ.isPending} />
+      )}
+    </div>
+  );
+}
+
+function BarrasEspecialidade({
+  data,
+  isPending,
+}: {
+  data?: { especialidade: string; valor: number }[];
+  isPending: boolean;
+}) {
+  const dados = data ?? [];
+  const peak = dados.reduce((max, d) => Math.max(max, d.valor), 0);
+
+  if (isPending) return <ChartLoading />;
+
+  return (
+    <div className="flex-grow relative min-h-[280px] flex items-end gap-2 pt-4">
+      {/* Grid lines — soft, with a firm baseline */}
+      <div className="absolute inset-x-0 top-0 bottom-[30px] flex flex-col justify-between z-0 opacity-10 pointer-events-none">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="w-full border-b border-m3-outline-variant" />
+        ))}
+      </div>
+      <div className="absolute inset-x-0 bottom-[30px] z-0 h-px bg-m3-outline-variant pointer-events-none" />
+      {dados.length === 0 ? (
+        <div className="flex-grow flex items-center justify-center text-body-md text-m3-secondary pb-[30px]">
+          Nenhum registro no período.
         </div>
-        <div className="absolute inset-x-0 bottom-[30px] z-0 h-px bg-m3-outline-variant pointer-events-none" />
-        {/* Bars */}
-        <div className="w-full flex justify-between items-end h-full z-10 pb-[30px] px-4">
-          {occupancyData.map((item, i) => {
-            const isPeak = item.value === peak;
+      ) : (
+        /* Bars */
+        <div className="w-full flex justify-between items-end h-full z-10 pb-[30px] px-4 gap-2">
+          {dados.map((item, i) => {
+            const isPeak = peak > 0 && item.valor === peak;
             return (
               <div
-                key={item.day}
-                className="relative group cursor-pointer w-[8%]"
-                style={{ height: `${item.value}%` }}
+                key={item.especialidade}
+                className={`relative group flex-1 ${peak > 0 ? '' : 'cursor-default'}`}
+                style={{ height: `${peak > 0 ? (item.valor / peak) * 100 : 0}%` }}
+                title={`${tipoLabels[item.especialidade] ?? item.especialidade}: ${item.valor} registros`}
               >
                 {/* Colored layer — grows from baseline, carries the inner light */}
                 <div
@@ -194,19 +272,125 @@ function OccupancyChart() {
                 />
                 {/* Value label — always visible, above the bar */}
                 <span className="absolute inset-x-0 -top-5 text-center text-label-sm font-semibold text-m3-on-surface">
-                  {item.value}%
+                  {item.valor}
                 </span>
               </div>
             );
           })}
         </div>
-        {/* X axis labels */}
-        <div className="absolute bottom-0 left-0 w-full flex justify-between px-4 text-label-md text-m3-secondary">
-          {occupancyData.map((item) => (
-            <span key={item.day}>{item.day}</span>
-          ))}
-        </div>
+      )}
+      {/* X axis labels */}
+      <div className="absolute bottom-0 left-0 w-full flex justify-between px-4 text-label-md text-m3-secondary">
+        {dados.map((item) => (
+          <span key={item.especialidade}>{espLabelsCurto[item.especialidade] ?? item.especialidade}</span>
+        ))}
       </div>
+    </div>
+  );
+}
+
+function LinhaEvolucoes({
+  data,
+  isPending,
+}: {
+  data?: { dia: string; evolucao: number; intercorrencia: number }[];
+  isPending: boolean;
+}) {
+  const dados = data ?? [];
+
+  if (isPending) return <ChartLoading />;
+  if (dados.length === 0) {
+    return (
+      <div className="flex-grow min-h-[280px] flex items-center justify-center text-body-md text-m3-secondary">
+        Nenhum registro no período.
+      </div>
+    );
+  }
+
+  const W = 720;
+  const H = 240;
+  const PAD_X = 12;
+  const PAD_TOP = 22;
+  const PAD_BOT = 26;
+  const max = Math.max(...dados.flatMap((d) => [d.evolucao, d.intercorrencia]), 1);
+  const plotH = H - PAD_TOP - PAD_BOT;
+  const passoX = dados.length > 1 ? (W - PAD_X * 2) / (dados.length - 1) : 0;
+  const y = (v: number) => PAD_TOP + plotH * (1 - v / max);
+  const pontos = (sel: 'evolucao' | 'intercorrencia') =>
+    dados.map((d, i) => `${(PAD_X + i * passoX).toFixed(1)},${y(d[sel]).toFixed(1)}`).join(' ');
+  const passoTick = Math.max(1, Math.floor(dados.length / 6));
+  const ticks = dados
+    .map((d, i) => ({ d, i }))
+    .filter((t) => t.i % passoTick === 0 || t.i === dados.length - 1);
+
+  return (
+    <div className="flex-grow min-h-[280px] flex flex-col">
+      <div className="flex items-center gap-4 mb-2 text-label-sm text-m3-secondary shrink-0">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-m3-primary" />
+          Evoluções
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-amber-500" />
+          Intercorrências
+        </span>
+      </div>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full h-auto flex-1 min-h-[200px]"
+        role="img"
+        aria-label="Evoluções e intercorrências por dia"
+      >
+        {[0.25, 0.5, 0.75, 1].map((f) => (
+          <line
+            key={f}
+            x1={PAD_X}
+            x2={W - PAD_X}
+            y1={y(max * f)}
+            y2={y(max * f)}
+            className="stroke-m3-outline-variant"
+            strokeOpacity={0.15}
+            strokeDasharray="3 5"
+          />
+        ))}
+        <polyline
+          points={pontos('evolucao')}
+          className="stroke-m3-primary"
+          strokeWidth={2.5}
+          fill="none"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        <polyline
+          points={pontos('intercorrencia')}
+          className="stroke-amber-500"
+          strokeWidth={2.5}
+          fill="none"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        {dados.map((d, i) => (
+          <g key={i}>
+            <circle cx={PAD_X + i * passoX} cy={y(d.evolucao)} r={3} className="fill-m3-primary">
+              <title>{`${d.dia}: ${d.evolucao} evoluções`}</title>
+            </circle>
+            <circle cx={PAD_X + i * passoX} cy={y(d.intercorrencia)} r={3} className="fill-amber-500">
+              <title>{`${d.dia}: ${d.intercorrencia} intercorrências`}</title>
+            </circle>
+          </g>
+        ))}
+        {ticks.map(({ d, i }) => (
+          <text
+            key={i}
+            x={PAD_X + i * passoX}
+            y={H - 8}
+            textAnchor="middle"
+            className="fill-m3-secondary text-[11px]"
+          >
+            {d.dia}
+          </text>
+        ))}
+      </svg>
     </div>
   );
 }
@@ -254,7 +438,7 @@ function ActivityList() {
 const SECOES = [
   { id: 'kpis', label: 'Indicadores principais', desc: 'Total de pacientes, admissões e AGAs pendentes' },
   { id: 'metricas', label: 'Visão institucional', desc: 'Equipe ativa, cobertura AGA, sinais vitais' },
-  { id: 'ocupacao', label: 'Tendência de ocupação', desc: 'Gráfico de barras da ocupação' },
+  { id: 'ocupacao', label: 'Visão de cuidado', desc: 'Registros por especialidade ou evolução × intercorrência (toggle)' },
   { id: 'atividades', label: 'Próximas atividades', desc: 'Agenda de atividades e avaliações' },
 ] as const;
 
@@ -451,7 +635,7 @@ function DashboardAdmin() {
       {/* Chart + Activity — adaptive blocks */}
       {(secoesVisiveis.includes('ocupacao') || secoesVisiveis.includes('atividades')) && (
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-gutter flex-1 min-h-0">
-          {secoesVisiveis.includes('ocupacao') && <OccupancyChart />}
+          {secoesVisiveis.includes('ocupacao') && <ChartCuidado />}
           {secoesVisiveis.includes('atividades') && <ActivityList />}
         </section>
       )}

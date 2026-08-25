@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useUserRole } from '@/lib/auth/use-user-role';
 import { trpc } from '@/lib/trpc/client';
 import { PatientForm } from '@/components/pacientes/PatientForm';
+import { usePatientFormContext } from '@/components/pacientes/patient-form-context';
 import { formatarData } from '@/lib/utils';
 import type { RouterOutputs } from '@/lib/trpc/types';
 
@@ -97,8 +98,10 @@ export default function PacientesPage() {
   const router = useRouter();
   const utils = trpc.useUtils();
   const canCreate = role === 'admin' || role === 'profissional';
+  const formCtx = usePatientFormContext();
 
-  const [formAberto, setFormAberto] = useState(false);
+  const [formLocal, setFormLocal] = useState(false);
+  const abrirForm = formCtx ? formCtx.abrir : () => setFormLocal(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [order, setOrder] = useState<OrderKey>('recentes');
@@ -160,7 +163,7 @@ export default function PacientesPage() {
         {canCreate ? (
           <Button
             type="button"
-            onClick={() => setFormAberto(true)}
+            onClick={abrirForm}
             className="gap-2 text-sm font-medium bg-teal-600 text-white hover:bg-teal-700 shadow-sm transition-all"
           >
             <Plus className="h-4.5 w-4.5" /> Novo Paciente
@@ -372,8 +375,9 @@ export default function PacientesPage() {
         )}
       </div>
 
-      {/* Modal Novo Paciente */}
-      <PatientForm open={formAberto} onCloseAction={() => setFormAberto(false)} />
+      {/* Modal Novo Paciente — dentro do AppShell o modal vive no shell (único);
+          fora do shell (testes) renderiza aqui com estado local */}
+      {!formCtx && <PatientForm open={formLocal} onCloseAction={() => setFormLocal(false)} />}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useUserRole } from '@/lib/auth/use-user-role';
 import { authClient, logoutAndClearClientState } from '@/lib/auth/client';
 import { ContextualAction } from './ContextualAction';
+import { usePatientFormContext } from '@/components/pacientes/patient-form-context';
 
 /**
  * Header global do novo shell (handoff §5): mesma cor-base da sidebar
@@ -20,6 +21,7 @@ export function GlobalHeader({ collapsed }: { collapsed: boolean }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: perfil, role } = useUserRole();
+  const formCtx = usePatientFormContext();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -72,7 +74,7 @@ export function GlobalHeader({ collapsed }: { collapsed: boolean }) {
 
       {/* Ação contextual por papel */}
       <div className="ml-auto hidden md:block">
-        <ContextualAction role={role} />
+        <ContextualAction role={role} onNovaAdmissaoAction={formCtx?.abrir} />
       </div>
 
       {/* Busca global */}

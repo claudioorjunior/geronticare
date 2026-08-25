@@ -13,9 +13,15 @@ async function main() {
   const db = await getDb();
 
   // 1. Instituição (obrigatória: usuarios.instituicao_id NOT NULL)
+  // Identidade = CNPJ; nome pode variar entre bancos já semeados.
   let inst = await db.query.instituicoes.findFirst({
-    where: eq(instituicoes.nome, 'ILPI Mock'),
+    where: eq(instituicoes.cnpj, '00.000.000/0001-00'),
   });
+  if (!inst) {
+    inst = await db.query.instituicoes.findFirst({
+      where: eq(instituicoes.nome, 'ILPI Mock'),
+    });
+  }
   if (!inst) {
     const created = await db.insert(instituicoes).values({
       nome: 'ILPI Mock',
@@ -32,7 +38,23 @@ async function main() {
     });
 
     if (existing) {
-      console.log(`já existe: ${u.email}`);
+      const hasAccount = await db.query.accounts.findFirst({
+        where: eq(accounts.userId, existing.id),
+      });
+
+      if (hasAccount) {
+        console.log(`já existe: ${u.email}`);
+        continue;
+      }
+
+      await db.insert(accounts).values({
+        userId: existing.id,
+        accountId: existing.id,
+        providerId: 'credential',
+        password: await hashPassword(u.password),
+      });
+
+      console.log(`conta credential recriada: ${u.email} (${existing.role})`);
       continue;
     }
 

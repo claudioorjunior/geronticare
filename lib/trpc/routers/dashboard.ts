@@ -11,7 +11,13 @@ import {
 import { count, eq, and, desc, asc, gte, sql } from 'drizzle-orm';
 import { alertasDeSinais } from '@/lib/dashboard/alertas-vitais';
 import { dashboardLayoutSchema, sanitizeLayout } from '@/lib/dashboard/layout';
-import { rollingWindowStart, startOfZonedDay, startOfZonedMonth } from '@/lib/dashboard/periodo';
+import {
+  TZ_INSTITUICAO,
+  civilDateInTimeZone,
+  rollingWindowStart,
+  startOfZonedDay,
+  startOfZonedMonth,
+} from '@/lib/dashboard/periodo';
 
 function ativosDaInstituicao(instituicaoId: string) {
   return and(eq(pacientes.instituicaoId, instituicaoId), eq(pacientes.ativo, true));
@@ -246,6 +252,76 @@ export const dashboardRouter = createTRPCRouter({
       alertasVitaisLista: alertasVitais,
     };
   }),
+
+  /**
+   * Volume de registros clínicos por especialidade, na janela dos últimos
+   * `dias`. Mostra onde o esforço de cuidado está concentrado (mix de equipe).
+   */
+  registrosPorEspecialidade: readClinicalProcedure
+    .input(z.object({ dias: z.number().int().min(7).max(90).default(30) }))
+    .query(async ({ ctx, input }) => {
+      const inicio = rollingWindowStart(new Date(), input.dias);
+
+      const linhas = await ctx.db
+        .select({ especialidade: registros.especialidade, valor: count() })
+        .from(registros)
+        .innerJoin(pacientes, eq(registros.pacienteId, pacientes.id))
+        .where(
+          and(
+            eq(pacientes.instituicaoId, ctx.instituicaoId),
+            gte(registros.dataRegistro, inicio),
+          ),
+        )
+        .groupBy(registros.especialidade);
+
+      return linhas
+        .map((l) => ({ especialidade: l.especialidade, valor: Number(l.valor) }))
+        .sort((a, b) => b.valor - a.valor);
+    }),
+
+  /**
+   * Séries diárias de evoluções e intercorrências, na janela dos últimos
+   * `dias`. O dia é truncado em UTC (mesma semântica do atendimentosPorDia) e
+   * rotulado no fuso da instituição (America/Sao_Paulo).
+   */
+  evolucoesIntercorrencias: readClinicalProcedure
+    .input(z.object({ dias: z.number().int().min(7).max(90).default(30) }))
+    .query(async ({ ctx, input }) => {
+      const inicio = rollingWindowStart(new Date(), input.dias);
+      const dia = sql`EXTRACT(EPOCH FROM DATE_TRUNC('day', ${registros.dataRegistro}))`;
+
+      const linhas = await ctx.db
+        .select({ dia, tipo: registros.tipo, valor: count() })
+        .from(registros)
+        .innerJoin(pacientes, eq(registros.pacienteId, pacientes.id))
+        .where(
+          and(
+            eq(pacientes.instituicaoId, ctx.instituicaoId),
+            gte(registros.dataRegistro, inicio),
+            sql`${registros.tipo} IN ('evolucao', 'intercorrencia')`,
+          ),
+        )
+        .groupBy(dia, registros.tipo);
+
+      const porDia = new Map<number, { evolucao: number; intercorrencia: number }>();
+      for (const linha of linhas) {
+        const chave = Number(linha.dia);
+        const atual = porDia.get(chave) ?? { evolucao: 0, intercorrencia: 0 };
+        if (linha.tipo === 'evolucao') atual.evolucao = Number(linha.valor);
+        else atual.intercorrencia = Number(linha.valor);
+        porDia.set(chave, atual);
+      }
+
+      return [...porDia.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .map(([epoch, valores]) => {
+          const { month, day } = civilDateInTimeZone(new Date(epoch * 1000), TZ_INSTITUICAO);
+          return {
+            dia: `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}`,
+            ...valores,
+          };
+        });
+    }),
 
   layout: adminProcedure.query(async ({ ctx }) => {
     const instituicao = await ctx.db.query.instituicoes.findFirst({
