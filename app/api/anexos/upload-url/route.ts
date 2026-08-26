@@ -9,6 +9,7 @@ import {
   gerarChaveAnexo,
   TAMANHO_MAXIMO_UPLOAD_BYTES,
 } from '@/lib/storage/s3';
+import { storageConfigurado, driverAtivo } from '@/lib/storage';
 import { lerJsonBodyLimitado, RequestBodyTooLargeError } from '@/lib/http/body';
 import { z } from 'zod';
 
@@ -23,6 +24,13 @@ const bodySchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    if (!storageConfigurado()) {
+      return NextResponse.json(
+        { error: 'Storage de anexos não configurado' },
+        { status: 503 },
+      );
+    }
+
     const auth = await getAuth();
     const db = await getDb();
 
@@ -48,16 +56,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Usuário sem instituição' }, { status: 403 });
     }
 
-    // SEGURANÇA: anexo clínico é ESCRITA clínica — exige `clinico:editar`
-    // (admin/profissional, ou cargo que conceda). Antes, o papel `usuario`
-    // (leitura) conseguia gerar URL de upload para qualquer paciente da
-    // instituição, gravando anexos sem permissão de escrita.
+    // SEGURANÇA: anexar exige a permissão `anexo:criar` (base do papel
+    // usuario/profissional/admin, ou cargo que conceda). O tenant é garantido
+    // pelo check do paciente abaixo.
     if (!usuario.ativo) {
       return NextResponse.json({ error: 'Usuário inativo' }, { status: 403 });
     }
-    if (!usuario.permissoes.includes('clinico:editar')) {
+    if (!usuario.permissoes.includes('anexo:criar')) {
       return NextResponse.json(
-        { error: 'Permissão de escrita clínica necessária' },
+        { error: 'Permissão para anexar documentos necessária' },
         { status: 403 },
       );
     }
@@ -74,11 +81,22 @@ export async function POST(request: NextRequest) {
     }
 
     const chave = gerarChaveAnexo(usuario.instituicaoId, pacienteId, nomeArquivo);
+
+    // Driver local: o cliente envia o arquivo depois para /api/anexos/upload-local
+    // (mesma chave). Driver S3: presigned URL para PUT direto.
+    if (driverAtivo() === 'local') {
+      return NextResponse.json({
+        chave,
+        driver: 'local',
+      });
+    }
+
     const { url } = await gerarUrlUpload(chave, tipoMime, tamanhoBytes);
 
     return NextResponse.json({
       uploadUrl: url,
       chave,
+      driver: 's3',
     });
   } catch (error) {
     if (error instanceof RequestBodyTooLargeError) {
@@ -88,7 +106,8 @@ export async function POST(request: NextRequest) {
       );
     }
     console.error('Erro ao gerar URL de upload:', error);
-    const message = error instanceof Error ? error.message : 'Erro interno';
-    return NextResponse.json({ error: message }, { status: 500 });
+    // SEGURANÇA: nunca devolver a mensagem interna do driver (pode conter
+    // bucket, região, endpoint ou chave parcial) — resposta genérica.
+    return NextResponse.json({ error: 'Erro interno' }, { status: 500 });
   }
 }

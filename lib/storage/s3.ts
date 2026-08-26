@@ -8,15 +8,26 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 import { env } from '@/lib/env';
 
-const s3Client = new S3Client({
-  region: env.S3_REGION,
-  endpoint: env.S3_ENDPOINT || undefined,
-  credentials: {
-    accessKeyId: env.S3_ACCESS_KEY_ID,
-    secretAccessKey: env.S3_SECRET_ACCESS_KEY,
-  },
-  forcePathStyle: !!env.S3_ENDPOINT,
-});
+let _s3Client: S3Client | null = null;
+
+/**
+ * Cria o client S3 sob demanda (lazy). Importar o módulo não instancia
+ * nada nem falha sem credenciais — o client só existe no primeiro uso.
+ */
+export function obterS3Client(): S3Client {
+  if (!_s3Client) {
+    _s3Client = new S3Client({
+      region: env.S3_REGION,
+      endpoint: env.S3_ENDPOINT || undefined,
+      credentials: {
+        accessKeyId: env.S3_ACCESS_KEY_ID,
+        secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+      },
+      forcePathStyle: !!env.S3_ENDPOINT,
+    });
+  }
+  return _s3Client;
+}
 
 const bucket = env.S3_BUCKET;
 
@@ -41,7 +52,7 @@ const MIME_PERMITIDOS = new Set([
 /**
  * Sanitiza um nome de arquivo, removendo path traversal e caracteres perigosos.
  */
-function sanitizarNomeArquivo(nome: string): string {
+export function sanitizarNomeArquivo(nome: string): string {
   // Remove path components (../, ..\, /, \)
   const nomeLimpo = nome.replace(/^.*[\\/]/, '');
   // Remove caracteres perigosos, mantendo apenas alfanuméricos, pontos, hífens e underscores
@@ -77,7 +88,7 @@ export async function gerarUrlUpload(
     ContentLength: tamanhoBytes,
   });
 
-  const url = await getSignedUrl(s3Client, comando, {
+  const url = await getSignedUrl(obterS3Client(), comando, {
     expiresIn: 300,
     // O Content-Length assinado impede trocar o tamanho no PUT direto para o S3.
     signableHeaders: new Set(['content-length']),
@@ -99,7 +110,7 @@ export async function gerarUrlDownload(chave: string): Promise<string> {
     Key: chave,
   });
 
-  return getSignedUrl(s3Client, comando, { expiresIn: 300 });
+  return getSignedUrl(obterS3Client(), comando, { expiresIn: 300 });
 }
 
 /**
@@ -143,7 +154,7 @@ export async function removerAnexo(chave: string): Promise<void> {
     Bucket: bucket,
     Key: chave,
   });
-  await s3Client.send(comando);
+  await obterS3Client().send(comando);
 }
 
 /**
@@ -186,5 +197,3 @@ export function gerarChaveAvatar(
   const nomeSeguro = sanitizarNomeArquivo(nomeArquivo);
   return `instituicoes/${instituicaoId}/usuarios/${usuarioId}/avatar/${uuid}-${nomeSeguro}`;
 }
-
-export { s3Client };

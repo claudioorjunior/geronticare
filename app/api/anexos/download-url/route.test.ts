@@ -14,13 +14,16 @@ const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   getDb: vi.fn(),
   findPaciente: vi.fn(),
+  findAnexo: vi.fn(),
   resolverUsuarioAutorizacao: vi.fn(),
   gerarUrlDownload: vi.fn(),
+  storageConfigurado: vi.fn(),
+  driverAtivo: vi.fn(),
 }));
 
 vi.mock('@/lib/auth', () => ({ getAuth: mocks.getAuth }));
 vi.mock('@/lib/db', () => ({ getDb: mocks.getDb }));
-vi.mock('@/lib/db/schema', () => ({ pacientes: {} }));
+vi.mock('@/lib/db/schema', () => ({ pacientes: {}, anexos: {} }));
 vi.mock('drizzle-orm', () => ({
   and: vi.fn((...conditions: unknown[]) => conditions),
   eq: vi.fn((...condition: unknown[]) => condition),
@@ -38,6 +41,10 @@ vi.mock('@/lib/storage/s3', () => ({
   },
   gerarUrlDownload: mocks.gerarUrlDownload,
 }));
+vi.mock('@/lib/storage', () => ({
+  storageConfigurado: mocks.storageConfigurado,
+  driverAtivo: mocks.driverAtivo,
+}));
 
 import { POST } from './route';
 
@@ -54,15 +61,21 @@ beforeEach(() => {
   mocks.getAuth.mockResolvedValue({ api: { getSession: mocks.getSession } });
   mocks.getSession.mockResolvedValue({ user: { id: 'user-1' } });
   mocks.getDb.mockResolvedValue({
-    query: { pacientes: { findFirst: mocks.findPaciente } },
+    query: {
+      pacientes: { findFirst: mocks.findPaciente },
+      anexos: { findFirst: mocks.findAnexo },
+    },
   });
   mocks.findPaciente.mockResolvedValue({ id: IDS.paciente });
+  mocks.findAnexo.mockResolvedValue({ chave });
   mocks.resolverUsuarioAutorizacao.mockResolvedValue({
     instituicaoId: IDS.instituicao,
     ativo: true,
-    permissoes: ['clinico:ler'],
+    permissoes: ['anexo:ver'],
   });
   mocks.gerarUrlDownload.mockResolvedValue('https://storage.test/download');
+  mocks.storageConfigurado.mockReturnValue(true);
+  mocks.driverAtivo.mockReturnValue('s3');
 });
 
 describe('POST /api/anexos/download-url', () => {
@@ -75,6 +88,15 @@ describe('POST /api/anexos/download-url', () => {
       expiresIn: 300,
     });
     expect(mocks.gerarUrlDownload).toHaveBeenCalledWith(chave);
+  });
+
+  it('retorna 503 quando o storage não está configurado', async () => {
+    mocks.storageConfigurado.mockReturnValue(false);
+
+    const response = await POST(request({ chave }));
+
+    expect(response.status).toBe(503);
+    expect(mocks.gerarUrlDownload).not.toHaveBeenCalled();
   });
 
   it('rejeita chave de outro tenant antes de assinar o objeto', async () => {
@@ -91,6 +113,15 @@ describe('POST /api/anexos/download-url', () => {
     const response = await POST(request({ chave: 'https://storage.test/public.pdf' }));
 
     expect(response.status).toBe(400);
+    expect(mocks.gerarUrlDownload).not.toHaveBeenCalled();
+  });
+
+  it('retorna 404 quando a chave é válida mas não existe metadado na tabela anexos', async () => {
+    mocks.findAnexo.mockResolvedValue(null);
+
+    const response = await POST(request({ chave }));
+
+    expect(response.status).toBe(404);
     expect(mocks.gerarUrlDownload).not.toHaveBeenCalled();
   });
 });

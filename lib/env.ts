@@ -33,8 +33,8 @@ function requireVar(key: string): () => string {
   };
 }
 
-function optionalVar(key: string, fallback: string): () => string {
-  return () => process.env[key] || fallback;
+function optionalVar(key: string, fallback: string | (() => string)): () => string {
+  return () => process.env[key] || (typeof fallback === 'function' ? fallback() : fallback);
 }
 
 export function authUrlValida(
@@ -101,6 +101,16 @@ export const env = defineEnv({
   AUTH_SECRET: requireAuthSecret(),
   AUTH_URL: requireAuthUrl(),
   NEXT_PUBLIC_APP_URL: optionalVar('NEXT_PUBLIC_APP_URL', 'http://localhost:3000'),
+
+  // Storage de anexos: 'local' (default, zero-config), 's3' (S3-compatible) ou 'none'.
+  STORAGE_DRIVER: optionalVar('STORAGE_DRIVER', 'local'),
+  // CLI define GERONTICARE_HOME fora do diretório descartável da release.
+  STORAGE_LOCAL_DIR: optionalVar(
+    'STORAGE_LOCAL_DIR',
+    () => process.env.GERONTICARE_HOME
+      ? `${process.env.GERONTICARE_HOME}/storage/anexos`
+      : './storage/anexos',
+  ),
 
   // S3 (opcional — só valida no primeiro uso de upload)
   S3_REGION: optionalVar('S3_REGION', 'us-east-1'),

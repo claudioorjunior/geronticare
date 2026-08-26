@@ -1,11 +1,13 @@
 import { z } from 'zod';
 import { createTRPCRouter, readClinicalProcedure, clinicalProcedure } from '../server';
-import { registros, agas, sinaisVitais, usuarios } from '@/lib/db/schema';
+import { registros, anexos, agas, sinaisVitais, usuarios } from '@/lib/db/schema';
 import { eq, and, gte, lte, inArray } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { verificarOwnershipPaciente } from '../ownership';
 import { urlHttpSchema } from '@/lib/validations/url';
 import { extrairContextoChaveAnexo } from '@/lib/storage/s3';
+import { storageConfigurado } from '@/lib/storage';
+import { temPermissao } from '../autorizacao';
 
 const anexoSchema = z.object({
   nome: z.string(),
@@ -20,9 +22,15 @@ const anexoSchema = z.object({
 );
 
 function validarContextoAnexos(
-  anexos: z.infer<typeof anexoSchema>[] | undefined,
-  instituicaoId: string,
-  pacienteId: string,
+  {
+    anexos,
+    instituicaoId,
+    pacienteId,
+  }: {
+    anexos: ReadonlyArray<{ chave?: string }> | undefined;
+    instituicaoId: string;
+    pacienteId: string;
+  },
 ) {
   for (const anexo of anexos ?? []) {
     if (!anexo.chave) continue;
@@ -39,6 +47,16 @@ function validarContextoAnexos(
     }
   }
 }
+
+// Anexo novo (tabela dedicada): chave + nome + tipo + tamanho.
+const anexoNovoSchema = z.object({
+  chave: z.string().min(1).max(1024),
+  nome: z.string().min(1).max(255),
+  tipo: z.string().min(1).max(255),
+  tamanhoBytes: z.number().int().positive().max(50 * 1024 * 1024),
+});
+
+const MAX_ANEXOS_POR_REGISTRO = 50;
 
 export const registrosRouter = createTRPCRouter({
   listar: readClinicalProcedure
@@ -66,11 +84,18 @@ export const registrosRouter = createTRPCRouter({
       if (dataInicio) condicoes.push(gte(registros.dataRegistro, dataInicio));
       if (dataFim) condicoes.push(lte(registros.dataRegistro, dataFim));
 
-      return ctx.db.query.registros.findMany({
+      const registrosList = await ctx.db.query.registros.findMany({
         where: and(...condicoes),
         orderBy: (registros, { desc }) => [desc(registros.dataRegistro)],
         limit,
+        with: {
+          anexos: {
+            columns: { id: true, chave: true, nome: true, tipo: true, tamanhoBytes: true, createdAt: true },
+          },
+        },
       });
+
+      return registrosList;
     }),
 
   buscar: readClinicalProcedure
@@ -83,6 +108,11 @@ export const registrosRouter = createTRPCRouter({
       // retorna null igual a não-encontrado.
       const registro = await ctx.db.query.registros.findFirst({
         where: eq(registros.id, input.id),
+        with: {
+          anexos: {
+            columns: { id: true, chave: true, nome: true, tipo: true, tamanhoBytes: true, createdAt: true },
+          },
+        },
       });
 
       if (!registro) return null;
@@ -107,21 +137,67 @@ export const registrosRouter = createTRPCRouter({
         conteudo: z.string().min(1),
         dataRegistro: z.coerce.date().optional(),
         anexos: z.array(anexoSchema).optional(),
+        // Anexos novos (tabela dedicada) — a chave é gerada pelo upload-url.
+        anexosNovos: z.array(anexoNovoSchema).max(MAX_ANEXOS_POR_REGISTRO).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       await verificarOwnershipPaciente(ctx.db, input.pacienteId, ctx.instituicaoId);
-      validarContextoAnexos(input.anexos, ctx.instituicaoId, input.pacienteId);
 
-      const [novoRegistro] = await ctx.db
-        .insert(registros)
-        .values({
-          ...input,
-          profissionalId: ctx.userId,
-        })
-        .returning();
+      const { anexosNovos = [], ...dadosRegistro } = input;
 
-      return novoRegistro;
+      if (anexosNovos.length > 0 && !temPermissao(ctx.permissoes, 'anexo:criar')) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
+
+      // SEGURANÇA: não persiste metadados de anexo sem storage configurado —
+      // evita "anexo fantasma" (metadado sem objeto) com chave forjada.
+      if (anexosNovos.length > 0 && !storageConfigurado()) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Storage de anexos não configurado',
+        });
+      }
+
+      validarContextoAnexos({
+        anexos: dadosRegistro.anexos,
+        instituicaoId: ctx.instituicaoId,
+        pacienteId: input.pacienteId,
+      });
+      validarContextoAnexos({
+        anexos: anexosNovos,
+        instituicaoId: ctx.instituicaoId,
+        pacienteId: input.pacienteId,
+      });
+
+      // Registro + metadados de anexos na mesma transação — falha reverte tudo.
+      // ADR 0001: a mutation devolve só `{ id }` — nunca ecoa a linha.
+      return ctx.db.transaction(async (tx) => {
+        const [novoRegistro] = await tx
+          .insert(registros)
+          .values({
+            ...dadosRegistro,
+            profissionalId: ctx.userId,
+          })
+          .returning({ id: registros.id });
+
+        if (anexosNovos.length > 0) {
+          await tx.insert(anexos).values(
+            anexosNovos.map((anexo) => ({
+              instituicaoId: ctx.instituicaoId,
+              pacienteId: input.pacienteId,
+              registroId: novoRegistro.id,
+              criadoPorId: ctx.userId,
+              chave: anexo.chave,
+              nome: anexo.nome,
+              tipo: anexo.tipo,
+              tamanhoBytes: anexo.tamanhoBytes,
+            })),
+          );
+        }
+
+        return novoRegistro;
+      });
     }),
 
   timeline: readClinicalProcedure
@@ -159,6 +235,11 @@ export const registrosRouter = createTRPCRouter({
           where: and(...condicoesRegistros),
           orderBy: (registros, { desc }) => [desc(registros.dataRegistro)],
           limit,
+          with: {
+            anexos: {
+              columns: { id: true, chave: true, nome: true, tipo: true, tamanhoBytes: true, createdAt: true },
+            },
+          },
         }),
         ctx.db.query.agas.findMany({
           where: and(...condicoesAga),
@@ -211,7 +292,7 @@ export const registrosRouter = createTRPCRouter({
           titulo: r.titulo,
           profissional: prof?.nome ?? 'Desconhecido',
           especialidade: prof?.especialidade ?? r.especialidade,
-          detalhes: { tipo: r.tipo, conteudo: r.conteudo },
+          detalhes: { tipo: r.tipo, conteudo: r.conteudo, anexos: r.anexos },
         });
       }
 
@@ -255,44 +336,5 @@ export const registrosRouter = createTRPCRouter({
       timeline.sort((a, b) => b.data.getTime() - a.data.getTime());
 
       return timeline.slice(0, limit);
-    }),
-
-  anexar: clinicalProcedure
-    .input(
-      z.object({
-        registroId: z.string().uuid(),
-        anexos: z.array(anexoSchema),
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
-      const registro = await ctx.db.query.registros.findFirst({
-        where: eq(registros.id, input.registroId),
-      });
-
-      if (!registro) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Registro não encontrado' });
-      }
-
-      await verificarOwnershipPaciente(ctx.db, registro.pacienteId, ctx.instituicaoId);
-      validarContextoAnexos(input.anexos, ctx.instituicaoId, registro.pacienteId);
-
-      const anexosAtuais = registro.anexos ?? [];
-      const novosAnexos = [...anexosAtuais, ...input.anexos];
-
-      // Limite de 50 anexos por registro (prevenção de abuso)
-      if (novosAnexos.length > 50) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: `Limite de 50 anexos por registro excedido (atual: ${anexosAtuais.length}, adicionando: ${input.anexos.length})`,
-        });
-      }
-
-      const [atualizado] = await ctx.db
-        .update(registros)
-        .set({ anexos: novosAnexos })
-        .where(eq(registros.id, input.registroId))
-        .returning();
-
-      return atualizado;
     }),
 });

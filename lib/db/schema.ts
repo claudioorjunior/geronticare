@@ -341,8 +341,9 @@ export const registros = pgTable('registros', {
 }));
 
 // Tabela: Anexos clínicos (arquivos de exames, fotos, documentos)
-// Mantida no schema para preservar o histórico de migrações e os metadados
-// existentes. Novos uploads usam chaves S3 privadas; registroId é opcional.
+// Metadados dedicados; o objeto em si fica no storage (local ou S3).
+// registro_id é opcional: anexos podem nascer avulsos na aba Documentos
+// (sem vínculo com um registro), além de anexados a um registro.
 export const anexos = pgTable('anexos', {
   id: uuid('id').primaryKey().defaultRandom(),
   instituicaoId: uuid('instituicao_id').references(() => instituicoes.id).notNull(),
@@ -350,7 +351,7 @@ export const anexos = pgTable('anexos', {
   registroId: uuid('registro_id').references(() => registros.id, { onDelete: 'cascade' }),
   chave: text('chave').notNull().unique(),
   nome: text('nome').notNull(),
-  tipo: text('tipo').notNull(),
+  tipo: text('tipo').notNull(), // MIME
   tamanhoBytes: integer('tamanho_bytes').notNull(),
   criadoPorId: uuid('criado_por_id').references(() => usuarios.id).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),

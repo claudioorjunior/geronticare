@@ -37,7 +37,7 @@ const allTabs = [
   { label: 'AGA', path: 'aga', roles: ['admin', 'profissional', 'usuario'] },
   { label: 'Registros', path: 'registros', roles: ['admin', 'profissional', 'usuario'] },
   { label: 'Sinais', path: 'sinais', roles: ['admin', 'profissional', 'usuario'] },
-  // ponytail: anexos tab removed — route doesn't exist yet; add when anexos page is implemented
+  { label: 'Documentos', path: 'documentos', roles: ['admin', 'profissional', 'usuario'] },
 ];
 
 export default function PatientLayout({ children }: { children: React.ReactNode }) {
