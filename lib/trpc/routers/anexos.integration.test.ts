@@ -71,6 +71,30 @@ describe('integração anexos (PGlite real) — v0.6.0', () => {
       tipo: 'application/pdf',
       tamanhoBytes: 4096,
     });
+
+    const registrosListados = await caller.registros.listar({
+      pacienteId: PACIENTE,
+      limit: 1,
+    });
+    expect(registrosListados.items).toHaveLength(1);
+    expect(registrosListados.totals.total).toBeGreaterThanOrEqual(1);
+    expect(registrosListados.pagination).toMatchObject({
+      offset: 0,
+      limit: 1,
+      total: expect.any(Number),
+      hasPrevious: false,
+    });
+    expect(registrosListados.items[0]).toMatchObject({
+      id: registro.id,
+      profissional: 'Dr. Mock',
+      anexos: [
+        expect.objectContaining({
+          chave,
+          nome: 'exame.pdf',
+          tamanhoBytes: 4096,
+        }),
+      ],
+    });
   });
 
   it('registros.criar sem anexos funciona normalmente', async () => {

@@ -1,33 +1,47 @@
+import { z } from 'zod';
 import { createTRPCRouter, readClinicalProcedure, adminProcedure } from '../server';
 import {
   agas,
+  instituicoes,
   pacientes,
   registros,
   sinaisVitais,
   usuarios,
 } from '@/lib/db/schema';
 import { count, eq, and, desc, asc, gte, sql } from 'drizzle-orm';
+import { alertasDeSinais } from '@/lib/dashboard/alertas-vitais';
+import { dashboardLayoutSchema, sanitizeLayout } from '@/lib/dashboard/layout';
+import {
+  TZ_INSTITUICAO,
+  civilDateInTimeZone,
+  rollingWindowStart,
+  startOfZonedDay,
+  startOfZonedMonth,
+} from '@/lib/dashboard/periodo';
+
+function ativosDaInstituicao(instituicaoId: string) {
+  return and(eq(pacientes.instituicaoId, instituicaoId), eq(pacientes.ativo, true));
+}
+
+const semAgaConcluida = sql`NOT EXISTS (SELECT 1 FROM agas a WHERE a.paciente_id = ${pacientes.id} AND a.status = 'concluida')`;
 
 export const dashboardRouter = createTRPCRouter({
   // Resumo do dashboard — contagens agregadas + pacientes recentes
   resumo: readClinicalProcedure.query(async ({ ctx }) => {
+    const seteDias = rollingWindowStart(new Date(), 7);
     const [totalRow] = await ctx.db
       .select({ value: count() })
       .from(pacientes)
-      .where(
-        and(eq(pacientes.instituicaoId, ctx.instituicaoId), eq(pacientes.ativo, true))
-      );
+      .where(ativosDaInstituicao(ctx.instituicaoId));
 
-    const seteDias = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const [admissoesRow] = await ctx.db
       .select({ value: count() })
       .from(pacientes)
       .where(
         and(
-          eq(pacientes.instituicaoId, ctx.instituicaoId),
-          eq(pacientes.ativo, true),
-          gte(pacientes.createdAt, seteDias)
-        )
+          ativosDaInstituicao(ctx.instituicaoId),
+          gte(pacientes.dataAdmissao, seteDias),
+        ),
       );
 
     // Pacientes ativos sem nenhuma AGA concluída no modelo novo (tabela `agas`).
@@ -35,22 +49,16 @@ export const dashboardRouter = createTRPCRouter({
     const [pendentesRow] = await ctx.db
       .select({ value: count() })
       .from(pacientes)
-      .where(
-        and(
-          eq(pacientes.instituicaoId, ctx.instituicaoId),
-          eq(pacientes.ativo, true),
-          sql`NOT EXISTS (SELECT 1 FROM agas a WHERE a.paciente_id = ${pacientes.id} AND a.status = 'concluida')`
-        )
-      );
+      .where(and(ativosDaInstituicao(ctx.instituicaoId), semAgaConcluida));
 
-    // SEGURANÇA: projeção mínima explícita — a UI (DashboardUsuario) só usa
+    // SEGURANÇA: projeção mínima explícita — a UI só usa
     // id/nome/dataNascimento/dataAdmissao/ativo. O CPF não pertence a este
     // resumo: permanece disponível apenas nas telas autorizadas de busca e
     // detalhe do paciente. Sem `columns:`, o Drizzle
     // devolve TODAS as colunas (RG, endereço completo, contato de emergência,
     // telefone, e-mail, foto) para qualquer papel com leitura clínica.
     const pacientesRecentes = await ctx.db.query.pacientes.findMany({
-      where: and(eq(pacientes.instituicaoId, ctx.instituicaoId), eq(pacientes.ativo, true)),
+      where: ativosDaInstituicao(ctx.instituicaoId),
       columns: {
         id: true,
         nome: true,
@@ -71,10 +79,275 @@ export const dashboardRouter = createTRPCRouter({
     };
   }),
 
+  /**
+   * Painel operacional: um payload para todos os widgets do catálogo.
+   * Contagens sem LIMIT. Listas truncadas só na apresentação.
+   */
+  painel: adminProcedure.query(async ({ ctx }) => {
+    const agora = new Date();
+    const inicioHoje = startOfZonedDay(agora);
+    const inicioMes = startOfZonedMonth(agora);
+    const seteDias = rollingWindowStart(agora, 7);
+    const daCasa = eq(pacientes.instituicaoId, ctx.instituicaoId);
+
+    const [
+      instituicao,
+      pacientesAtivos,
+      admissoesSemana,
+      admissoesMes,
+      agasPendentes,
+      agasConcluidasMes,
+      usuariosPorPapel,
+      sinaisNoMes,
+      registrosHoje,
+      registrosMesPorTipo,
+      filaAga,
+      pacientesRecentes,
+      registrosHojeLista,
+      ultimosSinais,
+    ] = await Promise.all([
+      ctx.db.query.instituicoes.findFirst({
+        where: eq(instituicoes.id, ctx.instituicaoId),
+        columns: { nome: true },
+      }),
+      ctx.db
+        .select({ value: count() })
+        .from(pacientes)
+        .where(ativosDaInstituicao(ctx.instituicaoId)),
+      ctx.db
+        .select({ value: count() })
+        .from(pacientes)
+        .where(and(ativosDaInstituicao(ctx.instituicaoId), gte(pacientes.dataAdmissao, seteDias))),
+      ctx.db
+        .select({ value: count() })
+        .from(pacientes)
+        .where(and(ativosDaInstituicao(ctx.instituicaoId), gte(pacientes.dataAdmissao, inicioMes))),
+      ctx.db
+        .select({ value: count() })
+        .from(pacientes)
+        .where(and(ativosDaInstituicao(ctx.instituicaoId), semAgaConcluida)),
+      ctx.db
+        .select({ value: count() })
+        .from(agas)
+        .innerJoin(pacientes, eq(agas.pacienteId, pacientes.id))
+        .where(
+          and(
+            daCasa,
+            eq(agas.status, 'concluida'),
+            gte(agas.concluidaEm, inicioMes),
+          ),
+        ),
+      ctx.db
+        .select({ role: usuarios.role, value: count() })
+        .from(usuarios)
+        .where(and(eq(usuarios.instituicaoId, ctx.instituicaoId), eq(usuarios.ativo, true)))
+        .groupBy(usuarios.role),
+      ctx.db
+        .select({ value: count() })
+        .from(sinaisVitais)
+        .innerJoin(pacientes, eq(sinaisVitais.pacienteId, pacientes.id))
+        .where(and(daCasa, gte(sinaisVitais.dataAfericao, inicioMes))),
+      ctx.db
+        .select({ value: count() })
+        .from(registros)
+        .innerJoin(pacientes, eq(registros.pacienteId, pacientes.id))
+        .where(and(daCasa, gte(registros.dataRegistro, inicioHoje))),
+      ctx.db
+        .select({ tipo: registros.tipo, value: count() })
+        .from(registros)
+        .innerJoin(pacientes, eq(registros.pacienteId, pacientes.id))
+        .where(and(daCasa, gte(registros.dataRegistro, inicioMes)))
+        .groupBy(registros.tipo),
+      ctx.db
+        .select({
+          pacienteId: pacientes.id,
+          pacienteNome: pacientes.nome,
+          dataAdmissao: pacientes.dataAdmissao,
+        })
+        .from(pacientes)
+        .where(and(ativosDaInstituicao(ctx.instituicaoId), semAgaConcluida))
+        .orderBy(asc(pacientes.dataAdmissao))
+        .limit(5),
+      ctx.db.query.pacientes.findMany({
+        where: ativosDaInstituicao(ctx.instituicaoId),
+        columns: {
+          id: true,
+          nome: true,
+          dataNascimento: true,
+          dataAdmissao: true,
+          ativo: true,
+          createdAt: true,
+        },
+        orderBy: desc(pacientes.createdAt),
+        limit: 5,
+      }),
+      ctx.db
+        .select({
+          id: registros.id,
+          pacienteNome: pacientes.nome,
+          tipo: registros.tipo,
+          titulo: registros.titulo,
+          dataRegistro: registros.dataRegistro,
+        })
+        .from(registros)
+        .innerJoin(pacientes, eq(registros.pacienteId, pacientes.id))
+        .where(and(daCasa, gte(registros.dataRegistro, inicioHoje)))
+        .orderBy(desc(registros.dataRegistro))
+        .limit(8),
+      ctx.db
+        .select({
+          pacienteNome: pacientes.nome,
+          pressaoArterialSistolica: sinaisVitais.pressaoArterialSistolica,
+          pressaoArterialDiastolica: sinaisVitais.pressaoArterialDiastolica,
+          saturacaoO2: sinaisVitais.saturacaoO2,
+          temperatura: sinaisVitais.temperatura,
+          glicemia: sinaisVitais.glicemia,
+        })
+        .from(sinaisVitais)
+        .innerJoin(pacientes, eq(sinaisVitais.pacienteId, pacientes.id))
+        .where(
+          and(
+            ativosDaInstituicao(ctx.instituicaoId),
+            sql`(${sinaisVitais.pacienteId}, ${sinaisVitais.dataAfericao}) IN (
+              SELECT sv2.paciente_id, MAX(sv2.data_afericao)
+              FROM sinais_vitais sv2
+              INNER JOIN pacientes p2 ON p2.id = sv2.paciente_id
+              WHERE p2.instituicao_id = ${ctx.instituicaoId}
+                AND p2.ativo = true
+              GROUP BY sv2.paciente_id
+            )`,
+          ),
+        ),
+    ]);
+
+    const porPapel: Record<string, number> = {};
+    for (const linha of usuariosPorPapel) {
+      porPapel[linha.role] = Number(linha.value);
+    }
+
+    const porTipo: Record<string, number> = {};
+    for (const linha of registrosMesPorTipo) {
+      porTipo[linha.tipo] = Number(linha.value);
+    }
+
+    const totalAtivos = Number(pacientesAtivos[0]?.value ?? 0);
+    const pendentes = Number(agasPendentes[0]?.value ?? 0);
+    const alertasVitais = alertasDeSinais(ultimosSinais);
+
+    return {
+      instituicaoNome: instituicao?.nome ?? null,
+      pacientesAtivos: totalAtivos,
+      admissoesSemana: Number(admissoesSemana[0]?.value ?? 0),
+      admissoesMes: Number(admissoesMes[0]?.value ?? 0),
+      agasPendentes: pendentes,
+      agasConcluidasMes: Number(agasConcluidasMes[0]?.value ?? 0),
+      coberturaAga: Math.max(0, totalAtivos - pendentes),
+      equipeAtiva: Object.values(porPapel).reduce((acc, n) => acc + n, 0),
+      equipePorPapel: porPapel,
+      sinaisVitaisMes: Number(sinaisNoMes[0]?.value ?? 0),
+      registrosHoje: Number(registrosHoje[0]?.value ?? 0),
+      evolucoesMes: porTipo.evolucao ?? 0,
+      intercorrenciasMes: porTipo.intercorrencia ?? 0,
+      alertasVitais: alertasVitais.length,
+      filaAga,
+      pacientesRecentes,
+      registrosHojeLista,
+      alertasVitaisLista: alertasVitais,
+    };
+  }),
+
+  /**
+   * Volume de registros clínicos por especialidade, na janela dos últimos
+   * `dias`. Mostra onde o esforço de cuidado está concentrado (mix de equipe).
+   */
+  registrosPorEspecialidade: readClinicalProcedure
+    .input(z.object({ dias: z.number().int().min(7).max(90).default(30) }))
+    .query(async ({ ctx, input }) => {
+      const inicio = rollingWindowStart(new Date(), input.dias);
+
+      const linhas = await ctx.db
+        .select({ especialidade: registros.especialidade, valor: count() })
+        .from(registros)
+        .innerJoin(pacientes, eq(registros.pacienteId, pacientes.id))
+        .where(
+          and(
+            eq(pacientes.instituicaoId, ctx.instituicaoId),
+            gte(registros.dataRegistro, inicio),
+          ),
+        )
+        .groupBy(registros.especialidade);
+
+      return linhas
+        .map((l) => ({ especialidade: l.especialidade, valor: Number(l.valor) }))
+        .sort((a, b) => b.valor - a.valor);
+    }),
+
+  /**
+   * Séries diárias de evoluções e intercorrências, na janela dos últimos
+   * `dias`. O dia é truncado em UTC (mesma semântica do atendimentosPorDia) e
+   * rotulado no fuso da instituição (America/Sao_Paulo).
+   */
+  evolucoesIntercorrencias: readClinicalProcedure
+    .input(z.object({ dias: z.number().int().min(7).max(90).default(30) }))
+    .query(async ({ ctx, input }) => {
+      const inicio = rollingWindowStart(new Date(), input.dias);
+      const dia = sql`EXTRACT(EPOCH FROM DATE_TRUNC('day', ${registros.dataRegistro}))`;
+
+      const linhas = await ctx.db
+        .select({ dia, tipo: registros.tipo, valor: count() })
+        .from(registros)
+        .innerJoin(pacientes, eq(registros.pacienteId, pacientes.id))
+        .where(
+          and(
+            eq(pacientes.instituicaoId, ctx.instituicaoId),
+            gte(registros.dataRegistro, inicio),
+            sql`${registros.tipo} IN ('evolucao', 'intercorrencia')`,
+          ),
+        )
+        .groupBy(dia, registros.tipo);
+
+      const porDia = new Map<number, { evolucao: number; intercorrencia: number }>();
+      for (const linha of linhas) {
+        const chave = Number(linha.dia);
+        const atual = porDia.get(chave) ?? { evolucao: 0, intercorrencia: 0 };
+        if (linha.tipo === 'evolucao') atual.evolucao = Number(linha.valor);
+        else atual.intercorrencia = Number(linha.valor);
+        porDia.set(chave, atual);
+      }
+
+      return [...porDia.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .map(([epoch, valores]) => {
+          const { month, day } = civilDateInTimeZone(new Date(epoch * 1000), TZ_INSTITUICAO);
+          return {
+            dia: `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}`,
+            ...valores,
+          };
+        });
+    }),
+
+  layout: adminProcedure.query(async ({ ctx }) => {
+    const instituicao = await ctx.db.query.instituicoes.findFirst({
+      where: eq(instituicoes.id, ctx.instituicaoId),
+      columns: { dashboardLayout: true },
+    });
+    return sanitizeLayout(instituicao?.dashboardLayout ?? null, 'admin');
+  }),
+
+  salvarLayout: adminProcedure
+    .input(z.object({ widgets: dashboardLayoutSchema }))
+    .mutation(async ({ ctx, input }) => {
+      const widgets = sanitizeLayout(input.widgets, 'admin');
+      await ctx.db
+        .update(instituicoes)
+        .set({ dashboardLayout: widgets, updatedAt: new Date() })
+        .where(eq(instituicoes.id, ctx.instituicaoId));
+      return widgets;
+    }),
+
   // Registros clínicos do dia atual (filtrados pela instituição)
   registrosHoje: readClinicalProcedure.query(async ({ ctx }) => {
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
+    const hoje = startOfZonedDay(new Date());
 
     return ctx.db
       .select({
@@ -94,7 +367,7 @@ export const dashboardRouter = createTRPCRouter({
       .from(registros)
       .innerJoin(pacientes, eq(registros.pacienteId, pacientes.id))
       .where(
-        and(eq(pacientes.instituicaoId, ctx.instituicaoId), gte(registros.dataRegistro, hoje))
+        and(eq(pacientes.instituicaoId, ctx.instituicaoId), gte(registros.dataRegistro, hoje)),
       )
       .orderBy(desc(registros.dataRegistro))
       .limit(10);
@@ -131,9 +404,12 @@ export const dashboardRouter = createTRPCRouter({
           sql`(${sinaisVitais.pacienteId}, ${sinaisVitais.dataAfericao}) IN (
             SELECT sv2.paciente_id, MAX(sv2.data_afericao)
             FROM sinais_vitais sv2
+            INNER JOIN pacientes p2 ON p2.id = sv2.paciente_id
+            WHERE p2.instituicao_id = ${ctx.instituicaoId}
+              AND p2.ativo = true
             GROUP BY sv2.paciente_id
-          )`
-        )
+          )`,
+        ),
       );
   }),
 
@@ -148,25 +424,17 @@ export const dashboardRouter = createTRPCRouter({
         dataAdmissao: pacientes.dataAdmissao,
       })
       .from(pacientes)
-      .where(
-        and(
-          eq(pacientes.instituicaoId, ctx.instituicaoId),
-          eq(pacientes.ativo, true),
-          sql`NOT EXISTS (SELECT 1 FROM agas a WHERE a.paciente_id = ${pacientes.id} AND a.status = 'concluida')`
-        )
-      )
+      .where(and(ativosDaInstituicao(ctx.instituicaoId), semAgaConcluida))
       .orderBy(asc(pacientes.dataAdmissao))
       .limit(5);
   }),
 
   /**
    * Métricas institucionais (WAYFINDER T-49): visão operacional do admin.
-   * Período fixo "mês corrente" — sem parâmetro de intervalo (YAGNI).
+   * Período fixo "mês corrente" em America/Sao_Paulo.
    */
   metricasInstituicao: adminProcedure.query(async ({ ctx }) => {
-    const inicioMes = new Date();
-    inicioMes.setDate(1);
-    inicioMes.setHours(0, 0, 0, 0);
+    const inicioMes = startOfZonedMonth(new Date());
 
     const [
       pacientesAtivos,
@@ -178,12 +446,7 @@ export const dashboardRouter = createTRPCRouter({
       ctx.db
         .select({ value: count() })
         .from(pacientes)
-        .where(
-          and(
-            eq(pacientes.instituicaoId, ctx.instituicaoId),
-            eq(pacientes.ativo, true)
-          )
-        ),
+        .where(ativosDaInstituicao(ctx.instituicaoId)),
       ctx.db
         .select({ value: count() })
         .from(agas)
@@ -191,27 +454,21 @@ export const dashboardRouter = createTRPCRouter({
         .where(
           and(
             eq(pacientes.instituicaoId, ctx.instituicaoId),
-            eq(agas.status, 'concluida')
-          )
+            eq(agas.status, 'concluida'),
+          ),
         ),
       ctx.db
         .select({ value: count() })
         .from(pacientes)
-        .where(
-          and(
-            eq(pacientes.instituicaoId, ctx.instituicaoId),
-            eq(pacientes.ativo, true),
-            sql`NOT EXISTS (SELECT 1 FROM agas a WHERE a.paciente_id = ${pacientes.id} AND a.status = 'concluida')`
-          )
-        ),
+        .where(and(ativosDaInstituicao(ctx.instituicaoId), semAgaConcluida)),
       ctx.db
         .select({ role: usuarios.role, value: count() })
         .from(usuarios)
         .where(
           and(
             eq(usuarios.instituicaoId, ctx.instituicaoId),
-            eq(usuarios.ativo, true)
-          )
+            eq(usuarios.ativo, true),
+          ),
         )
         .groupBy(usuarios.role),
       ctx.db
@@ -221,8 +478,8 @@ export const dashboardRouter = createTRPCRouter({
         .where(
           and(
             eq(pacientes.instituicaoId, ctx.instituicaoId),
-            gte(sinaisVitais.dataAfericao, inicioMes)
-          )
+            gte(sinaisVitais.dataAfericao, inicioMes),
+          ),
         ),
     ]);
 

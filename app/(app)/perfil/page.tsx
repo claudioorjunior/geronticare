@@ -186,8 +186,8 @@ export default function PerfilPage() {
           <User className="h-5 w-5 text-teal-600" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Meu Perfil</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
+          <h1 className="page-title">Meu Perfil</h1>
+          <p className="page-lede">
             Configure suas informações e credenciais
           </p>
         </div>

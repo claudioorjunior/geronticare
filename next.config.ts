@@ -4,12 +4,17 @@ import type { NextConfig } from 'next';
 // alguns por padrão; o deploy próprio precisa deles explícitos).
 // CSP completa não entra aqui porque quebra scripts/fontes inline do Next;
 // ver ONDE-PAREI (hardening futuro).
-const securityHeaders = [
-  { key: 'X-Frame-Options', value: 'DENY' },
-  { key: 'X-Content-Type-Options', value: 'nosniff' },
-  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
-];
+// Em dev, desligamos tudo: o X-Frame-Options: DENY bloqueia o preview
+// embutido (iframe) do Hermes Desktop — não protege nada em localhost.
+const securityHeaders =
+  process.env.NODE_ENV === 'production'
+    ? [
+        { key: 'X-Frame-Options', value: 'DENY' },
+        { key: 'X-Content-Type-Options', value: 'nosniff' },
+        { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+      ]
+    : [];
 
 const nextConfig: NextConfig = {
   // Empty turbopack config: Next 16 enables Turbopack by default for `next build`.
@@ -25,6 +30,7 @@ const nextConfig: NextConfig = {
     return config;
   },
   async headers() {
+    if (securityHeaders.length === 0) return [];
     return [
       {
         source: '/(.*)',

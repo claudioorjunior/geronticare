@@ -12,6 +12,8 @@ const NOVO_USUARIO_ID = 'eeeeeeee-5555-4555-8555-555555555555';
 interface MakeDbOpts {
   /** Usuário alvo retornado por findFirst (guard do último admin). */
   alvo?: { role: string; ativo: boolean } | null;
+  /** Perfil retornado por findFirst em usuarios.meuPerfil. */
+  perfil?: Record<string, unknown> | null;
   /** Total de admins ativos da instituição (guard do último admin). */
   adminCount?: number;
   /** Falha simulada no insert do usuário dentro da transação. */
@@ -47,7 +49,9 @@ function makeDb(opts: MakeDbOpts = {}) {
   const db = {
     query: {
       usuarios: {
-        findFirst: vi.fn(async () => opts.alvo ?? null),
+        findFirst: vi.fn(async () => (
+          opts.perfil !== undefined ? opts.perfil : opts.alvo ?? null
+        )),
         findMany: vi.fn(async () => []),
       },
       instituicoes: {
@@ -81,7 +85,12 @@ function makeDb(opts: MakeDbOpts = {}) {
   return { db, inserts };
 }
 
-function makeCaller(db: Db, role: string | null, userId: string | null = ADMIN_ID) {
+function makeCaller(
+  db: Db,
+  role: string | null,
+  userId: string | null = ADMIN_ID,
+  permissoes = role ? permissaoEfetiva(role) : [],
+) {
   const ctx = {
     db,
     session: null,
@@ -89,7 +98,7 @@ function makeCaller(db: Db, role: string | null, userId: string | null = ADMIN_I
     userId,
     instituicaoId: INSTITUICAO_ID,
     userRole: role,
-    permissoes: role ? permissaoEfetiva(role) : [],
+    permissoes,
   } as unknown as Context;
   return appRouter.createCaller(ctx);
 }
@@ -366,6 +375,30 @@ describe('buscar/meuPerfil — null em vez de undefined (T-48)', () => {
     await expect(
       caller.usuarios.buscar({ id: NOVO_USUARIO_ID }),
     ).resolves.toBeNull();
+  });
+
+  it('usuarios.meuPerfil expõe as permissões efetivas do contexto', async () => {
+    const perfil = {
+      id: ADMIN_ID,
+      nome: 'Cuidadora',
+      email: 'cuidadora@mock.ilpi',
+      especialidade: null,
+      registroProfissional: null,
+      role: 'usuario',
+      image: null,
+    };
+    const permissoes = permissaoEfetiva('usuario', ['clinico:editar']);
+    const caller = makeCaller(
+      makeDb({ perfil }).db,
+      'usuario',
+      ADMIN_ID,
+      permissoes,
+    );
+
+    await expect(caller.usuarios.meuPerfil()).resolves.toEqual({
+      ...perfil,
+      permissoes,
+    });
   });
 
   it('instituicoes.buscar exige admin', async () => {

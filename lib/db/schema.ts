@@ -26,6 +26,11 @@ export const instituicoes = pgTable('instituicoes', {
     estado: string;
     cep: string;
   }>(),
+  dashboardLayout: jsonb('dashboard_layout').$type<Array<{
+    id: string;
+    type: string;
+    size: 'sm' | 'md' | 'lg';
+  }>>(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -158,7 +163,14 @@ export const pacientes = pgTable('pacientes', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   instituicaoIdx: index('pacientes_instituicao_idx').on(table.instituicaoId),
-  ativoIdx: index('pacientes_ativo_idx').on(table.ativo),
+  instituicaoAtivoIdx: index('pacientes_instituicao_ativo_idx').on(
+    table.instituicaoId,
+    table.ativo,
+  ),
+  instituicaoAdmissaoIdx: index('pacientes_instituicao_admissao_idx').on(
+    table.instituicaoId,
+    table.dataAdmissao,
+  ),
 }));
 
 // Tabela: Avaliação Geriátrica Ampla (AGA)
@@ -258,7 +270,13 @@ export const agas = pgTable('agas', {
   concluidaPorId: uuid('concluida_por_id').references(() => usuarios.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-}, (table) => ({ pacienteIdx: index('agas_paciente_idx').on(table.pacienteId) }));
+}, (table) => ({
+  pacienteStatusIdx: index('agas_paciente_status_idx').on(table.pacienteId, table.status),
+  pacienteConcluidaIdx: index('agas_paciente_concluida_idx').on(
+    table.pacienteId,
+    table.concluidaEm,
+  ),
+}));
 
 export const agaAplicacoes = pgTable('aga_aplicacoes', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -315,7 +333,10 @@ export const registros = pgTable('registros', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
-  pacienteIdx: index('registros_paciente_idx').on(table.pacienteId),
+  pacienteDataIdx: index('registros_paciente_data_idx').on(
+    table.pacienteId,
+    table.dataRegistro,
+  ),
   profissionalIdx: index('registros_profissional_idx').on(table.profissionalId),
 }));
 
@@ -370,7 +391,10 @@ export const sinaisVitais = pgTable('sinais_vitais', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
-  pacienteIdx: index('sinaisvitais_paciente_idx').on(table.pacienteId),
+  pacienteDataIdx: index('sinaisvitais_paciente_data_idx').on(
+    table.pacienteId,
+    table.dataAfericao,
+  ),
   profissionalIdx: index('sinaisvitais_profissional_idx').on(table.profissionalId),
 }));
 

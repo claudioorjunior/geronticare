@@ -99,6 +99,8 @@ export function PatientForm({
   const criar = trpc.pacientes.criar.useMutation({
     onSuccess: (paciente) => {
       utils.pacientes.listar.invalidate();
+      // Dashboard agrega contagens de pacientes/AGAs/registros: invalida tudo.
+      void utils.dashboard.invalidate();
       setSubmitMsg(null);
       onCloseAction();
       reset();

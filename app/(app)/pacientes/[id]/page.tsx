@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useUserRole } from '@/lib/auth/use-user-role';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
-import { Activity, Heart, Calendar, Thermometer, User, Loader2, AlertCircle, CheckCircle2, ClipboardList, ChevronRight, FileText, BarChart3 } from 'lucide-react';
+import { Activity, HeartPulse, Gauge, Wind, Calendar, Thermometer, User, Loader2, AlertCircle, CheckCircle2, ClipboardList, ChevronRight, FileText, BarChart3, Clock } from 'lucide-react';
 import { trpc } from '@/lib/trpc/client';
 import {
   atualizarPacienteSchema,
@@ -25,15 +25,51 @@ import {
 
 type PacienteDetails = RouterOutputs['pacientes']['buscar'];
 
-function Kpi({ icon: Icon, label, value, unit }: { icon: typeof Activity; label: string; value: string; unit: string }) {
+function Kpi({
+  icon: Icon,
+  label,
+  value,
+  unit,
+  updatedAt,
+  footer,
+  accent,
+}: {
+  icon: typeof Activity;
+  label: string;
+  value: string;
+  unit: string;
+  updatedAt?: Date | string | null;
+  footer?: string | null;
+  accent?: { bg: string; fg: string };
+}) {
+  const stamp = (() => {
+    if (!updatedAt) return null;
+    const d = updatedAt instanceof Date ? updatedAt : new Date(updatedAt as string);
+    if (Number.isNaN(d.getTime())) return null;
+    return `${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+  })();
+  const foot = footer ?? (stamp ? `Atualizado ${stamp}` : null);
+  const isAtualizado = foot?.startsWith('Atualizado') ?? false;
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center gap-2 text-slate-400">
-        <Icon className="h-4 w-4" />
-        <span className="text-[11px] uppercase tracking-wider">{label}</span>
+    <div className="flex h-full min-h-[132px] flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center gap-2">
+        <Icon className={`h-4 w-4 shrink-0 ${accent?.fg ?? 'text-slate-500'}`} />
+        <span className="text-[11px] font-medium uppercase tracking-wider text-slate-400">{label}</span>
       </div>
-      <div className="mt-2 text-2xl font-semibold tabular-nums text-slate-900">
+      <div className="mt-3 text-2xl font-semibold leading-none tabular-nums text-slate-900">
         {value} <span className="text-base font-normal text-slate-400">{unit}</span>
+      </div>
+      <div className="mt-auto pt-3 text-[11px] leading-none tabular-nums">
+        {foot ? (
+          <span className="inline-flex items-center gap-1.5 text-slate-400">
+            {isAtualizado ? (
+              <Clock className={`h-3 w-3 shrink-0 ${accent?.fg ?? 'text-slate-400'} opacity-80`} />
+            ) : null}
+            {foot}
+          </span>
+        ) : (
+          <span className="invisible select-none">—</span>
+        )}
       </div>
     </div>
   );
@@ -52,7 +88,11 @@ export default function PatientDadosPage() {
   // Último sinal vital registrado para o paciente
   const { data: ultimoSV } = trpc.sinaisVitais.ultimo.useQuery(
     { pacienteId: params.id },
-    { enabled: !!params.id && canViewClinical },
+    {
+      enabled: !!params.id && canViewClinical,
+      // ponytail: polling de 20s nos indicadores; trocar por push (SSE) se houver edição concorrente real
+      refetchInterval: 20_000,
+    },
   );
 
   const [agora] = useState(() => Date.now());
@@ -96,16 +136,28 @@ export default function PatientDadosPage() {
   const adm = new Date(paciente.dataAdmissao);
   const diasInternado = Number.isNaN(adm.getTime()) ? null : Math.max(0, Math.floor((agora - adm.getTime()) / 86400000));
 
-  // Build KPIs from real vital signs data; fallback to '—' when null
-  const kpis = [
+  // Build KPIs from real vital signs data; fallback to '—' quando sem aferição
+  const atualizadoEm = ultimoSV?.dataAfericao ?? null;
+  const admissaoFooter = Number.isNaN(adm.getTime()) ? null : `Desde ${adm.toLocaleDateString('pt-BR')}`;
+  const kpis: Array<{
+    icon: typeof Activity;
+    label: string;
+    value: string;
+    unit: string;
+    updatedAt?: Date | string | null;
+    footer?: string | null;
+    accent?: { bg: string; fg: string };
+  }> = [
     {
-      icon: Heart,
+      icon: HeartPulse,
       label: 'FC',
       value: ultimoSV?.frequenciaCardiaca?.toString() ?? '—',
       unit: 'bpm',
+      updatedAt: atualizadoEm,
+      accent: { bg: 'bg-rose-50', fg: 'text-rose-500' },
     },
     {
-      icon: Activity,
+      icon: Gauge,
       label: 'PA',
       value:
         ultimoSV?.pressaoArterialSistolica != null &&
@@ -113,24 +165,32 @@ export default function PatientDadosPage() {
           ? `${ultimoSV.pressaoArterialSistolica}/${ultimoSV.pressaoArterialDiastolica}`
           : '—',
       unit: 'mmHg',
+      updatedAt: atualizadoEm,
+      accent: { bg: 'bg-sky-50', fg: 'text-sky-600' },
     },
     {
-      icon: Activity,
+      icon: Wind,
       label: 'SpO2',
       value: ultimoSV?.saturacaoO2?.toString() ?? '—',
       unit: '%',
+      updatedAt: atualizadoEm,
+      accent: { bg: 'bg-cyan-50', fg: 'text-cyan-600' },
     },
     {
       icon: Thermometer,
       label: 'Temp',
       value: ultimoSV?.temperatura != null ? (ultimoSV.temperatura / 10).toFixed(1) : '—',
       unit: '°C',
+      updatedAt: atualizadoEm,
+      accent: { bg: 'bg-amber-50', fg: 'text-amber-600' },
     },
     {
       icon: Calendar,
       label: 'Internado',
       value: diasInternado?.toString() ?? '—',
       unit: 'dias',
+      footer: admissaoFooter,
+      accent: { bg: 'bg-slate-50', fg: 'text-slate-500' },
     },
   ];
 
@@ -138,7 +198,16 @@ export default function PatientDadosPage() {
     <>
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {kpis.map((kpi) => (
-          <Kpi key={kpi.label} icon={kpi.icon} label={kpi.label} value={kpi.value} unit={kpi.unit} />
+          <Kpi
+            key={kpi.label}
+            icon={kpi.icon}
+            label={kpi.label}
+            value={kpi.value}
+            unit={kpi.unit}
+            updatedAt={kpi.updatedAt}
+            footer={kpi.footer}
+            accent={kpi.accent}
+          />
         ))}
       </div>
 

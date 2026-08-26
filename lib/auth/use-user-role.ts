@@ -14,5 +14,6 @@ export function useUserRole() {
   return {
     ...perfilQuery,
     role: perfilQuery.data?.role ?? null,
+    permissions: perfilQuery.data?.permissoes ?? [],
   };
 }

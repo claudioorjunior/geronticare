@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { Db } from '@/lib/db';
 import type { Context } from '../server';
-import { agas, instituicoes, pacientes } from '@/lib/db/schema';
+import { agas, instituicoes, pacientes, registros } from '@/lib/db/schema';
 import { permissaoEfetiva } from '../autorizacao';
 
 /**
@@ -50,6 +50,12 @@ beforeAll(async () => {
 });
 
 describe('integração dashboard (PGlite real) — A3 AGA nova', () => {
+  it('restringe o painel operacional completo ao administrador', async () => {
+    await expect(caller.dashboard.painel()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+  });
+
   it('baseline: todos os pacientes ativos do seed estão pendentes, em fila por admissão', async () => {
     const resumo = await caller.dashboard.resumo();
     expect(resumo.agasPendentes).toBe(4);
@@ -144,5 +150,66 @@ describe('integração dashboard (PGlite real) — A3 AGA nova', () => {
     expect(proximas.map((p) => p.pacienteNome)).not.toContain('Paciente Externo');
     expect(proximas.map((p) => p.pacienteNome)).not.toContain('Novo Paciente 3');
     expect(proximas.map((p) => p.pacienteNome)).toContain('Novo Paciente 2');
+  });
+
+  it('registrosPorEspecialidade: agrupa por especialidade, na janela, isolado por instituição', async () => {
+    const base = await caller.dashboard.registrosPorEspecialidade({ dias: 30 });
+    const totalBase = base.reduce((acc, r) => acc + r.valor, 0);
+
+    await db.insert(registros).values({
+      pacienteId: MARIA,
+      profissionalId: MEDICO,
+      especialidade: 'enfermagem',
+      tipo: 'evolucao',
+      titulo: 'Cuidados',
+      conteudo: 'Curativo e banho',
+      dataRegistro: new Date(),
+    });
+    await db.insert(registros).values({
+      pacienteId: JOAO,
+      profissionalId: MEDICO,
+      especialidade: 'fisioterapia',
+      tipo: 'evolucao',
+      titulo: 'Exercícios',
+      conteudo: 'Sessão de fisioterapia',
+      dataRegistro: new Date(),
+    });
+
+    const result = await caller.dashboard.registrosPorEspecialidade({ dias: 30 });
+    expect(result.reduce((acc, r) => acc + r.valor, 0)).toBe(totalBase + 2);
+    expect(result.every((r) => r.valor > 0)).toBe(true);
+    const baseFisio = base.find((r) => r.especialidade === 'fisioterapia')?.valor ?? 0;
+    expect(result.find((r) => r.especialidade === 'fisioterapia')?.valor).toBe(baseFisio + 1);
+  });
+
+  it('evolucoesIntercorrencias: séries diárias de evolução e intercorrência, isolado por instituição', async () => {
+    const base = await caller.dashboard.evolucoesIntercorrencias({ dias: 30 });
+    const ultimoBase = base[base.length - 1];
+
+    await db.insert(registros).values({
+      pacienteId: MARIA,
+      profissionalId: MEDICO,
+      especialidade: 'enfermagem',
+      tipo: 'intercorrencia',
+      titulo: 'Queda',
+      conteudo: 'Queda da própria altura, sem lesão',
+      dataRegistro: new Date(),
+    });
+    // Prescrição não entra em nenhuma das duas séries.
+    await db.insert(registros).values({
+      pacienteId: MARIA,
+      profissionalId: MEDICO,
+      especialidade: 'medicina',
+      tipo: 'prescricao',
+      titulo: 'Prescrição',
+      conteudo: 'Ajuste de dose',
+      dataRegistro: new Date(),
+    });
+
+    const result = await caller.dashboard.evolucoesIntercorrencias({ dias: 30 });
+    const ultimo = result[result.length - 1];
+    expect(ultimo.dia).toBe(ultimoBase.dia);
+    expect(ultimo.intercorrencia).toBe(ultimoBase.intercorrencia + 1);
+    expect(ultimo.evolucao).toBe(ultimoBase.evolucao);
   });
 });

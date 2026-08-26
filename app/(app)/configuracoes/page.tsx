@@ -122,8 +122,8 @@ export default function ConfiguracoesPage() {
   return (
     <div className="mx-auto w-full max-w-container-max px-margin-mobile md:px-margin-desktop py-6">
       <header className="mb-6">
-        <h1 className="text-headline-lg text-slate-900">Configurações</h1>
-        <p className="mt-1 text-sm text-slate-500">Dados cadastrais da instituição.</p>
+        <h1 className="page-title">Configurações</h1>
+        <p className="page-lede">Dados cadastrais da instituição.</p>
       </header>
 
       <form onSubmit={handleSubmit} className="max-w-3xl space-y-6">

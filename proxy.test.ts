@@ -18,4 +18,11 @@ describe('bootstrap routes in proxy', () => {
       'http://localhost/login?callbackUrl=%2Fdashboard',
     );
   });
+
+  it('lets public brand assets load without a session', () => {
+    const response = proxy(new NextRequest('http://localhost/geronticare-logo.png'));
+
+    expect(response.headers.get('x-middleware-next')).toBe('1');
+    expect(response.headers.get('location')).toBeNull();
+  });
 });
