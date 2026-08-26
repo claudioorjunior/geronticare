@@ -22,4 +22,3 @@ describe('isNavigationItemActive', () => {
     expect(isNavigationItemActive(findItem('Dashboard'), '/dashboard')).toBe(true);
   });
 });
-
