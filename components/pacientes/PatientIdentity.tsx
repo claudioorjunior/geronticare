@@ -50,8 +50,8 @@ export function PatientIdentity({
     paciente.sexo === 'masculino' ? 'M' : paciente.sexo === 'feminino' ? 'F' : '—';
 
   return (
-    <div className="flex items-start justify-between gap-4">
-      <div className="flex items-center gap-4">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+      <div className="flex min-w-0 items-center gap-3 sm:gap-4">
         <Link
           href="/pacientes"
           aria-label="Voltar para lista de pacientes"
@@ -61,7 +61,7 @@ export function PatientIdentity({
         </Link>
         <div
           aria-hidden
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-teal-500 to-teal-700 text-white shadow-sm"
+          className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-teal-500 to-teal-700 text-white shadow-sm sm:flex"
         >
           <span className="text-sm font-bold tracking-wide">{getInitials(paciente.nome)}</span>
         </div>

@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { Search, Bell, User, LogOut, ChevronDown } from 'lucide-react';
+import { Search, Bell, User, LogOut, ChevronDown, Menu } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUserRole } from '@/lib/auth/use-user-role';
 import { authClient, logoutAndClearClientState } from '@/lib/auth/client';
@@ -16,7 +17,13 @@ import { usePatientFormContext } from '@/components/pacientes/patient-form-conte
  * de usuário. Reutiliza o perfil e o logout existentes — não recria
  * autenticação.
  */
-export function GlobalHeader({ collapsed }: { collapsed: boolean }) {
+export function GlobalHeader({
+  collapsed,
+  onOpenNavigation,
+}: {
+  collapsed: boolean;
+  onOpenNavigation: () => void;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -66,8 +73,17 @@ export function GlobalHeader({ collapsed }: { collapsed: boolean }) {
         collapsed ? 'md:pl-[72px]' : 'md:pl-64'
       } pl-4`}
     >
+      <button
+        type="button"
+        aria-label="Abrir navegação"
+        onClick={onOpenNavigation}
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-institution-fg hover:bg-institution-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-institution-active md:hidden"
+      >
+        <Menu className="h-5 w-5" aria-hidden="true" />
+      </button>
+
       {/* Contexto institucional */}
-      <div className="min-w-0 pl-2">
+      <div className="min-w-0 md:pl-2">
         <p className="truncate text-xs text-institution-muted">Residencial Aurora · Unidade Centro</p>
         <p className="truncate text-sm font-semibold text-institution-fg">{currentSection}</p>
       </div>
@@ -129,7 +145,17 @@ export function GlobalHeader({ collapsed }: { collapsed: boolean }) {
         >
           <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-institution-active text-xs font-semibold text-institution-active-fg">
             {perfil?.image
-              ? <img src={perfil.image} alt="" className="h-full w-full object-cover" />
+              ? (
+                <Image
+                  src={perfil.image}
+                  alt=""
+                  width={32}
+                  height={32}
+                  sizes="32px"
+                  unoptimized
+                  className="h-full w-full object-cover"
+                />
+              )
               : (perfil?.nome ?? 'U').slice(0, 1).toUpperCase()}
           </span>
           <ChevronDown className={`h-4 w-4 text-institution-muted transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
@@ -142,7 +168,17 @@ export function GlobalHeader({ collapsed }: { collapsed: boolean }) {
             <div className="flex items-center gap-3 px-2.5 py-2.5">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-institution-active text-sm font-semibold text-institution-active-fg">
                 {perfil?.image
-                  ? <img src={perfil.image} alt="" className="h-full w-full object-cover" />
+                  ? (
+                    <Image
+                      src={perfil.image}
+                      alt=""
+                      width={40}
+                      height={40}
+                      sizes="40px"
+                      unoptimized
+                      className="h-full w-full object-cover"
+                    />
+                  )
                   : (perfil?.nome ?? 'U').slice(0, 1).toUpperCase()}
               </span>
               <div className="min-w-0">

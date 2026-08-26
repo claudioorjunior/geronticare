@@ -34,7 +34,7 @@ export function PatientRecordRail() {
   return (
     <nav
       aria-label="Seções do prontuário"
-      className="flex shrink-0 flex-col gap-1 pt-1"
+      className="flex shrink-0 gap-1 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0 md:pt-1"
     >
       {sections.map((section) => {
         const Icon = section.icon;
@@ -43,14 +43,14 @@ export function PatientRecordRail() {
         // Encaixe na folha: borda esquerda de destaque + fundo branco contínuo,
         // "puxando" o marcador +1px para dentro da folha (−mr) no estado ativo.
         const base =
-          'group relative flex items-center gap-2.5 rounded-l-lg py-2.5 pl-3 pr-4 text-sm transition-colors';
+          'group relative flex shrink-0 items-center gap-2 rounded-t-lg border px-3 py-2.5 text-sm transition-colors md:gap-2.5 md:rounded-l-lg md:rounded-tr-none md:border-y md:border-l md:border-r-0 md:pl-3 md:pr-4';
 
         if (section.status === 'soon') {
           return (
             <span
               key={section.label}
               aria-disabled="true"
-              className={`${base} cursor-default text-slate-400`}
+              className={`${base} cursor-default border-transparent text-slate-400`}
             >
               <Icon className="h-4 w-4 shrink-0" aria-hidden />
               <span className="min-w-0 flex-1 truncate">{section.label}</span>
@@ -68,8 +68,8 @@ export function PatientRecordRail() {
             aria-current={isActive ? 'page' : undefined}
             className={`${base} ${
               isActive
-                ? '-mr-px border-y border-l border-slate-200 bg-white font-semibold text-slate-900 shadow-[inset_3px_0_0_0_var(--color-teal-700,#0f766e)]'
-                : 'border-y border-l border-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                ? 'border-slate-200 bg-white font-semibold text-slate-900 shadow-[inset_0_-3px_0_0_var(--color-teal-700,#0f766e)] md:-mr-px md:shadow-[inset_3px_0_0_0_var(--color-teal-700,#0f766e)]'
+                : 'border-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900'
             }`}
           >
             <Icon

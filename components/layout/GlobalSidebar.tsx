@@ -5,7 +5,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Menu } from '@base-ui/react/menu';
-import { Check, Activity, ChevronsLeft, ChevronsRight, ChevronDown, CircleHelp, Command } from 'lucide-react';
+import { Check, Activity, ChevronsLeft, ChevronsRight, ChevronDown, CircleHelp, Command, X } from 'lucide-react';
 import { useUserRole } from '@/lib/auth/use-user-role';
 import { NAVIGATION_GROUPS, filtrarPorPermissao, isNavigationItemActive } from '@/lib/navigation';
 import { PERMISSOES_BASE } from '@/lib/trpc/autorizacao';
@@ -56,9 +56,13 @@ function InstitutionMark() {
  */
 export function GlobalSidebar({
   collapsed,
+  mobileOpen,
+  onMobileClose,
   onToggle,
 }: {
   collapsed: boolean;
+  mobileOpen: boolean;
+  onMobileClose: () => void;
   onToggle: () => void;
 }) {
   const pathname = usePathname();
@@ -73,10 +77,12 @@ export function GlobalSidebar({
   return (
     <aside
       aria-label="Navegação principal"
-      className={`institution-shell institution-sidebar-shell fixed inset-y-0 left-0 z-40 flex flex-col transition-[width] duration-300 ease-out ${collapsed ? 'w-[72px]' : 'w-64'}`}
+      className={`institution-shell institution-sidebar-shell fixed inset-y-0 left-0 z-50 flex w-64 flex-col transition-[transform,width] duration-300 ease-out md:translate-x-0 ${
+        mobileOpen ? 'translate-x-0' : '-translate-x-full'
+      } ${collapsed ? 'md:w-[72px]' : 'md:w-64'}`}
     >
       {/* Marca fixa da plataforma. A identidade da ILPI pertence ao seletor abaixo. */}
-      <div className={`flex h-[72px] items-center border-b border-institution-border ${collapsed ? 'justify-center px-2' : 'px-4'}`}>
+      <div className={`relative flex h-[72px] items-center border-b border-institution-border ${collapsed ? 'justify-center px-2' : 'px-4'}`}>
         <Image
           src={collapsed ? '/geronticare-symbol.png' : '/geronticare-logo.png'}
           alt="GerontiCare"
@@ -88,6 +94,14 @@ export function GlobalSidebar({
             ? 'h-10 w-auto max-w-[40px] object-contain brightness-0 invert'
             : 'h-auto w-full max-h-10 object-contain brightness-0 invert'}
         />
+        <button
+          type="button"
+          aria-label="Fechar navegação"
+          onClick={onMobileClose}
+          className="absolute right-3 flex h-9 w-9 items-center justify-center rounded-md text-institution-muted hover:bg-institution-hover hover:text-institution-fg md:hidden"
+        >
+          <X className="h-5 w-5" aria-hidden="true" />
+        </button>
       </div>
 
       {/* Workspace switcher: mesmo com uma unidade, a interação já escala para a lista real. */}
@@ -182,7 +196,7 @@ export function GlobalSidebar({
         </div>
       )}
 
-      <div className={`mb-2 flex ${collapsed ? 'justify-center' : 'justify-end px-3'}`}>
+      <div className={`mb-2 hidden md:flex ${collapsed ? 'justify-center' : 'justify-end px-3'}`}>
         <button
           type="button"
           onClick={onToggle}
@@ -211,6 +225,7 @@ export function GlobalSidebar({
                   <li key={item.label}>
                     <Link
                       href={item.href}
+                      onClick={onMobileClose}
                       aria-current={active ? 'page' : undefined}
                       data-tip={collapsed ? item.label : undefined}
                       className={`group relative flex items-center gap-3 rounded-md px-2 py-2 text-[13px] transition-[background-color,color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-institution-active/70 ${

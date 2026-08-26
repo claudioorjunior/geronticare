@@ -18,13 +18,18 @@ export function PatientRecordSheet({
   children: ReactNode;
 }) {
   return (
-    <div className="flex gap-0">
-      {/* Rail de fichário — largura fixa, marcadores encaixam na folha */}
-      <div className="hidden w-44 shrink-0 md:block">{rail}</div>
+    <div>
+      {/* Em telas estreitas, mantém todas as seções acessíveis em uma faixa
+          horizontal; no desktop, preserva o rail de fichário vertical. */}
+      <div className="mb-3 md:hidden">{rail}</div>
 
-      {/* Folha branca de conteúdo clínico */}
-      <div className="min-w-0 flex-1 rounded-xl rounded-tl-none border border-slate-200 bg-white shadow-sm md:rounded-tl-none">
-        <div className="px-6 py-6">{children}</div>
+      <div className="flex gap-0">
+        <div className="hidden w-44 shrink-0 md:block">{rail}</div>
+
+        {/* Folha branca de conteúdo clínico */}
+        <div className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white shadow-sm md:rounded-tl-none">
+          <div className="px-4 py-5 sm:px-6 sm:py-6">{children}</div>
+        </div>
       </div>
     </div>
   );

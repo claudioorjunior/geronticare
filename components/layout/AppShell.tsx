@@ -29,6 +29,7 @@ const LEGACY_THEME_VARS = [
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [patientFormOpen, setPatientFormOpen] = useState(false);
 
   useEffect(() => {
@@ -36,6 +37,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     for (const key of LEGACY_THEME_VARS) root.style.removeProperty(key);
     localStorage.removeItem('geronticare:institution-theme');
   }, []);
+
+  useEffect(() => {
+    if (!mobileNavigationOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMobileNavigationOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [mobileNavigationOpen]);
 
   return (
     <PatientFormContext.Provider
@@ -46,8 +56,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       }}
     >
       <div className="min-h-dvh">
-        <GlobalSidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
-        <GlobalHeader collapsed={collapsed} />
+        {mobileNavigationOpen && (
+          <button
+            type="button"
+            aria-label="Fechar navegação"
+            className="fixed inset-0 z-40 bg-slate-950/45 backdrop-blur-[1px] md:hidden"
+            onClick={() => setMobileNavigationOpen(false)}
+          />
+        )}
+        <GlobalSidebar
+          collapsed={collapsed}
+          mobileOpen={mobileNavigationOpen}
+          onMobileClose={() => setMobileNavigationOpen(false)}
+          onToggle={() => setCollapsed((v) => !v)}
+        />
+        <GlobalHeader
+          collapsed={collapsed}
+          onOpenNavigation={() => {
+            setCollapsed(false);
+            setMobileNavigationOpen(true);
+          }}
+        />
         <main
           className={`transition-[padding] duration-300 ease-out ${
             collapsed ? 'md:pl-[72px]' : 'md:pl-64'

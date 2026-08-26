@@ -85,7 +85,7 @@ export default function PatientLayout({ children }: { children: React.ReactNode 
   // reais; a rail vem de `lib/patient-record.ts`.
   if (NOVO_UI_ATIVO) {
     return (
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <div className="mb-5 border-b border-slate-200 pb-5">
           <PatientIdentity paciente={paciente} patientId={patientId} />
         </div>
