@@ -134,22 +134,19 @@ describe('coordenação de anexos', () => {
     );
   });
 
-  it('remove uma referência atual e preserva o objeto citado pelo legado', async () => {
-    const { db, tx, findRegistro } = criarDb({ referenciaLegada: true });
+  it('remove uma referência sob lock e deixa a exclusão física para o cleanup', async () => {
+    const { db, tx } = criarDb();
     const removerReferencia = vi.fn();
-    const removerFisicamente = vi.fn();
     const { removerReferenciaAnexo } = await import('./coordenacao');
 
     await expect(removerReferenciaAnexo(
       db,
       'chave',
       removerReferencia,
-      removerFisicamente,
-    )).resolves.toBe('referenciado');
+    )).resolves.toBeUndefined();
     expect(removerReferencia).toHaveBeenCalledWith(tx);
-    expect(removerFisicamente).not.toHaveBeenCalled();
-    expect(removerReferencia.mock.invocationCallOrder[0]).toBeLessThan(
-      findRegistro.mock.invocationCallOrder[0],
+    expect(mocks.bloquearChavesAnexo.mock.invocationCallOrder[0]).toBeLessThan(
+      removerReferencia.mock.invocationCallOrder[0],
     );
   });
 });

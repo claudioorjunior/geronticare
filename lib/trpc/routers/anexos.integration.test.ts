@@ -348,7 +348,7 @@ describe('integração anexos (PGlite real) — v0.6.0', () => {
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
-  it('remover anexo apaga metadados e objeto sob coordenação', async () => {
+  it('remover anexo apaga metadados e deixa o objeto para o cleanup', async () => {
     storageMocks.removerObjeto.mockClear();
     const chave = chaveValida();
     const registro = await caller.registros.criar({
@@ -373,7 +373,7 @@ describe('integração anexos (PGlite real) — v0.6.0', () => {
       where: eq(anexos.id, anexo!.id),
     });
     expect(restante).toBeUndefined();
-    expect(storageMocks.removerObjeto).toHaveBeenCalledWith(chave);
+    expect(storageMocks.removerObjeto).not.toHaveBeenCalled();
   });
 
   it('remover anexo preserva o objeto citado por um registro legado', async () => {

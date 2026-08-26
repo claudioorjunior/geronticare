@@ -36,3 +36,7 @@ ts	phase	decision	why	evidence	result
 2026-08-26T16:19:48Z	verify	rejected the parallel standalone type-check result	the build replaced .next/types while tsc was reading it	terminal output	INCONCLUSIVE
 2026-08-26T16:20:48Z	verify	verified the final branch with 332 tests, production build, type-check, and lint	the checks ran against the final artifact after the build	commit ed44cf7	VERIFIED
 2026-08-26T16:20:48Z	verify	could not run a two-connection PostgreSQL contention test	no DATABASE_URL or container runtime is available in this environment	environment check	open
+2026-08-26T16:29:23Z	audit	reject physical deletion inside the metadata transaction	object storage cannot roll back if the database commit fails	lib/trpc/routers/anexos.ts, lib/storage/coordenacao.ts	act on
+2026-08-26T16:29:23Z	audit	keep S3 fallback based on access key and secret	the bucket has a documented default; the trail must not call it an independently required credential	lib/env.ts	clarify
+2026-08-26T16:29:23Z	audit	record legacy input bounds as an intentional contract change	private keys now share the same size and count policy as dedicated attachments	lib/trpc/routers/registros.ts	accepted
+2026-08-26T16:29:23Z	harness	require direct removal to leave physical deletion to coordinated cleanup	the test must fail while the router still deletes storage in the transaction	lib/storage/coordenacao.test.ts, lib/trpc/routers/anexos.integration.test.ts	awaiting red run
