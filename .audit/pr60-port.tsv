@@ -15,3 +15,5 @@ ts	phase	decision	why	evidence	result
 2026-08-26T15:29:40Z	harness	add protocol tests for finalization, orphan removal, and lock order	the shared transaction invariant needs one direct proof	lib/storage/coordenacao.test.ts, lib/storage/lock.test.ts	awaiting red run
 2026-08-26T15:30:08Z	harness	confirmed all six coordination tests fail before implementation	the coordination and lock modules do not exist	commit e2c6d1f	VERIFIED RED
 2026-08-26T15:30:43Z	coordination	centralize lock, physical check, and reference recheck in one transaction	callers must not be able to reorder the protocol	lib/storage/coordenacao.ts, lib/storage/lock.ts	awaiting green run
+2026-08-26T15:31:20Z	coordination	verified finalization, current and legacy reference checks, removal, and lock order	the protocol tests exercise every result state	commit 5edbb7a	VERIFIED
+2026-08-26T15:32:30Z	harness	add router tests for missing objects and legacy JSON references	the port must preserve the PR 65 input split while using coordination	lib/trpc/routers/anexos.integration.test.ts	awaiting red run

@@ -6,6 +6,15 @@ import { anexos, registros, instituicoes } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { permissaoEfetiva } from '../autorizacao';
 
+const storageMocks = vi.hoisted(() => ({
+  objetoExiste: vi.fn(),
+}));
+
+vi.mock('@/lib/storage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/storage')>()),
+  objetoExiste: storageMocks.objetoExiste,
+}));
+
 type Caller = ReturnType<import('@/lib/trpc/root').AppRouter['createCaller']>;
 
 const INSTITUICAO = 'ae6c72cc-c72e-4b20-9686-7d015efe9b24';
@@ -28,6 +37,7 @@ beforeAll(async () => {
   // Garante PGlite in-memory (schema migrado) mesmo com DATABASE_URL no
   // ambiente do shell — o teste de integração não deve depender de Postgres.
   delete (process.env as Record<string, string | undefined>).DATABASE_URL;
+  storageMocks.objetoExiste.mockResolvedValue(true);
   const { getDb } = await import('@/lib/db');
   const { appRouter } = await import('@/lib/trpc/root');
   db = await getDb<Db>();
@@ -97,6 +107,36 @@ describe('integração anexos (PGlite real) — v0.6.0', () => {
     });
   });
 
+  it('registros.criar bloqueia a chave legada sem exigir um objeto novo', async () => {
+    storageMocks.objetoExiste.mockClear();
+    storageMocks.objetoExiste.mockResolvedValue(false);
+    const chave = chaveValida();
+
+    try {
+      const registro = await caller.registros.criar({
+        pacienteId: PACIENTE,
+        especialidade: 'medicina',
+        tipo: 'exame',
+        titulo: 'Exame com referência legada',
+        conteudo: 'Referência JSON preservada.',
+        anexos: [
+          { nome: 'legado.pdf', chave, tipo: 'application/pdf' },
+        ],
+      });
+
+      const persistido = await db.query.registros.findFirst({
+        where: eq(registros.id, registro.id),
+        columns: { anexos: true },
+      });
+      expect(persistido?.anexos).toEqual([
+        { nome: 'legado.pdf', chave, tipo: 'application/pdf' },
+      ]);
+      expect(storageMocks.objetoExiste).not.toHaveBeenCalled();
+    } finally {
+      storageMocks.objetoExiste.mockResolvedValue(true);
+    }
+  });
+
   it('registros.criar sem anexos funciona normalmente', async () => {
     const registro = await caller.registros.criar({
       pacienteId: PACIENTE,
@@ -158,6 +198,26 @@ describe('integração anexos (PGlite real) — v0.6.0', () => {
         ],
       }),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('registros.criar rejeita metadados quando o objeto não existe', async () => {
+    storageMocks.objetoExiste.mockResolvedValue(false);
+    try {
+      await expect(
+        caller.registros.criar({
+          pacienteId: PACIENTE,
+          especialidade: 'medicina',
+          tipo: 'exame',
+          titulo: 'Exame sem objeto',
+          conteudo: 'O upload físico não foi concluído.',
+          anexosNovos: [
+            { chave: chaveValida(), nome: 'ausente.pdf', tipo: 'application/pdf', tamanhoBytes: 100 },
+          ],
+        }),
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    } finally {
+      storageMocks.objetoExiste.mockResolvedValue(true);
+    }
   });
 
   it('rejeita chave de anexo de outro paciente/instituição (fail-closed)', async () => {
@@ -343,6 +403,23 @@ describe('integração anexos (PGlite real) — v0.6.0', () => {
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     } finally {
       spy.mockRestore();
+    }
+  });
+
+  it('anexos.criar rejeita metadados quando o objeto não existe', async () => {
+    storageMocks.objetoExiste.mockResolvedValue(false);
+    try {
+      await expect(
+        caller.anexos.criar({
+          pacienteId: PACIENTE,
+          chave: chaveValida(),
+          nome: 'fantasma.pdf',
+          tipo: 'application/pdf',
+          tamanhoBytes: 2048,
+        }),
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    } finally {
+      storageMocks.objetoExiste.mockResolvedValue(true);
     }
   });
 
