@@ -14,6 +14,7 @@ vi.mock('@/lib/env', () => ({
 }));
 
 vi.mock('./s3', () => ({
+  chaveStorageValida: (chave: string) => Boolean(chave),
   sanitizarNomeArquivo: (nome: string) => nome,
 }));
 

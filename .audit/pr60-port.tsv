@@ -9,3 +9,5 @@ ts	phase	decision	why	evidence	result
 2026-08-26T15:26:19Z	harness	add physical probes, paginated S3 listing, and dotted-name tests	absence and infrastructure failure need different outcomes	lib/storage/local.existence.test.ts, lib/storage/s3.test.ts	awaiting red run
 2026-08-26T15:27:05Z	harness	confirmed seven storage boundary failures before implementation	the probes and structural key validation do not exist	commit 0f4643f	VERIFIED RED
 2026-08-26T15:27:47Z	storage	add one structural key validator plus local and S3 probes	a dotted filename is valid while dot path segments are not	lib/storage/local.ts, lib/storage/s3.ts, lib/storage/index.ts	awaiting green run
+2026-08-26T15:28:15Z	harness	rejected the first probe result	the local test mock omitted the new shared key validator	lib/storage/local.existence.test.ts	INCONCLUSIVE
+2026-08-26T15:28:27Z	harness	add the key validator to the isolated local test mock	the test must reach stat before it can measure error handling	lib/storage/local.existence.test.ts	awaiting rerun
