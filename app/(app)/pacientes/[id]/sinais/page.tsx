@@ -2,12 +2,20 @@
 
 import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { useUserRole } from '@/lib/auth/use-user-role';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Heart, Activity, Thermometer, Droplets } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { trpc } from '@/lib/trpc/client';
+
+const VitalSignsCharts = dynamic(
+  () => import('@/components/pacientes/VitalSignsCharts').then((module) => module.VitalSignsCharts),
+  {
+    ssr: false,
+    loading: () => <div className="h-[508px] animate-pulse rounded-xl bg-slate-100" />,
+  },
+);
 
 type SinalVital = {
   id: string;
@@ -20,18 +28,6 @@ type SinalVital = {
   temperatura?: number;
   glicemia?: number;
   peso?: number;
-};
-
-type SinalVitalApi = {
-  id: string;
-  dataAfericao: Date;
-  pressaoArterialSistolica: number | null;
-  pressaoArterialDiastolica: number | null;
-  frequenciaCardiaca: number | null;
-  saturacaoO2: number | null;
-  temperatura: number | null;
-  glicemia: number | null;
-  peso: number | null;
 };
 
 type SinalVitalForm = {
@@ -115,7 +111,7 @@ export default function SinaisVitaisPage() {
     });
   };
 
-  const historico: SinalVital[] = useMemo(() => ((historicoQuery.data ?? []) as SinalVitalApi[]).map((sinal) => ({
+  const historico: SinalVital[] = useMemo(() => (historicoQuery.data ?? []).map((sinal) => ({
     id: sinal.id,
     data: sinal.dataAfericao.toLocaleDateString('pt-BR'),
     hora: sinal.dataAfericao.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
@@ -168,31 +164,7 @@ export default function SinaisVitaisPage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <section className="space-y-6 lg:col-span-2">
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-m3-2">
-            <h3 className="mb-4 text-sm font-semibold text-slate-900">Pressao Arterial e Frequencia Cardiaca</h3>
-            <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="data" tick={{ fontSize: 11 }} stroke="#94a3b8" /><YAxis tick={{ fontSize: 11 }} stroke="#94a3b8" />
-                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }} /><Legend wrapperStyle={{ fontSize: 12 }} />
-                <Line type="monotone" dataKey="sistolica" name="PA Sistolica" stroke="#ef4444" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
-                <Line type="monotone" dataKey="diastolica" name="PA Diastolica" stroke="#f97316" strokeWidth={2} dot={{ r: 2 }} />
-                <Line type="monotone" dataKey="fc" name="FC" stroke="#6366f1" strokeWidth={1.5} dot={{ r: 2 }} strokeDasharray="5 5" />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-m3-2">
-            <h3 className="mb-4 text-sm font-semibold text-slate-900">Saturacao O2 e Temperatura</h3>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" /><XAxis dataKey="data" tick={{ fontSize: 11 }} stroke="#94a3b8" />
-                <YAxis yAxisId="left" domain={[88, 100]} tick={{ fontSize: 11 }} stroke="#94a3b8" /><YAxis yAxisId="right" orientation="right" domain={[35, 39]} tick={{ fontSize: 11 }} stroke="#94a3b8" />
-                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }} /><Legend wrapperStyle={{ fontSize: 12 }} />
-                <Line yAxisId="left" type="monotone" dataKey="spo2" name="SpO2" stroke="#0d9488" strokeWidth={2} dot={{ r: 2 }} />
-                <Line yAxisId="right" type="monotone" dataKey="temp" name="Temp" stroke="#f59e0b" strokeWidth={2} dot={{ r: 2 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          <VitalSignsCharts data={chartData} />
         </section>
 
         <aside className="space-y-5">
