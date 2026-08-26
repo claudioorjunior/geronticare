@@ -48,6 +48,12 @@ beforeAll(async () => {
 });
 
 describe('integração dashboard (PGlite real) — A3 AGA nova', () => {
+  it('restringe o painel operacional completo ao administrador', async () => {
+    await expect(caller.dashboard.painel()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+  });
+
   it('baseline: todos os pacientes ativos do seed estão pendentes, em fila por admissão', async () => {
     const resumo = await caller.dashboard.resumo();
     expect(resumo.agasPendentes).toBe(4);

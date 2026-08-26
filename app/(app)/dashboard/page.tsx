@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useUserRole } from '@/lib/auth/use-user-role';
 import { trpc } from '@/lib/trpc/client';
 import type { WidgetType } from '@/lib/dashboard/catalog';
+import { classificarSinalVital } from '@/lib/dashboard/alertas-vitais';
 
 // === Mock Data (atividades não têm query no DB — permanecem mock) ===
 
@@ -448,22 +449,22 @@ const SECAO_DEFAULT: SecaoId[] = ['kpis', 'metricas', 'ocupacao', 'atividades'];
 
 function SeletorSecoes({
   selecionadas,
-  onChange,
   onClose,
   onAplicar,
   salvar,
 }: {
   selecionadas: SecaoId[];
-  onChange: (secoes: SecaoId[]) => void;
   onClose: () => void;
-  onAplicar: (secoes: SecaoId[]) => void;
+  onAplicar: (secoes: SecaoId[]) => Promise<void>;
   salvar: boolean;
 }) {
+  const [rascunho, setRascunho] = useState<SecaoId[]>(selecionadas);
+
   const toggle = (id: SecaoId) => {
-    if (selecionadas.includes(id)) {
-      onChange(selecionadas.filter((s) => s !== id));
+    if (rascunho.includes(id)) {
+      setRascunho(rascunho.filter((s) => s !== id));
     } else {
-      onChange([...selecionadas, id]);
+      setRascunho([...rascunho, id]);
     }
   };
 
@@ -481,7 +482,7 @@ function SeletorSecoes({
       </div>
       <div className="space-y-1.5">
         {SECOES.map((secao) => {
-          const ativa = selecionadas.includes(secao.id);
+          const ativa = rascunho.includes(secao.id);
           return (
             <label
               key={secao.id}
@@ -505,18 +506,23 @@ function SeletorSecoes({
         <Button
           variant="outline"
           className="text-label-md border-m3-outline-variant text-m3-on-surface bg-m3-surface-container-lowest hover:bg-m3-surface-variant"
-          onClick={() => onChange([...SECAO_DEFAULT])}
+          onClick={() => setRascunho([...SECAO_DEFAULT])}
         >
           Restaurar padrão
         </Button>
         <Button
           className="text-label-md bg-m3-primary text-m3-on-primary hover:bg-m3-primary-container hover:text-m3-on-primary-container disabled:opacity-60"
-          disabled={salvar}
-          onClick={() => onAplicar(selecionadas)}
+          disabled={salvar || rascunho.length === 0}
+          onClick={() => void onAplicar(rascunho)}
         >
           {salvar ? 'Salvando…' : 'Aplicar'}
         </Button>
       </div>
+      {rascunho.length === 0 && (
+        <p role="alert" className="mt-2 text-right text-label-sm text-m3-error">
+          Selecione ao menos uma seção.
+        </p>
+      )}
     </div>
   );
 }
@@ -543,12 +549,15 @@ function DashboardAdmin() {
   const secoesVisiveis = secoes ?? secoesDoLayout ?? SECAO_DEFAULT;
 
   const aplicar = async (proximas: SecaoId[]) => {
-    setSecoes(proximas);
-    setPersonalizando(false);
     // Persiste como widgets do catálogo (cada seção vira um widget com size sm).
-    await salvar.mutateAsync({
+    const layoutSalvo = await salvar.mutateAsync({
       widgets: proximas.map((id) => ({ id: `secao-${id}`, type: secaoToWidget(id), size: 'sm' })),
     });
+    const secoesSalvas = layoutSalvo
+      .map((widget) => widget.id.replace(/^secao-/, ''))
+      .filter((id): id is SecaoId => SECOES.some((secao) => secao.id === id));
+    setSecoes(secoesSalvas.length > 0 ? secoesSalvas : [...SECAO_DEFAULT]);
+    setPersonalizando(false);
     await utils.dashboard.layout.invalidate();
   };
 
@@ -590,7 +599,6 @@ function DashboardAdmin() {
         <div className="shrink-0">
           <SeletorSecoes
             selecionadas={secoesVisiveis}
-            onChange={setSecoes}
             onClose={() => setPersonalizando(false)}
             onAplicar={aplicar}
             salvar={salvar.isPending}
@@ -737,32 +745,6 @@ function MetricasInstitucionais({ totalPacientes }: { totalPacientes: number }) 
 
 // === Professional Dashboard (M3 tokens) ===
 
-// Converte um sinal vital num rótulo legível + severidade (para Alertas Vitais)
-// ponytail: pontos de corte fixos; trocar por thresholds configuráveis se houver variação por perfil clínico
-function classificarSinal(s: {
-  pressaoArterialSistolica: number | null;
-  pressaoArterialDiastolica: number | null;
-  saturacaoO2: number | null;
-  temperatura: number | null;
-  glicemia: number | null;
-}): { sinal: string; severidade: 'critico' | 'atencao' | 'normal' } | null {
-  // Críticos primeiro
-  if (s.saturacaoO2 != null && s.saturacaoO2 < 90) {
-    return { sinal: `SpO2 ${s.saturacaoO2}%`, severidade: 'critico' };
-  }
-  if (s.pressaoArterialSistolica != null && s.pressaoArterialSistolica >= 170) {
-    const db = s.pressaoArterialDiastolica ?? 0;
-    return { sinal: `PA ${s.pressaoArterialSistolica}/${db} mmHg`, severidade: 'critico' };
-  }
-  if (s.temperatura != null && s.temperatura >= 38.5) {
-    return { sinal: `Temp ${s.temperatura.toFixed(1)} C`, severidade: 'atencao' };
-  }
-  if (s.glicemia != null && s.glicemia >= 200) {
-    return { sinal: `Glicemia ${s.glicemia} mg/dL`, severidade: 'atencao' };
-  }
-  return null;
-}
-
 // Converte um sinal vital num rótulo resumido para "Sinais para Monitorar"
 function sinalVitalLabel(s: {
   pressaoArterialSistolica: number | null;
@@ -785,35 +767,16 @@ function DashboardProfissional() {
   const agasQ = trpc.dashboard.agasProximas.useQuery();
   const resumoQ = trpc.dashboard.resumo.useQuery();
 
-  const registrosHoje = (registrosQ.data ?? []) as {
-    id: string;
-    pacienteNome: string;
-    especialidade: string;
-    tipo: string;
-    titulo: string;
-    conteudo: string;
-    dataRegistro: Date;
-  }[];
-  const sinaisVitais = (sinaisQ.data ?? []) as {
-    pacienteNome: string;
-    pressaoArterialSistolica: number | null;
-    pressaoArterialDiastolica: number | null;
-    saturacaoO2: number | null;
-    glicemia: number | null;
-    temperatura: number | null;
-  }[];
+  const registrosHoje = registrosQ.data ?? [];
+  const sinaisVitais = sinaisQ.data ?? [];
   // Modelo novo de AGA: não há agendamento. O backend devolve pacientes ativos
   // sem AGA concluída (fila por admissão) e a data exibida é a da admissão.
-  const agasProximas = (agasQ.data ?? []) as {
-    pacienteId: string;
-    pacienteNome: string;
-    dataAdmissao: Date;
-  }[];
+  const agasProximas = agasQ.data ?? [];
 
   // Alertas: classifica cada sinal vital e mantém só os anormais
   const alertasVitais: { paciente: string; sinal: string; severidade: 'critico' | 'atencao' }[] = sinaisVitais
     .map((s) => {
-      const cls = classificarSinal(s);
+      const cls = classificarSinalVital(s);
       return cls ? { paciente: s.pacienteNome, sinal: cls.sinal, severidade: cls.severidade } : null;
     })
     .filter((a): a is { paciente: string; sinal: string; severidade: 'critico' | 'atencao' } => a !== null);
@@ -840,7 +803,7 @@ function DashboardProfissional() {
     tipo: r.titulo,
     profissional: '', // não há join com tabela de usuários na query atual
     data: r.dataRegistro instanceof Date ? r.dataRegistro.toLocaleDateString('pt-BR') : '',
-    status: 'concluido' as Status,
+    status: 'concluido',
   }));
 
   const alertasCriticos = alertasVitais.filter((a) => a.severidade === 'critico').length;
@@ -1031,13 +994,7 @@ function DashboardProfissional() {
 
 function DashboardUsuario() {
   const { data: resumo, isLoading } = trpc.dashboard.resumo.useQuery();
-  const pacientesRecentes = (resumo?.pacientesRecentes ?? []) as {
-    id: string;
-    nome: string;
-    dataNascimento: Date;
-    dataAdmissao: Date;
-    ativo: boolean;
-  }[];
+  const pacientesRecentes = resumo?.pacientesRecentes ?? [];
 
   if (isLoading) {
     return (

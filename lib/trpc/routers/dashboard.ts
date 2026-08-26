@@ -83,7 +83,7 @@ export const dashboardRouter = createTRPCRouter({
    * Painel operacional: um payload para todos os widgets do catálogo.
    * Contagens sem LIMIT. Listas truncadas só na apresentação.
    */
-  painel: readClinicalProcedure.query(async ({ ctx }) => {
+  painel: adminProcedure.query(async ({ ctx }) => {
     const agora = new Date();
     const inicioHoje = startOfZonedDay(agora);
     const inicioMes = startOfZonedMonth(agora);
@@ -211,6 +211,9 @@ export const dashboardRouter = createTRPCRouter({
             sql`(${sinaisVitais.pacienteId}, ${sinaisVitais.dataAfericao}) IN (
               SELECT sv2.paciente_id, MAX(sv2.data_afericao)
               FROM sinais_vitais sv2
+              INNER JOIN pacientes p2 ON p2.id = sv2.paciente_id
+              WHERE p2.instituicao_id = ${ctx.instituicaoId}
+                AND p2.ativo = true
               GROUP BY sv2.paciente_id
             )`,
           ),
@@ -401,6 +404,9 @@ export const dashboardRouter = createTRPCRouter({
           sql`(${sinaisVitais.pacienteId}, ${sinaisVitais.dataAfericao}) IN (
             SELECT sv2.paciente_id, MAX(sv2.data_afericao)
             FROM sinais_vitais sv2
+            INNER JOIN pacientes p2 ON p2.id = sv2.paciente_id
+            WHERE p2.instituicao_id = ${ctx.instituicaoId}
+              AND p2.ativo = true
             GROUP BY sv2.paciente_id
           )`,
         ),
