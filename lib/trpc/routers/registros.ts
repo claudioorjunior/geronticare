@@ -57,6 +57,7 @@ const anexoNovoSchema = z.object({
 });
 
 const MAX_ANEXOS_POR_REGISTRO = 50;
+const tipoRegistroSchema = z.enum(['evolucao', 'prescricao', 'exame', 'intercorrencia']);
 
 export const registrosRouter = createTRPCRouter({
   listar: readClinicalProcedure
@@ -64,7 +65,7 @@ export const registrosRouter = createTRPCRouter({
       z.object({
         pacienteId: z.string().uuid(),
         especialidade: z.enum(['medicina', 'enfermagem', 'fisioterapia', 'terapia_ocupacional', 'fonoaudiologia', 'nutricao', 'psicologia', 'servico_social']).optional(),
-        tipo: z.enum(['evolucao', 'prescricao', 'exame', 'intercorrencia']).optional(),
+        tipo: tipoRegistroSchema.optional(),
         dataInicio: z.coerce.date().optional(),
         dataFim: z.coerce.date().optional(),
         limit: z.number().int().min(1).max(100).default(25),
@@ -128,7 +129,10 @@ export const registrosRouter = createTRPCRouter({
         intercorrencia: 0,
       };
       for (const row of totaisRows) {
-        totaisPorTipo[row.tipo] = Number(row.value);
+        const tipoRegistro = tipoRegistroSchema.safeParse(row.tipo);
+        if (tipoRegistro.success) {
+          totaisPorTipo[tipoRegistro.data] = Number(row.value);
+        }
       }
       const total = Object.values(totaisPorTipo).reduce((soma, value) => soma + value, 0);
       const totalFiltrado = tipo ? totaisPorTipo[tipo] : total;
@@ -136,6 +140,7 @@ export const registrosRouter = createTRPCRouter({
       return {
         items: registrosList.map((registro) => ({
           ...registro,
+          tipo: tipoRegistroSchema.parse(registro.tipo),
           profissional: profissionalPorId.get(registro.profissionalId) ?? 'Desconhecido',
         })),
         totals: {
@@ -186,7 +191,7 @@ export const registrosRouter = createTRPCRouter({
       z.object({
         pacienteId: z.string().uuid(),
         especialidade: z.enum(['medicina', 'enfermagem', 'fisioterapia', 'terapia_ocupacional', 'fonoaudiologia', 'nutricao', 'psicologia', 'servico_social']),
-        tipo: z.enum(['evolucao', 'prescricao', 'exame', 'intercorrencia']),
+        tipo: tipoRegistroSchema,
         titulo: z.string().min(3),
         conteudo: z.string().min(1),
         dataRegistro: z.coerce.date().optional(),
