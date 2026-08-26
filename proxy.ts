@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { devBypassAtivo } from '@/lib/trpc/autorizacao';
 
 /**
  * Primeira camada de proteção das páginas autenticadas.
@@ -12,13 +11,6 @@ export function proxy(request: NextRequest) {
   const sessionCookie =
     request.cookies.get('better-auth.session_token') ??
     request.cookies.get('__Secure-better-auth.session_token');
-  const hostname = request.nextUrl.hostname;
-  const localDevBypass =
-    devBypassAtivo() && (hostname === 'localhost' || hostname === '127.0.0.1');
-
-  if (localDevBypass) {
-    return NextResponse.next();
-  }
 
   if (pathname === '/' || pathname === '/setup') {
     return NextResponse.next();
