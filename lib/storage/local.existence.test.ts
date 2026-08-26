@@ -36,6 +36,15 @@ describe('existência de anexos locais', () => {
     await expect(anexoExisteLocal(chave)).resolves.toBe(false);
   });
 
+  it('distingue arquivos de diretórios existentes', async () => {
+    const { anexoExisteLocal } = await import('./local');
+    mocks.stat.mockResolvedValueOnce({ isFile: () => true });
+    await expect(anexoExisteLocal(chave)).resolves.toBe(true);
+
+    mocks.stat.mockResolvedValueOnce({ isFile: () => false });
+    await expect(anexoExisteLocal(chave)).resolves.toBe(false);
+  });
+
   it('propaga erros operacionais do filesystem', async () => {
     const { anexoExisteLocal } = await import('./local');
     const erro = Object.assign(new Error('Permissão negada'), { code: 'EACCES' });

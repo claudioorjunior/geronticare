@@ -4,7 +4,6 @@ import type { Db } from '@/lib/db';
 const mocks = vi.hoisted(() => ({
   listarObjetosAnexosS3: vi.fn(),
   removerAnexo: vi.fn(),
-  removerObjetoSeOrfao: vi.fn(),
 }));
 
 const envMock = vi.hoisted(() => ({
@@ -25,9 +24,6 @@ vi.mock('./s3', () => ({
   listarObjetosAnexosS3: mocks.listarObjetosAnexosS3,
   removerAnexo: mocks.removerAnexo,
   sanitizarNomeArquivo: (nome: string) => nome,
-}));
-vi.mock('./coordenacao', () => ({
-  removerObjetoSeOrfao: mocks.removerObjetoSeOrfao,
 }));
 
 const antigo =
@@ -61,24 +57,34 @@ describe('limpeza de órfãos no storage S3', () => {
           { chave: `${antigo}.sem-data`, atualizadoEm: undefined },
         ],
       });
-    mocks.removerObjetoSeOrfao
-      .mockImplementationOnce(async (
-        _db: Db,
-        chave: string,
-        remover: (chave: string) => Promise<void>,
-      ) => {
-        await remover(chave);
-        return 'removido';
-      })
-      .mockResolvedValueOnce('referenciado');
     mocks.removerAnexo.mockResolvedValue(undefined);
+    const findAnexo = vi.fn()
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ id: 'metadado-atual' });
+    const findRegistro = vi.fn().mockResolvedValueOnce(undefined);
+    const execute = vi.fn().mockResolvedValue(undefined);
+    const transaction = vi.fn(async (
+      callback: (transaction: Db) => Promise<unknown>,
+    ) => callback({
+      execute,
+      query: {
+        anexos: { findFirst: findAnexo },
+        registros: { findFirst: findRegistro },
+      },
+    } as unknown as Db));
+    const db = {
+      transaction,
+    } as unknown as Db;
 
-    await expect(limparOrfaosS3({} as Db)).resolves.toEqual({
+    await expect(limparOrfaosS3(db)).resolves.toEqual({
       removidos: 1,
       verificados: 4,
     });
     expect(mocks.removerAnexo).toHaveBeenCalledWith(antigo);
-    expect(mocks.removerObjetoSeOrfao).toHaveBeenCalledTimes(2);
+    expect(transaction).toHaveBeenCalledTimes(2);
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(findAnexo).toHaveBeenCalledTimes(2);
+    expect(findRegistro).toHaveBeenCalledTimes(1);
     expect(mocks.listarObjetosAnexosS3).toHaveBeenNthCalledWith(1, undefined);
     expect(mocks.listarObjetosAnexosS3).toHaveBeenNthCalledWith(2, 'pagina-2');
   });
