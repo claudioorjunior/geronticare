@@ -1,4 +1,4 @@
-import sharp from 'sharp';
+import sharp, { type Metadata } from 'sharp';
 
 /**
  * Processamento de logo institucional (upload whitelabel).
@@ -51,7 +51,7 @@ interface CorMedia {
 }
 
 export async function processarLogo(input: Buffer): Promise<LogoProcessado> {
-  let metadata: sharp.Metadata;
+  let metadata: Metadata;
   try {
     metadata = await sharp(input).metadata();
   } catch {
