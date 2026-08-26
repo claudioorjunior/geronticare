@@ -1,0 +1,5 @@
+ts	phase	decision	why	evidence	result
+2026-08-26T15:22:55Z	frame	port PR 60 behavior onto merged main instead of merging its branch	the old branch conflicts with the records API delivered by PR 65	PR 60, PR 65	open
+2026-08-26T15:22:55Z	design	use one coordination module for finalization and orphan removal	the lock, physical-object check, and reference check form one transaction protocol	architect candidates A and B, cross-judge verdict	chosen
+2026-08-26T15:22:55Z	design	preserve dadosRegistro, tenant validation, and paginated listing	these are newer guarantees from PR 65	lib/trpc/routers/registros.ts	required
+2026-08-26T15:23:46Z	harness	add the legacy S3 fallback tests before implementation	the fallback must be observable without loading global process state	lib/env.test.ts	awaiting red run
