@@ -8,7 +8,7 @@ import {
 } from '../server';
 import { anexos, registros } from '@/lib/db/schema';
 import { verificarOwnershipPaciente } from '../ownership';
-import { removerObjeto, storageConfigurado } from '@/lib/storage';
+import { storageConfigurado } from '@/lib/storage';
 import {
   finalizarReferenciasAnexo,
   ObjetosAnexoAusentesError,
@@ -169,7 +169,6 @@ export const anexosRouter = createTRPCRouter({
         async (transaction) => {
           await transaction.delete(anexos).where(eq(anexos.id, anexo.id));
         },
-        removerObjeto,
       );
 
       return { removido: true };

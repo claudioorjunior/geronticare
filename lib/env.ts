@@ -40,8 +40,7 @@ function optionalVar(key: string, fallback: string | (() => string)): () => stri
 export function storageDriverPadrao(
   variables: Record<string, string | undefined> = process.env,
 ): 'local' | 's3' {
-  const bucket = variables.S3_BUCKET || 'geronticare-anexos';
-  return variables.S3_ACCESS_KEY_ID && variables.S3_SECRET_ACCESS_KEY && bucket
+  return variables.S3_ACCESS_KEY_ID && variables.S3_SECRET_ACCESS_KEY
     ? 's3'
     : 'local';
 }

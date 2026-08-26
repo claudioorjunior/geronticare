@@ -39,15 +39,4 @@ export async function objetoExiste(chave: string): Promise<boolean> {
   return false;
 }
 
-export async function removerObjeto(chave: string): Promise<void> {
-  const driver = driverAtivo();
-  if (driver === 'local') {
-    const { removerAnexoLocal } = await import('./local');
-    await removerAnexoLocal(chave);
-  } else if (driver === 's3') {
-    const { removerAnexo } = await import('./s3');
-    await removerAnexo(chave);
-  }
-}
-
 export { TAMANHO_MAXIMO_UPLOAD_BYTES } from './s3';

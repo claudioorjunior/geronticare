@@ -40,3 +40,5 @@ ts	phase	decision	why	evidence	result
 2026-08-26T16:29:23Z	audit	keep S3 fallback based on access key and secret	the bucket has a documented default; the trail must not call it an independently required credential	lib/env.ts	clarify
 2026-08-26T16:29:23Z	audit	record legacy input bounds as an intentional contract change	private keys now share the same size and count policy as dedicated attachments	lib/trpc/routers/registros.ts	accepted
 2026-08-26T16:29:23Z	harness	require direct removal to leave physical deletion to coordinated cleanup	the test must fail while the router still deletes storage in the transaction	lib/storage/coordenacao.test.ts, lib/trpc/routers/anexos.integration.test.ts	awaiting red run
+2026-08-26T16:30:04Z	harness	confirmed direct removal still attempts physical deletion inside the transaction	the metadata route calls the storage dispatcher before commit	commit c9a6638	VERIFIED RED
+2026-08-26T16:31:10Z	removal	delete only the metadata reference under lock and defer the object to cleanup	this avoids an irreversible storage delete before a fallible database commit	lib/storage/coordenacao.ts, lib/trpc/routers/anexos.ts	awaiting green run

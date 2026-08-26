@@ -34,7 +34,7 @@ describe('AUTH_SECRET validation', () => {
 });
 
 describe('storage driver fallback', () => {
-  it('preserva S3 quando credenciais legadas completas estão presentes', () => {
+  it('preserva S3 quando credenciais legadas usam o bucket padrão', () => {
     expect(storageDriverPadrao({
       S3_ACCESS_KEY_ID: 'access-key',
       S3_SECRET_ACCESS_KEY: 'secret-key',
