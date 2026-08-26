@@ -8,7 +8,6 @@ import { Menu } from '@base-ui/react/menu';
 import { Check, Activity, ChevronsLeft, ChevronsRight, ChevronDown, CircleHelp, Command, X } from 'lucide-react';
 import { useUserRole } from '@/lib/auth/use-user-role';
 import { NAVIGATION_GROUPS, filtrarPorPermissao, isNavigationItemActive } from '@/lib/navigation';
-import { PERMISSOES_BASE } from '@/lib/trpc/autorizacao';
 
 const INSTITUTION = {
   initials: 'RA',
@@ -66,13 +65,13 @@ export function GlobalSidebar({
   onToggle: () => void;
 }) {
   const pathname = usePathname();
-  const { role } = useUserRole();
+  const { role, permissions } = useUserRole();
   const [unitMenuOpen, setUnitMenuOpen] = useState(false);
   const [selectedUnitId, setSelectedUnitId] = useState(INSTITUTION.units[0].id);
   const selectedUnit = INSTITUTION.units.find((unit) => unit.id === selectedUnitId) ?? INSTITUTION.units[0];
 
   // Papel efetivo + permissões reais — itens sem permissão ficam ocultos.
-  const groups = filtrarPorPermissao(NAVIGATION_GROUPS, role, role ? PERMISSOES_BASE[role] : []);
+  const groups = filtrarPorPermissao(NAVIGATION_GROUPS, role, permissions);
 
   return (
     <aside

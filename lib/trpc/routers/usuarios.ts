@@ -327,7 +327,7 @@ export const usuariosRouter = createTRPCRouter({
   // Perfil próprio — qualquer papel pode ver/editar apenas os próprios dados básicos
   meuPerfil: protectedProcedure.query(async ({ ctx }) => {
     // React Query rejeita `undefined`; findFirst sem match vira null.
-    return (await ctx.db.query.usuarios.findFirst({
+    const perfil = await ctx.db.query.usuarios.findFirst({
       where: eq(usuarios.id, ctx.userId),
       columns: {
         id: true,
@@ -338,7 +338,11 @@ export const usuariosRouter = createTRPCRouter({
         role: true,
         image: true,
       },
-    })) ?? null;
+    });
+
+    return perfil
+      ? { ...perfil, permissoes: ctx.permissoes }
+      : null;
   }),
 
   atualizarMeuPerfil: protectedProcedure
