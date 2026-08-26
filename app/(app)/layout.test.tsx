@@ -17,6 +17,7 @@ vi.mock('@/lib/bootstrap', () => ({
 }));
 vi.mock('@/lib/auth', () => ({ getAuth: mocks.getAuth }));
 vi.mock('@/components/layout/TopNav', () => ({ TopNav: () => <nav>top-nav</nav> }));
+vi.mock('@/lib/novo-ui', () => ({ NOVO_UI_ATIVO: false }));
 
 import AppLayout from './layout';
 
@@ -53,7 +54,7 @@ describe('authenticated app bootstrap gate', () => {
     expect(mocks.getAuth).not.toHaveBeenCalled();
   });
 
-  it('keeps a configured legacy installation compatible', async () => {
+  it('keeps the explicit legacy rollback compatible', async () => {
     const result = await AppLayout({ children: <div>conteudo-protegido</div> });
     const html = renderToStaticMarkup(result);
 
