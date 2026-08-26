@@ -13,3 +13,5 @@ ts	phase	decision	why	evidence	result
 2026-08-26T15:28:27Z	harness	add the key validator to the isolated local test mock	the test must reach stat before it can measure error handling	lib/storage/local.existence.test.ts	awaiting rerun
 2026-08-26T15:28:53Z	storage	verified physical probes, S3 listing, and structural key validation	the corrected tests exercise absence and propagated failures	commit 1906075	VERIFIED
 2026-08-26T15:29:40Z	harness	add protocol tests for finalization, orphan removal, and lock order	the shared transaction invariant needs one direct proof	lib/storage/coordenacao.test.ts, lib/storage/lock.test.ts	awaiting red run
+2026-08-26T15:30:08Z	harness	confirmed all six coordination tests fail before implementation	the coordination and lock modules do not exist	commit e2c6d1f	VERIFIED RED
+2026-08-26T15:30:43Z	coordination	centralize lock, physical check, and reference recheck in one transaction	callers must not be able to reorder the protocol	lib/storage/coordenacao.ts, lib/storage/lock.ts	awaiting green run
