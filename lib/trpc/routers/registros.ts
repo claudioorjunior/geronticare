@@ -5,6 +5,7 @@ import { eq, and, gte, lte, inArray } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { verificarOwnershipPaciente } from '../ownership';
 import { urlHttpSchema } from '@/lib/validations/url';
+import { extrairContextoChaveAnexo } from '@/lib/storage/s3';
 
 const anexoSchema = z.object({
   nome: z.string(),
@@ -18,6 +19,27 @@ const anexoSchema = z.object({
   { message: 'Anexo deve informar URL legada ou chave privada, mas não ambas' },
 );
 
+function validarContextoAnexos(
+  anexos: z.infer<typeof anexoSchema>[] | undefined,
+  instituicaoId: string,
+  pacienteId: string,
+) {
+  for (const anexo of anexos ?? []) {
+    if (!anexo.chave) continue;
+    const contexto = extrairContextoChaveAnexo(anexo.chave);
+    if (
+      !contexto ||
+      contexto.instituicaoId !== instituicaoId ||
+      contexto.pacienteId !== pacienteId
+    ) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Chave de anexo não pertence a este paciente',
+      });
+    }
+  }
+}
+
 export const registrosRouter = createTRPCRouter({
   listar: readClinicalProcedure
     .input(
@@ -27,10 +49,11 @@ export const registrosRouter = createTRPCRouter({
         tipo: z.enum(['evolucao', 'prescricao', 'exame', 'intercorrencia']).optional(),
         dataInicio: z.coerce.date().optional(),
         dataFim: z.coerce.date().optional(),
+        limit: z.number().int().min(1).max(200).default(100),
       })
     )
     .query(async ({ ctx, input }) => {
-      const { pacienteId, especialidade, tipo, dataInicio, dataFim } = input;
+      const { pacienteId, especialidade, tipo, dataInicio, dataFim, limit } = input;
 
       await verificarOwnershipPaciente(ctx.db, pacienteId, ctx.instituicaoId);
 
@@ -46,6 +69,7 @@ export const registrosRouter = createTRPCRouter({
       return ctx.db.query.registros.findMany({
         where: and(...condicoes),
         orderBy: (registros, { desc }) => [desc(registros.dataRegistro)],
+        limit,
       });
     }),
 
@@ -87,6 +111,7 @@ export const registrosRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       await verificarOwnershipPaciente(ctx.db, input.pacienteId, ctx.instituicaoId);
+      validarContextoAnexos(input.anexos, ctx.instituicaoId, input.pacienteId);
 
       const [novoRegistro] = await ctx.db
         .insert(registros)
@@ -105,10 +130,11 @@ export const registrosRouter = createTRPCRouter({
         pacienteId: z.string().uuid(),
         dataInicio: z.coerce.date().optional(),
         dataFim: z.coerce.date().optional(),
+        limit: z.number().int().min(1).max(200).default(100),
       })
     )
     .query(async ({ ctx, input }) => {
-      const { pacienteId, dataInicio, dataFim } = input;
+      const { pacienteId, dataInicio, dataFim, limit } = input;
 
       await verificarOwnershipPaciente(ctx.db, pacienteId, ctx.instituicaoId);
 
@@ -132,14 +158,17 @@ export const registrosRouter = createTRPCRouter({
         ctx.db.query.registros.findMany({
           where: and(...condicoesRegistros),
           orderBy: (registros, { desc }) => [desc(registros.dataRegistro)],
+          limit,
         }),
         ctx.db.query.agas.findMany({
           where: and(...condicoesAga),
           orderBy: (agas, { desc }) => [desc(agas.dataAvaliacao)],
+          limit,
         }),
         ctx.db.query.sinaisVitais.findMany({
           where: and(...condicoesSinais),
           orderBy: (sinaisVitais, { desc }) => [desc(sinaisVitais.dataAfericao)],
+          limit,
         }),
       ]);
 
@@ -225,7 +254,7 @@ export const registrosRouter = createTRPCRouter({
 
       timeline.sort((a, b) => b.data.getTime() - a.data.getTime());
 
-      return timeline;
+      return timeline.slice(0, limit);
     }),
 
   anexar: clinicalProcedure
@@ -245,6 +274,7 @@ export const registrosRouter = createTRPCRouter({
       }
 
       await verificarOwnershipPaciente(ctx.db, registro.pacienteId, ctx.instituicaoId);
+      validarContextoAnexos(input.anexos, ctx.instituicaoId, registro.pacienteId);
 
       const anexosAtuais = registro.anexos ?? [];
       const novosAnexos = [...anexosAtuais, ...input.anexos];
