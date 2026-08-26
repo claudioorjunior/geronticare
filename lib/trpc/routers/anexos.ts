@@ -8,10 +8,11 @@ import {
 } from '../server';
 import { anexos, registros } from '@/lib/db/schema';
 import { verificarOwnershipPaciente } from '../ownership';
-import { storageConfigurado } from '@/lib/storage';
+import { removerObjeto, storageConfigurado } from '@/lib/storage';
 import {
   finalizarReferenciasAnexo,
   ObjetosAnexoAusentesError,
+  removerReferenciaAnexo,
 } from '@/lib/storage/coordenacao';
 
 const TAMANHO_MAXIMO = 50 * 1024 * 1024;
@@ -162,19 +163,14 @@ export const anexosRouter = createTRPCRouter({
         }
       }
 
-      await ctx.db.delete(anexos).where(eq(anexos.id, anexo.id));
-
-      // Remoção do objeto no storage é best-effort: metadados já foram removidos;
-      // objeto órfão é limpo pelo job de limpeza se esta falhar.
-      const { driverAtivo } = await import('@/lib/storage');
-      const driver = driverAtivo();
-      if (driver === 'local') {
-        const { removerAnexoLocal } = await import('@/lib/storage/local');
-        await removerAnexoLocal(anexo.chave).catch(() => {});
-      } else if (driver === 's3') {
-        const { removerAnexo } = await import('@/lib/storage/s3');
-        await removerAnexo(anexo.chave).catch(() => {});
-      }
+      await removerReferenciaAnexo(
+        ctx.db,
+        anexo.chave,
+        async (transaction) => {
+          await transaction.delete(anexos).where(eq(anexos.id, anexo.id));
+        },
+        removerObjeto,
+      );
 
       return { removido: true };
     }),

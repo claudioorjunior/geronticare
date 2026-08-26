@@ -128,7 +128,19 @@ export async function anexoExisteLocal(chave: string): Promise<boolean> {
 /** Remove um anexo local do disco (não falha se já não existir). */
 export async function removerAnexoLocal(chave: string): Promise<void> {
   const caminho = caminhoDaChave(chave);
-  await unlink(caminho).catch(() => {});
+  try {
+    await unlink(caminho);
+  } catch (error) {
+    if (
+      typeof error === 'object'
+      && error !== null
+      && 'code' in error
+      && error.code === 'ENOENT'
+    ) {
+      return;
+    }
+    throw error;
+  }
 }
 
 /**

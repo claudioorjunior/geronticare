@@ -179,6 +179,8 @@ export async function anexoExisteS3(chave: string): Promise<boolean> {
       && error.$metadata !== null
       && 'httpStatusCode' in error.$metadata
       && error.$metadata.httpStatusCode === 404
+      && 'name' in error
+      && (error.name === 'NotFound' || error.name === 'NoSuchKey')
     ) {
       return false;
     }

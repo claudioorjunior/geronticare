@@ -68,15 +68,39 @@ async function referenciaPersistida(db: Db, chave: string): Promise<boolean> {
   return Boolean(referenciaLegada);
 }
 
+async function removerSobLock(
+  transaction: Db,
+  chave: string,
+  removerFisicamente: (chave: string) => Promise<void>,
+  removerReferencia?: (transaction: Db) => Promise<void>,
+): Promise<ResultadoRemocaoOrfao> {
+  await bloquearChavesAnexo(transaction, [chave]);
+  if (removerReferencia) await removerReferencia(transaction);
+  if (await referenciaPersistida(transaction, chave)) return 'referenciado';
+  await removerFisicamente(chave);
+  return 'removido';
+}
+
 export async function removerObjetoSeOrfao(
   db: Db,
   chave: string,
   removerFisicamente: (chave: string) => Promise<void>,
 ): Promise<ResultadoRemocaoOrfao> {
-  return db.transaction(async (transaction) => {
-    await bloquearChavesAnexo(transaction, [chave]);
-    if (await referenciaPersistida(transaction, chave)) return 'referenciado';
-    await removerFisicamente(chave);
-    return 'removido';
-  });
+  return db.transaction((transaction) =>
+    removerSobLock(transaction, chave, removerFisicamente));
+}
+
+export async function removerReferenciaAnexo(
+  db: Db,
+  chave: string,
+  removerReferencia: (transaction: Db) => Promise<void>,
+  removerFisicamente: (chave: string) => Promise<void>,
+): Promise<ResultadoRemocaoOrfao> {
+  return db.transaction((transaction) =>
+    removerSobLock(
+      transaction,
+      chave,
+      removerFisicamente,
+      removerReferencia,
+    ));
 }
