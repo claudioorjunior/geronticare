@@ -1,6 +1,6 @@
 {
-  "id": "71168a40-05d7-4c40-a329-ac41afb8fb83",
-  "prevId": "859185dc-0aef-433f-990f-42aab4d34a2c",
+  "id": "cd6e8fbb-b5dd-4bc3-ac4d-c00ae731e0eb",
+  "prevId": "71168a40-05d7-4c40-a329-ac41afb8fb83",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -471,7 +471,7 @@
           "name": "registro_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "chave": {
           "name": "chave",

@@ -163,7 +163,14 @@ export const pacientes = pgTable('pacientes', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   instituicaoIdx: index('pacientes_instituicao_idx').on(table.instituicaoId),
-  ativoIdx: index('pacientes_ativo_idx').on(table.ativo),
+  instituicaoAtivoIdx: index('pacientes_instituicao_ativo_idx').on(
+    table.instituicaoId,
+    table.ativo,
+  ),
+  instituicaoAdmissaoIdx: index('pacientes_instituicao_admissao_idx').on(
+    table.instituicaoId,
+    table.dataAdmissao,
+  ),
 }));
 
 // Tabela: Avaliação Geriátrica Ampla (AGA)
@@ -263,7 +270,13 @@ export const agas = pgTable('agas', {
   concluidaPorId: uuid('concluida_por_id').references(() => usuarios.id),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-}, (table) => ({ pacienteIdx: index('agas_paciente_idx').on(table.pacienteId) }));
+}, (table) => ({
+  pacienteStatusIdx: index('agas_paciente_status_idx').on(table.pacienteId, table.status),
+  pacienteConcluidaIdx: index('agas_paciente_concluida_idx').on(
+    table.pacienteId,
+    table.concluidaEm,
+  ),
+}));
 
 export const agaAplicacoes = pgTable('aga_aplicacoes', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -320,8 +333,42 @@ export const registros = pgTable('registros', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
-  pacienteIdx: index('registros_paciente_idx').on(table.pacienteId),
+  pacienteDataIdx: index('registros_paciente_data_idx').on(
+    table.pacienteId,
+    table.dataRegistro,
+  ),
   profissionalIdx: index('registros_profissional_idx').on(table.profissionalId),
+}));
+
+// Tabela: Anexos clínicos (arquivos de exames, fotos, documentos)
+// Mantida no schema para preservar o histórico de migrações e os metadados
+// existentes. Novos uploads usam chaves S3 privadas; registroId é opcional.
+export const anexos = pgTable('anexos', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  instituicaoId: uuid('instituicao_id').references(() => instituicoes.id).notNull(),
+  pacienteId: uuid('paciente_id').references(() => pacientes.id).notNull(),
+  registroId: uuid('registro_id').references(() => registros.id, { onDelete: 'cascade' }),
+  chave: text('chave').notNull().unique(),
+  nome: text('nome').notNull(),
+  tipo: text('tipo').notNull(),
+  tamanhoBytes: integer('tamanho_bytes').notNull(),
+  criadoPorId: uuid('criado_por_id').references(() => usuarios.id).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  pacienteIdx: index('anexos_paciente_idx').on(table.pacienteId),
+  registroIdx: index('anexos_registro_idx').on(table.registroId),
+}));
+
+export const anexosRelations = relations(anexos, ({ one }) => ({
+  instituicao: one(instituicoes, { fields: [anexos.instituicaoId], references: [instituicoes.id] }),
+  paciente: one(pacientes, { fields: [anexos.pacienteId], references: [pacientes.id] }),
+  registro: one(registros, { fields: [anexos.registroId], references: [registros.id] }),
+  criadoPor: one(usuarios, { fields: [anexos.criadoPorId], references: [usuarios.id] }),
+}));
+
+export const registrosRelations = relations(registros, ({ many }) => ({
+  anexos: many(anexos),
 }));
 
 // Tabela: Sinais vitais
@@ -343,7 +390,10 @@ export const sinaisVitais = pgTable('sinais_vitais', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
-  pacienteIdx: index('sinaisvitais_paciente_idx').on(table.pacienteId),
+  pacienteDataIdx: index('sinaisvitais_paciente_data_idx').on(
+    table.pacienteId,
+    table.dataAfericao,
+  ),
   profissionalIdx: index('sinaisvitais_profissional_idx').on(table.profissionalId),
 }));
 
@@ -364,5 +414,7 @@ export type AgaAplicacao = typeof agaAplicacoes.$inferSelect;
 export type NovaAgaAplicacao = typeof agaAplicacoes.$inferInsert;
 export type Registro = typeof registros.$inferSelect;
 export type NovoRegistro = typeof registros.$inferInsert;
+export type Anexo = typeof anexos.$inferSelect;
+export type NovoAnexo = typeof anexos.$inferInsert;
 export type SinaisVitais = typeof sinaisVitais.$inferSelect;
 export type NovosSinaisVitais = typeof sinaisVitais.$inferInsert;

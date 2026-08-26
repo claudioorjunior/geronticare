@@ -1,6 +1,6 @@
 {
-  "id": "71168a40-05d7-4c40-a329-ac41afb8fb83",
-  "prevId": "859185dc-0aef-433f-990f-42aab4d34a2c",
+  "id": "17b6c337-a470-4321-8f35-ecfaaa2dc31c",
+  "prevId": "cd6e8fbb-b5dd-4bc3-ac4d-c00ae731e0eb",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -381,11 +381,38 @@
         }
       },
       "indexes": {
-        "agas_paciente_idx": {
-          "name": "agas_paciente_idx",
+        "agas_paciente_status_idx": {
+          "name": "agas_paciente_status_idx",
           "columns": [
             {
               "expression": "paciente_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "agas_paciente_concluida_idx": {
+          "name": "agas_paciente_concluida_idx",
+          "columns": [
+            {
+              "expression": "paciente_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "concluida_em",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -471,7 +498,7 @@
           "name": "registro_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "chave": {
           "name": "chave",
@@ -1153,6 +1180,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "dashboard_layout": {
+          "name": "dashboard_layout",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -1313,11 +1346,38 @@
           "method": "btree",
           "with": {}
         },
-        "pacientes_ativo_idx": {
-          "name": "pacientes_ativo_idx",
+        "pacientes_instituicao_ativo_idx": {
+          "name": "pacientes_instituicao_ativo_idx",
           "columns": [
             {
+              "expression": "instituicao_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
               "expression": "ativo",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pacientes_instituicao_admissao_idx": {
+          "name": "pacientes_instituicao_admissao_idx",
+          "columns": [
+            {
+              "expression": "instituicao_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "data_admissao",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1427,11 +1487,17 @@
         }
       },
       "indexes": {
-        "registros_paciente_idx": {
-          "name": "registros_paciente_idx",
+        "registros_paciente_data_idx": {
+          "name": "registros_paciente_data_idx",
           "columns": [
             {
               "expression": "paciente_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "data_registro",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1684,11 +1750,17 @@
         }
       },
       "indexes": {
-        "sinaisvitais_paciente_idx": {
-          "name": "sinaisvitais_paciente_idx",
+        "sinaisvitais_paciente_data_idx": {
+          "name": "sinaisvitais_paciente_data_idx",
           "columns": [
             {
               "expression": "paciente_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "data_afericao",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
