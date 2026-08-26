@@ -32,3 +32,7 @@ ts	phase	decision	why	evidence	result
 2026-08-26T16:17:43Z	hardening	coordinate direct removal and apply one policy to every private key	all managed attachment references need permission, storage, existence, and bounded cardinality	lib/storage, lib/trpc/routers	awaiting green run
 2026-08-26T16:18:16Z	hardening	verified all seven adversarial regressions	the focused suite covers direct removal, legacy policy, error identity, and protocol order	commit 65d554b	VERIFIED
 2026-08-26T16:19:01Z	verify	run S3 cleanup through the real coordination module and cover positive local probes	the destructive path should not be proven through a mocked coordinator	lib/storage/limpeza.s3.test.ts, lib/storage/local.existence.test.ts	awaiting rerun
+2026-08-26T16:19:36Z	verify	verified S3 cleanup through coordination and positive local probes	the stronger destructive-path suite passed	commit ed44cf7	VERIFIED
+2026-08-26T16:19:48Z	verify	rejected the parallel standalone type-check result	the build replaced .next/types while tsc was reading it	terminal output	INCONCLUSIVE
+2026-08-26T16:20:48Z	verify	verified the final branch with 332 tests, production build, type-check, and lint	the checks ran against the final artifact after the build	commit ed44cf7	VERIFIED
+2026-08-26T16:20:48Z	verify	could not run a two-connection PostgreSQL contention test	no DATABASE_URL or container runtime is available in this environment	environment check	open
