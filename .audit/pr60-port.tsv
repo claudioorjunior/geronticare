@@ -42,3 +42,5 @@ ts	phase	decision	why	evidence	result
 2026-08-26T16:29:23Z	harness	require direct removal to leave physical deletion to coordinated cleanup	the test must fail while the router still deletes storage in the transaction	lib/storage/coordenacao.test.ts, lib/trpc/routers/anexos.integration.test.ts	awaiting red run
 2026-08-26T16:30:04Z	harness	confirmed direct removal still attempts physical deletion inside the transaction	the metadata route calls the storage dispatcher before commit	commit c9a6638	VERIFIED RED
 2026-08-26T16:31:10Z	removal	delete only the metadata reference under lock and defer the object to cleanup	this avoids an irreversible storage delete before a fallible database commit	lib/storage/coordenacao.ts, lib/trpc/routers/anexos.ts	awaiting green run
+2026-08-26T16:31:38Z	removal	verified direct removal leaves physical deletion to cleanup	the coordinated metadata transaction no longer performs irreversible storage I/O	commit 4bce7ed	VERIFIED
+2026-08-26T16:32:55Z	verify	reran 332 tests, production build, type-check, and lint sequentially	the sequential run avoids the earlier .next types race	/opt/cursor/artifacts/pr60_port_validation.log	VERIFIED
