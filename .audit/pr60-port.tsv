@@ -17,3 +17,5 @@ ts	phase	decision	why	evidence	result
 2026-08-26T15:30:43Z	coordination	centralize lock, physical check, and reference recheck in one transaction	callers must not be able to reorder the protocol	lib/storage/coordenacao.ts, lib/storage/lock.ts	awaiting green run
 2026-08-26T15:31:20Z	coordination	verified finalization, current and legacy reference checks, removal, and lock order	the protocol tests exercise every result state	commit 5edbb7a	VERIFIED
 2026-08-26T15:32:30Z	harness	add router tests for missing objects and legacy JSON references	the port must preserve the PR 65 input split while using coordination	lib/trpc/routers/anexos.integration.test.ts	awaiting red run
+2026-08-26T15:32:55Z	harness	confirmed both finalization routes accept missing physical objects	the routers do not call the coordination boundary	commit 81c2d16	VERIFIED RED
+2026-08-26T15:33:42Z	finalization	move both metadata writes behind the coordination protocol	the routers retain RBAC and tenant checks while the domain module owns transaction order	lib/trpc/routers/anexos.ts, lib/trpc/routers/registros.ts	awaiting green run

@@ -7,6 +7,10 @@ import { verificarOwnershipPaciente } from '../ownership';
 import { urlHttpSchema } from '@/lib/validations/url';
 import { extrairContextoChaveAnexo } from '@/lib/storage/s3';
 import { storageConfigurado } from '@/lib/storage';
+import {
+  finalizarReferenciasAnexo,
+  ObjetosAnexoAusentesError,
+} from '@/lib/storage/coordenacao';
 import { temPermissao } from '../autorizacao';
 
 const anexoSchema = z.object({
@@ -229,34 +233,53 @@ export const registrosRouter = createTRPCRouter({
         pacienteId: input.pacienteId,
       });
 
-      // Registro + metadados de anexos na mesma transação — falha reverte tudo.
-      // ADR 0001: a mutation devolve só `{ id }` — nunca ecoa a linha.
-      return ctx.db.transaction(async (tx) => {
-        const [novoRegistro] = await tx
-          .insert(registros)
-          .values({
-            ...dadosRegistro,
-            profissionalId: ctx.userId,
-          })
-          .returning({ id: registros.id });
+      const chavesNovas = anexosNovos.map((anexo) => anexo.chave);
+      const chavesLegadas = (dadosRegistro.anexos ?? []).flatMap((anexo) =>
+        anexo.chave ? [anexo.chave] : []);
 
-        if (anexosNovos.length > 0) {
-          await tx.insert(anexos).values(
-            anexosNovos.map((anexo) => ({
-              instituicaoId: ctx.instituicaoId,
-              pacienteId: input.pacienteId,
-              registroId: novoRegistro.id,
-              criadoPorId: ctx.userId,
-              chave: anexo.chave,
-              nome: anexo.nome,
-              tipo: anexo.tipo,
-              tamanhoBytes: anexo.tamanhoBytes,
-            })),
-          );
+      try {
+        return await finalizarReferenciasAnexo(
+          ctx.db,
+          {
+            chavesBloqueadas: [...chavesNovas, ...chavesLegadas],
+            chavesObrigatorias: chavesNovas,
+          },
+          async (transaction) => {
+            const [novoRegistro] = await transaction
+              .insert(registros)
+              .values({
+                ...dadosRegistro,
+                profissionalId: ctx.userId,
+              })
+              .returning({ id: registros.id });
+
+            if (anexosNovos.length > 0) {
+              await transaction.insert(anexos).values(
+                anexosNovos.map((anexo) => ({
+                  instituicaoId: ctx.instituicaoId,
+                  pacienteId: input.pacienteId,
+                  registroId: novoRegistro.id,
+                  criadoPorId: ctx.userId,
+                  chave: anexo.chave,
+                  nome: anexo.nome,
+                  tipo: anexo.tipo,
+                  tamanhoBytes: anexo.tamanhoBytes,
+                })),
+              );
+            }
+
+            return novoRegistro;
+          },
+        );
+      } catch (error) {
+        if (error instanceof ObjetosAnexoAusentesError) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Arquivo de anexo não encontrado no storage',
+          });
         }
-
-        return novoRegistro;
-      });
+        throw error;
+      }
     }),
 
   timeline: readClinicalProcedure

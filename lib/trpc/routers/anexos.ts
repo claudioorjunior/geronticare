@@ -9,6 +9,10 @@ import {
 import { anexos, registros } from '@/lib/db/schema';
 import { verificarOwnershipPaciente } from '../ownership';
 import { storageConfigurado } from '@/lib/storage';
+import {
+  finalizarReferenciasAnexo,
+  ObjetosAnexoAusentesError,
+} from '@/lib/storage/coordenacao';
 
 const TAMANHO_MAXIMO = 50 * 1024 * 1024;
 
@@ -61,21 +65,39 @@ export const anexosRouter = createTRPCRouter({
         });
       }
 
-      // ADR 0001: mutations devolvem só `{ id }` — nunca ecoam a linha.
-      const [novo] = await ctx.db
-        .insert(anexos)
-        .values({
-          instituicaoId: ctx.instituicaoId,
-          pacienteId: input.pacienteId,
-          criadoPorId: ctx.userId,
-          chave: input.chave,
-          nome: input.nome,
-          tipo: input.tipo,
-          tamanhoBytes: input.tamanhoBytes,
-        })
-        .returning({ id: anexos.id });
+      try {
+        return await finalizarReferenciasAnexo(
+          ctx.db,
+          {
+            chavesBloqueadas: [input.chave],
+            chavesObrigatorias: [input.chave],
+          },
+          async (transaction) => {
+            const [novo] = await transaction
+              .insert(anexos)
+              .values({
+                instituicaoId: ctx.instituicaoId,
+                pacienteId: input.pacienteId,
+                criadoPorId: ctx.userId,
+                chave: input.chave,
+                nome: input.nome,
+                tipo: input.tipo,
+                tamanhoBytes: input.tamanhoBytes,
+              })
+              .returning({ id: anexos.id });
 
-      return { id: novo.id };
+            return { id: novo.id };
+          },
+        );
+      } catch (error) {
+        if (error instanceof ObjetosAnexoAusentesError) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Arquivo de anexo não encontrado no storage',
+          });
+        }
+        throw error;
+      }
     }),
 
   /** Lista os metadados de anexos de um paciente (sem conteúdo). */
