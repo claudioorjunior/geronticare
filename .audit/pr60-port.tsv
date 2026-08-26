@@ -19,3 +19,5 @@ ts	phase	decision	why	evidence	result
 2026-08-26T15:32:30Z	harness	add router tests for missing objects and legacy JSON references	the port must preserve the PR 65 input split while using coordination	lib/trpc/routers/anexos.integration.test.ts	awaiting red run
 2026-08-26T15:32:55Z	harness	confirmed both finalization routes accept missing physical objects	the routers do not call the coordination boundary	commit 81c2d16	VERIFIED RED
 2026-08-26T15:33:42Z	finalization	move both metadata writes behind the coordination protocol	the routers retain RBAC and tenant checks while the domain module owns transaction order	lib/trpc/routers/anexos.ts, lib/trpc/routers/registros.ts	awaiting green run
+2026-08-26T15:34:18Z	finalization	verified missing-object rejection, legacy JSON persistence, and paginated records regression	the focused integration suite covers both routers and the coordination boundary	commit 378d533	VERIFIED
+2026-08-26T15:35:12Z	harness	add legacy-reference and paginated S3 cleanup tests	cleanup must enumerate candidates but delegate the atomic removal decision	lib/storage/limpeza.test.ts, lib/storage/limpeza.s3.test.ts	awaiting red run
