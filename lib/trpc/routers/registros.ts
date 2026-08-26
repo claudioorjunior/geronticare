@@ -7,15 +7,21 @@ import { verificarOwnershipPaciente } from '../ownership';
 import { urlHttpSchema } from '@/lib/validations/url';
 import { extrairContextoChaveAnexo } from '@/lib/storage/s3';
 import { storageConfigurado } from '@/lib/storage';
+import {
+  finalizarReferenciasAnexo,
+  ObjetosAnexoAusentesError,
+} from '@/lib/storage/coordenacao';
 import { temPermissao } from '../autorizacao';
 
+const MAX_ANEXOS_POR_REGISTRO = 50;
+
 const anexoSchema = z.object({
-  nome: z.string(),
+  nome: z.string().min(1).max(255),
   // SEGURANÇA: http/https apenas — `z.string().url()` aceita javascript:/file:
   url: urlHttpSchema.optional(),
   // Novos anexos clínicos persistem a chave privada e usam download-url para leitura.
   chave: z.string().min(1).max(1024).optional(),
-  tipo: z.string(),
+  tipo: z.string().min(1).max(255),
 }).refine(
   ({ url, chave }) => (url !== undefined) !== (chave !== undefined),
   { message: 'Anexo deve informar URL legada ou chave privada, mas não ambas' },
@@ -56,7 +62,6 @@ const anexoNovoSchema = z.object({
   tamanhoBytes: z.number().int().positive().max(50 * 1024 * 1024),
 });
 
-const MAX_ANEXOS_POR_REGISTRO = 50;
 const tipoRegistroSchema = z.enum(['evolucao', 'prescricao', 'exame', 'intercorrencia']);
 
 export const registrosRouter = createTRPCRouter({
@@ -195,23 +200,30 @@ export const registrosRouter = createTRPCRouter({
         titulo: z.string().min(3),
         conteudo: z.string().min(1),
         dataRegistro: z.coerce.date().optional(),
-        anexos: z.array(anexoSchema).optional(),
+        anexos: z.array(anexoSchema).max(MAX_ANEXOS_POR_REGISTRO).optional(),
         // Anexos novos (tabela dedicada) — a chave é gerada pelo upload-url.
         anexosNovos: z.array(anexoNovoSchema).max(MAX_ANEXOS_POR_REGISTRO).optional(),
-      })
+      }).refine(
+        ({ anexos, anexosNovos }) =>
+          (anexos?.length ?? 0) + (anexosNovos?.length ?? 0)
+          <= MAX_ANEXOS_POR_REGISTRO,
+        { message: `Limite de ${MAX_ANEXOS_POR_REGISTRO} anexos por registro` },
+      )
     )
     .mutation(async ({ ctx, input }) => {
       await verificarOwnershipPaciente(ctx.db, input.pacienteId, ctx.instituicaoId);
 
       const { anexosNovos = [], ...dadosRegistro } = input;
+      const chavesNovas = anexosNovos.map((anexo) => anexo.chave);
+      const chavesLegadas = (dadosRegistro.anexos ?? []).flatMap((anexo) =>
+        anexo.chave ? [anexo.chave] : []);
+      const chavesPrivadas = [...chavesNovas, ...chavesLegadas];
 
-      if (anexosNovos.length > 0 && !temPermissao(ctx.permissoes, 'anexo:criar')) {
+      if (chavesPrivadas.length > 0 && !temPermissao(ctx.permissoes, 'anexo:criar')) {
         throw new TRPCError({ code: 'FORBIDDEN' });
       }
 
-      // SEGURANÇA: não persiste metadados de anexo sem storage configurado —
-      // evita "anexo fantasma" (metadado sem objeto) com chave forjada.
-      if (anexosNovos.length > 0 && !storageConfigurado()) {
+      if (chavesPrivadas.length > 0 && !storageConfigurado()) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'Storage de anexos não configurado',
@@ -229,34 +241,49 @@ export const registrosRouter = createTRPCRouter({
         pacienteId: input.pacienteId,
       });
 
-      // Registro + metadados de anexos na mesma transação — falha reverte tudo.
-      // ADR 0001: a mutation devolve só `{ id }` — nunca ecoa a linha.
-      return ctx.db.transaction(async (tx) => {
-        const [novoRegistro] = await tx
-          .insert(registros)
-          .values({
-            ...dadosRegistro,
-            profissionalId: ctx.userId,
-          })
-          .returning({ id: registros.id });
+      try {
+        return await finalizarReferenciasAnexo(
+          ctx.db,
+          {
+            chavesBloqueadas: chavesPrivadas,
+            chavesObrigatorias: chavesPrivadas,
+          },
+          async (transaction) => {
+            const [novoRegistro] = await transaction
+              .insert(registros)
+              .values({
+                ...dadosRegistro,
+                profissionalId: ctx.userId,
+              })
+              .returning({ id: registros.id });
 
-        if (anexosNovos.length > 0) {
-          await tx.insert(anexos).values(
-            anexosNovos.map((anexo) => ({
-              instituicaoId: ctx.instituicaoId,
-              pacienteId: input.pacienteId,
-              registroId: novoRegistro.id,
-              criadoPorId: ctx.userId,
-              chave: anexo.chave,
-              nome: anexo.nome,
-              tipo: anexo.tipo,
-              tamanhoBytes: anexo.tamanhoBytes,
-            })),
-          );
+            if (anexosNovos.length > 0) {
+              await transaction.insert(anexos).values(
+                anexosNovos.map((anexo) => ({
+                  instituicaoId: ctx.instituicaoId,
+                  pacienteId: input.pacienteId,
+                  registroId: novoRegistro.id,
+                  criadoPorId: ctx.userId,
+                  chave: anexo.chave,
+                  nome: anexo.nome,
+                  tipo: anexo.tipo,
+                  tamanhoBytes: anexo.tamanhoBytes,
+                })),
+              );
+            }
+
+            return novoRegistro;
+          },
+        );
+      } catch (error) {
+        if (error instanceof ObjetosAnexoAusentesError) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Arquivo de anexo não encontrado no storage',
+          });
         }
-
-        return novoRegistro;
-      });
+        throw error;
+      }
     }),
 
   timeline: readClinicalProcedure

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { authSecretValido, authUrlValida } from './env';
+import { authSecretValido, authUrlValida, storageDriverPadrao } from './env';
 
 describe('AUTH_URL validation', () => {
   it('accepts local HTTP during development', () => {
@@ -30,5 +30,22 @@ describe('AUTH_SECRET validation', () => {
 
   it('keeps local development fixtures compatible', () => {
     expect(authSecretValido('dev-secret', 'development')).toBe(true);
+  });
+});
+
+describe('storage driver fallback', () => {
+  it('preserva S3 quando credenciais legadas usam o bucket padrão', () => {
+    expect(storageDriverPadrao({
+      S3_ACCESS_KEY_ID: 'access-key',
+      S3_SECRET_ACCESS_KEY: 'secret-key',
+    })).toBe('s3');
+  });
+
+  it('usa local quando as credenciais S3 não estão completas', () => {
+    expect(storageDriverPadrao({
+      S3_ACCESS_KEY_ID: 'access-key',
+      S3_SECRET_ACCESS_KEY: '',
+      S3_BUCKET: 'geronticare-anexos',
+    })).toBe('local');
   });
 });

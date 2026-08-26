@@ -1,0 +1,46 @@
+ts	phase	decision	why	evidence	result
+2026-08-26T15:22:55Z	frame	port PR 60 behavior onto merged main instead of merging its branch	the old branch conflicts with the records API delivered by PR 65	PR 60, PR 65	open
+2026-08-26T15:22:55Z	design	use one coordination module for finalization and orphan removal	the lock, physical-object check, and reference check form one transaction protocol	architect candidates A and B, cross-judge verdict	chosen
+2026-08-26T15:22:55Z	design	preserve dadosRegistro, tenant validation, and paginated listing	these are newer guarantees from PR 65	lib/trpc/routers/registros.ts	required
+2026-08-26T15:23:46Z	harness	add the legacy S3 fallback tests before implementation	the fallback must be observable without loading global process state	lib/env.test.ts	awaiting red run
+2026-08-26T15:24:21Z	harness	confirmed that both fallback tests fail before implementation	the exported fallback function does not exist	commit 4b5c4df	VERIFIED RED
+2026-08-26T15:24:53Z	config	infer S3 only from complete legacy credentials and keep explicit driver precedence	incomplete credentials must remain local	lib/env.ts	awaiting green run
+2026-08-26T15:25:30Z	config	verified legacy S3 fallback	the pure fallback tests cover complete and incomplete credentials	commit 2060d2f	VERIFIED
+2026-08-26T15:26:19Z	harness	add physical probes, paginated S3 listing, and dotted-name tests	absence and infrastructure failure need different outcomes	lib/storage/local.existence.test.ts, lib/storage/s3.test.ts	awaiting red run
+2026-08-26T15:27:05Z	harness	confirmed seven storage boundary failures before implementation	the probes and structural key validation do not exist	commit 0f4643f	VERIFIED RED
+2026-08-26T15:27:47Z	storage	add one structural key validator plus local and S3 probes	a dotted filename is valid while dot path segments are not	lib/storage/local.ts, lib/storage/s3.ts, lib/storage/index.ts	awaiting green run
+2026-08-26T15:28:15Z	harness	rejected the first probe result	the local test mock omitted the new shared key validator	lib/storage/local.existence.test.ts	INCONCLUSIVE
+2026-08-26T15:28:27Z	harness	add the key validator to the isolated local test mock	the test must reach stat before it can measure error handling	lib/storage/local.existence.test.ts	awaiting rerun
+2026-08-26T15:28:53Z	storage	verified physical probes, S3 listing, and structural key validation	the corrected tests exercise absence and propagated failures	commit 1906075	VERIFIED
+2026-08-26T15:29:40Z	harness	add protocol tests for finalization, orphan removal, and lock order	the shared transaction invariant needs one direct proof	lib/storage/coordenacao.test.ts, lib/storage/lock.test.ts	awaiting red run
+2026-08-26T15:30:08Z	harness	confirmed all six coordination tests fail before implementation	the coordination and lock modules do not exist	commit e2c6d1f	VERIFIED RED
+2026-08-26T15:30:43Z	coordination	centralize lock, physical check, and reference recheck in one transaction	callers must not be able to reorder the protocol	lib/storage/coordenacao.ts, lib/storage/lock.ts	awaiting green run
+2026-08-26T15:31:20Z	coordination	verified finalization, current and legacy reference checks, removal, and lock order	the protocol tests exercise every result state	commit 5edbb7a	VERIFIED
+2026-08-26T15:32:30Z	harness	add router tests for missing objects and legacy JSON references	the port must preserve the PR 65 input split while using coordination	lib/trpc/routers/anexos.integration.test.ts	awaiting red run
+2026-08-26T15:32:55Z	harness	confirmed both finalization routes accept missing physical objects	the routers do not call the coordination boundary	commit 81c2d16	VERIFIED RED
+2026-08-26T15:33:42Z	finalization	move both metadata writes behind the coordination protocol	the routers retain RBAC and tenant checks while the domain module owns transaction order	lib/trpc/routers/anexos.ts, lib/trpc/routers/registros.ts	awaiting green run
+2026-08-26T15:34:18Z	finalization	verified missing-object rejection, legacy JSON persistence, and paginated records regression	the focused integration suite covers both routers and the coordination boundary	commit 378d533	VERIFIED
+2026-08-26T15:35:12Z	harness	add legacy-reference and paginated S3 cleanup tests	cleanup must enumerate candidates but delegate the atomic removal decision	lib/storage/limpeza.test.ts, lib/storage/limpeza.s3.test.ts	awaiting red run
+2026-08-26T15:35:39Z	harness	confirmed local cleanup deletes a legacy reference and S3 cleanup is absent	the current job checks only the dedicated table	commit 90b5a21	VERIFIED RED
+2026-08-26T15:36:13Z	cleanup	delegate per-object removal to coordination and add paginated S3 enumeration	TTL selects candidates while the coordination boundary owns the final decision	lib/storage/limpeza.ts, scripts/limpar-orfaos.ts	awaiting green run
+2026-08-26T15:36:53Z	cleanup	verified local legacy preservation and paginated S3 cleanup	the focused suite covers TTL, pagination, dispatcher, and coordinated outcomes	commit fa824da	VERIFIED
+2026-08-26T15:37:47Z	verify	ran full tests and production build after the semantic port	all 326 tests and the webpack build passed	commit fa824da	VERIFIED
+2026-08-26T16:15:18Z	review	expand coordination to direct removal and private legacy keys	four reviewers found paths that could still create ghost references	adversarial review of origin/main...HEAD	act on
+2026-08-26T16:15:18Z	review	keep cleanup fail-fast and defer a GIN index	destructive jobs should stop on infrastructure errors and the legacy scan runs only after an indexed miss	lib/storage/coordenacao.ts, lib/storage/limpeza.ts	noted
+2026-08-26T16:15:18Z	harness	add tests for coordinated direct removal, legacy RBAC and existence, local delete errors, protocol order, and S3 404 identity	the review findings need executable regression proof	lib/storage and lib/trpc/routers/anexos.integration.test.ts	awaiting red run
+2026-08-26T16:16:16Z	harness	confirmed seven adversarial regressions before fixes	direct removal, private legacy keys, local deletion, and S3 error identity violate the target invariants	commit d2c5765	VERIFIED RED
+2026-08-26T16:17:43Z	hardening	coordinate direct removal and apply one policy to every private key	all managed attachment references need permission, storage, existence, and bounded cardinality	lib/storage, lib/trpc/routers	awaiting green run
+2026-08-26T16:18:16Z	hardening	verified all seven adversarial regressions	the focused suite covers direct removal, legacy policy, error identity, and protocol order	commit 65d554b	VERIFIED
+2026-08-26T16:19:01Z	verify	run S3 cleanup through the real coordination module and cover positive local probes	the destructive path should not be proven through a mocked coordinator	lib/storage/limpeza.s3.test.ts, lib/storage/local.existence.test.ts	awaiting rerun
+2026-08-26T16:19:36Z	verify	verified S3 cleanup through coordination and positive local probes	the stronger destructive-path suite passed	commit ed44cf7	VERIFIED
+2026-08-26T16:19:48Z	verify	rejected the parallel standalone type-check result	the build replaced .next/types while tsc was reading it	terminal output	INCONCLUSIVE
+2026-08-26T16:20:48Z	verify	verified the final branch with 332 tests, production build, type-check, and lint	the checks ran against the final artifact after the build	commit ed44cf7	VERIFIED
+2026-08-26T16:20:48Z	verify	could not run a two-connection PostgreSQL contention test	no DATABASE_URL or container runtime is available in this environment	environment check	open
+2026-08-26T16:29:23Z	audit	reject physical deletion inside the metadata transaction	object storage cannot roll back if the database commit fails	lib/trpc/routers/anexos.ts, lib/storage/coordenacao.ts	act on
+2026-08-26T16:29:23Z	audit	keep S3 fallback based on access key and secret	the bucket has a documented default; the trail must not call it an independently required credential	lib/env.ts	clarify
+2026-08-26T16:29:23Z	audit	record legacy input bounds as an intentional contract change	private keys now share the same size and count policy as dedicated attachments	lib/trpc/routers/registros.ts	accepted
+2026-08-26T16:29:23Z	harness	require direct removal to leave physical deletion to coordinated cleanup	the test must fail while the router still deletes storage in the transaction	lib/storage/coordenacao.test.ts, lib/trpc/routers/anexos.integration.test.ts	awaiting red run
+2026-08-26T16:30:04Z	harness	confirmed direct removal still attempts physical deletion inside the transaction	the metadata route calls the storage dispatcher before commit	commit c9a6638	VERIFIED RED
+2026-08-26T16:31:10Z	removal	delete only the metadata reference under lock and defer the object to cleanup	this avoids an irreversible storage delete before a fallible database commit	lib/storage/coordenacao.ts, lib/trpc/routers/anexos.ts	awaiting green run
+2026-08-26T16:31:38Z	removal	verified direct removal leaves physical deletion to cleanup	the coordinated metadata transaction no longer performs irreversible storage I/O	commit 4bce7ed	VERIFIED
+2026-08-26T16:32:55Z	verify	reran 332 tests, production build, type-check, and lint sequentially	the sequential run avoids the earlier .next types race	/opt/cursor/artifacts/pr60_port_validation.log	VERIFIED

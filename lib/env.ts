@@ -37,6 +37,14 @@ function optionalVar(key: string, fallback: string | (() => string)): () => stri
   return () => process.env[key] || (typeof fallback === 'function' ? fallback() : fallback);
 }
 
+export function storageDriverPadrao(
+  variables: Record<string, string | undefined> = process.env,
+): 'local' | 's3' {
+  return variables.S3_ACCESS_KEY_ID && variables.S3_SECRET_ACCESS_KEY
+    ? 's3'
+    : 'local';
+}
+
 export function authUrlValida(
   value: string | undefined,
   nodeEnv = process.env.NODE_ENV,
@@ -103,7 +111,7 @@ export const env = defineEnv({
   NEXT_PUBLIC_APP_URL: optionalVar('NEXT_PUBLIC_APP_URL', 'http://localhost:3000'),
 
   // Storage de anexos: 'local' (default, zero-config), 's3' (S3-compatible) ou 'none'.
-  STORAGE_DRIVER: optionalVar('STORAGE_DRIVER', 'local'),
+  STORAGE_DRIVER: optionalVar('STORAGE_DRIVER', () => storageDriverPadrao()),
   // CLI define GERONTICARE_HOME fora do diretório descartável da release.
   STORAGE_LOCAL_DIR: optionalVar(
     'STORAGE_LOCAL_DIR',

@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile, unlink, readFile, link, readdir } from 'node:fs/promises';
+import { mkdir, writeFile, unlink, readFile, link, readdir, stat } from 'node:fs/promises';
 import { join, resolve, sep, relative } from 'node:path';
 import { env } from '@/lib/env';
-import { sanitizarNomeArquivo } from './s3';
+import { chaveStorageValida, sanitizarNomeArquivo } from './s3';
 
 // Limite de defesa no servidor; cada rota pode aplicar um limite mais baixo.
 export const TAMANHO_MAXIMO_UPLOAD_BYTES = 50 * 1024 * 1024;
@@ -48,8 +48,7 @@ export function gerarChaveAnexoLocal(
 
 /** Converte uma chave de anexo em caminho absoluto seguro dentro do diretório local. */
 export function caminhoDaChave(chave: string): string {
-  // SEGURANÇA: path traversal — só aceita chaves no formato gerado pelo app.
-  if (!chave || chave.includes('..') || chave.startsWith('/') || chave.includes('\\')) {
+  if (!chaveStorageValida(chave)) {
     throw new Error('Chave de armazenamento inválida');
   }
   const base = diretorioLocal();
@@ -110,10 +109,38 @@ export async function lerAnexoLocal(chave: string): Promise<Buffer> {
   return readFile(caminho);
 }
 
+export async function anexoExisteLocal(chave: string): Promise<boolean> {
+  try {
+    return (await stat(caminhoDaChave(chave))).isFile();
+  } catch (error) {
+    if (
+      typeof error === 'object'
+      && error !== null
+      && 'code' in error
+      && (error.code === 'ENOENT' || error.code === 'ENOTDIR')
+    ) {
+      return false;
+    }
+    throw error;
+  }
+}
+
 /** Remove um anexo local do disco (não falha se já não existir). */
 export async function removerAnexoLocal(chave: string): Promise<void> {
   const caminho = caminhoDaChave(chave);
-  await unlink(caminho).catch(() => {});
+  try {
+    await unlink(caminho);
+  } catch (error) {
+    if (
+      typeof error === 'object'
+      && error !== null
+      && 'code' in error
+      && error.code === 'ENOENT'
+    ) {
+      return;
+    }
+    throw error;
+  }
 }
 
 /**
