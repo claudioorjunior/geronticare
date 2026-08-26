@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { createTRPCRouter, readClinicalProcedure, clinicalProcedure } from '../server';
 import { registros, anexos, agas, sinaisVitais, usuarios } from '@/lib/db/schema';
-import { eq, and, gte, lte, inArray } from 'drizzle-orm';
+import { eq, and, gte, lte, inArray, count } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { verificarOwnershipPaciente } from '../ownership';
 import { urlHttpSchema } from '@/lib/validations/url';
@@ -67,35 +67,89 @@ export const registrosRouter = createTRPCRouter({
         tipo: z.enum(['evolucao', 'prescricao', 'exame', 'intercorrencia']).optional(),
         dataInicio: z.coerce.date().optional(),
         dataFim: z.coerce.date().optional(),
-        limit: z.number().int().min(1).max(200).default(100),
+        limit: z.number().int().min(1).max(100).default(25),
+        offset: z.number().int().min(0).max(10_000).default(0),
       })
     )
     .query(async ({ ctx, input }) => {
-      const { pacienteId, especialidade, tipo, dataInicio, dataFim, limit } = input;
+      const { pacienteId, especialidade, tipo, dataInicio, dataFim, limit, offset } = input;
 
       await verificarOwnershipPaciente(ctx.db, pacienteId, ctx.instituicaoId);
 
-      const condicoes = [
+      const condicoesBase = [
         eq(registros.pacienteId, pacienteId),
       ];
 
-      if (especialidade) condicoes.push(eq(registros.especialidade, especialidade));
-      if (tipo) condicoes.push(eq(registros.tipo, tipo));
-      if (dataInicio) condicoes.push(gte(registros.dataRegistro, dataInicio));
-      if (dataFim) condicoes.push(lte(registros.dataRegistro, dataFim));
+      if (especialidade) condicoesBase.push(eq(registros.especialidade, especialidade));
+      if (dataInicio) condicoesBase.push(gte(registros.dataRegistro, dataInicio));
+      if (dataFim) condicoesBase.push(lte(registros.dataRegistro, dataFim));
 
-      const registrosList = await ctx.db.query.registros.findMany({
-        where: and(...condicoes),
-        orderBy: (registros, { desc }) => [desc(registros.dataRegistro)],
-        limit,
-        with: {
-          anexos: {
-            columns: { id: true, chave: true, nome: true, tipo: true, tamanhoBytes: true, createdAt: true },
+      const condicoesLista = tipo
+        ? [...condicoesBase, eq(registros.tipo, tipo)]
+        : condicoesBase;
+
+      const [registrosList, totaisRows] = await Promise.all([
+        ctx.db.query.registros.findMany({
+          where: and(...condicoesLista),
+          orderBy: (registros, { desc }) => [desc(registros.dataRegistro)],
+          limit,
+          offset,
+          with: {
+            anexos: {
+              columns: { id: true, chave: true, nome: true, tipo: true, tamanhoBytes: true, createdAt: true },
+            },
           },
-        },
-      });
+        }),
+        ctx.db
+          .select({ tipo: registros.tipo, value: count() })
+          .from(registros)
+          .where(and(...condicoesBase))
+          .groupBy(registros.tipo),
+      ]);
 
-      return registrosList;
+      const profissionalIds = [...new Set(registrosList.map((registro) => registro.profissionalId))];
+      const profissionais = profissionalIds.length > 0
+        ? await ctx.db.query.usuarios.findMany({
+            where: and(
+              inArray(usuarios.id, profissionalIds),
+              eq(usuarios.instituicaoId, ctx.instituicaoId),
+            ),
+            columns: { id: true, nome: true },
+          })
+        : [];
+      const profissionalPorId = new Map(
+        profissionais.map((profissional) => [profissional.id, profissional.nome]),
+      );
+
+      const totaisPorTipo = {
+        evolucao: 0,
+        prescricao: 0,
+        exame: 0,
+        intercorrencia: 0,
+      };
+      for (const row of totaisRows) {
+        totaisPorTipo[row.tipo] = Number(row.value);
+      }
+      const total = Object.values(totaisPorTipo).reduce((soma, value) => soma + value, 0);
+      const totalFiltrado = tipo ? totaisPorTipo[tipo] : total;
+
+      return {
+        items: registrosList.map((registro) => ({
+          ...registro,
+          profissional: profissionalPorId.get(registro.profissionalId) ?? 'Desconhecido',
+        })),
+        totals: {
+          total,
+          ...totaisPorTipo,
+        },
+        pagination: {
+          offset,
+          limit,
+          total: totalFiltrado,
+          hasPrevious: offset > 0,
+          hasNext: offset + registrosList.length < totalFiltrado,
+        },
+      };
     }),
 
   buscar: readClinicalProcedure
