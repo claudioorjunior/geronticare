@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   stat: vi.fn(),
+  unlink: vi.fn(),
 }));
 
 vi.mock('node:fs/promises', async (importOriginal) => ({
   ...(await importOriginal<typeof import('node:fs/promises')>()),
   stat: mocks.stat,
+  unlink: mocks.unlink,
 }));
 
 vi.mock('@/lib/env', () => ({
@@ -40,5 +42,17 @@ describe('existência de anexos locais', () => {
     mocks.stat.mockRejectedValueOnce(erro);
 
     await expect(anexoExisteLocal(chave)).rejects.toBe(erro);
+  });
+
+  it('ignora ausência ao remover e propaga falhas operacionais', async () => {
+    const { removerAnexoLocal } = await import('./local');
+    mocks.unlink.mockRejectedValueOnce(Object.assign(new Error('Não encontrado'), {
+      code: 'ENOENT',
+    }));
+    await expect(removerAnexoLocal(chave)).resolves.toBeUndefined();
+
+    const erro = Object.assign(new Error('Permissão negada'), { code: 'EACCES' });
+    mocks.unlink.mockRejectedValueOnce(erro);
+    await expect(removerAnexoLocal(chave)).rejects.toBe(erro);
   });
 });

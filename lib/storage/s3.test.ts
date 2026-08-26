@@ -144,6 +144,13 @@ describe('S3 upload capability', () => {
     });
     mocks.send.mockRejectedValueOnce(indisponivel);
     await expect(anexoExisteS3(chave)).rejects.toBe(indisponivel);
+
+    const bucketAusente = {
+      name: 'NoSuchBucket',
+      $metadata: { httpStatusCode: 404 },
+    };
+    mocks.send.mockRejectedValueOnce(bucketAusente);
+    await expect(anexoExisteS3(chave)).rejects.toBe(bucketAusente);
   });
 
   it('lista objetos de anexos por página', async () => {
@@ -164,6 +171,18 @@ describe('S3 upload capability', () => {
       Prefix: 'instituicoes/',
       ContinuationToken: undefined,
     });
+  });
+
+  it('rejeita resposta truncada sem token de continuação', async () => {
+    const { listarObjetosAnexosS3 } = await import('./s3');
+    mocks.send.mockResolvedValueOnce({
+      Contents: [],
+      IsTruncated: true,
+    });
+
+    await expect(listarObjetosAnexosS3()).rejects.toThrow(
+      'Resposta S3 truncada sem token de continuação',
+    );
   });
 
   it('aceita nomes com pontos consecutivos na URL de download', async () => {

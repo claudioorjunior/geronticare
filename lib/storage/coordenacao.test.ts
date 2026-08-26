@@ -21,20 +21,22 @@ function criarDb({
   referenciaAtual?: boolean;
   referenciaLegada?: boolean;
 } = {}) {
+  const findAnexo = vi.fn(async () => referenciaAtual ? { id: 'anexo-1' } : null);
+  const findRegistro = vi.fn(async () => referenciaLegada ? { id: 'registro-1' } : null);
   const tx = {
     query: {
       anexos: {
-        findFirst: vi.fn(async () => referenciaAtual ? { id: 'anexo-1' } : null),
+        findFirst: findAnexo,
       },
       registros: {
-        findFirst: vi.fn(async () => referenciaLegada ? { id: 'registro-1' } : null),
+        findFirst: findRegistro,
       },
     },
   } as unknown as Db;
   const db = {
     transaction: vi.fn(async (callback: (transaction: Db) => Promise<unknown>) => callback(tx)),
   } as unknown as Db;
-  return { db, tx };
+  return { db, tx, findAnexo, findRegistro };
 }
 
 describe('coordenação de anexos', () => {
@@ -61,6 +63,12 @@ describe('coordenação de anexos', () => {
     expect(mocks.objetoExiste).toHaveBeenCalledTimes(1);
     expect(mocks.objetoExiste).toHaveBeenCalledWith('novo');
     expect(persistir).toHaveBeenCalledWith(tx);
+    expect(mocks.bloquearChavesAnexo.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.objetoExiste.mock.invocationCallOrder[0],
+    );
+    expect(mocks.objetoExiste.mock.invocationCallOrder[0]).toBeLessThan(
+      persistir.mock.invocationCallOrder[0],
+    );
   });
 
   it('não persiste referências quando um objeto obrigatório está ausente', async () => {
@@ -84,14 +92,14 @@ describe('coordenação de anexos', () => {
   });
 
   it('preserva o objeto quando existe uma referência atual', async () => {
-    const { db, tx } = criarDb({ referenciaAtual: true });
+    const { db, findRegistro } = criarDb({ referenciaAtual: true });
     const removerFisicamente = vi.fn();
     const { removerObjetoSeOrfao } = await import('./coordenacao');
 
     await expect(
       removerObjetoSeOrfao(db, 'chave', removerFisicamente),
     ).resolves.toBe('referenciado');
-    expect(tx.query.registros.findFirst).not.toHaveBeenCalled();
+    expect(findRegistro).not.toHaveBeenCalled();
     expect(removerFisicamente).not.toHaveBeenCalled();
   });
 
@@ -107,7 +115,7 @@ describe('coordenação de anexos', () => {
   });
 
   it('remove o objeto sem referência atual ou legada', async () => {
-    const { db } = criarDb();
+    const { db, findAnexo, findRegistro } = criarDb();
     const removerFisicamente = vi.fn();
     const { removerObjetoSeOrfao } = await import('./coordenacao');
 
@@ -115,5 +123,33 @@ describe('coordenação de anexos', () => {
       removerObjetoSeOrfao(db, 'chave', removerFisicamente),
     ).resolves.toBe('removido');
     expect(removerFisicamente).toHaveBeenCalledWith('chave');
+    expect(mocks.bloquearChavesAnexo.mock.invocationCallOrder[0]).toBeLessThan(
+      findAnexo.mock.invocationCallOrder[0],
+    );
+    expect(findAnexo.mock.invocationCallOrder[0]).toBeLessThan(
+      findRegistro.mock.invocationCallOrder[0],
+    );
+    expect(findRegistro.mock.invocationCallOrder[0]).toBeLessThan(
+      removerFisicamente.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('remove uma referência atual e preserva o objeto citado pelo legado', async () => {
+    const { db, tx, findRegistro } = criarDb({ referenciaLegada: true });
+    const removerReferencia = vi.fn();
+    const removerFisicamente = vi.fn();
+    const { removerReferenciaAnexo } = await import('./coordenacao');
+
+    await expect(removerReferenciaAnexo(
+      db,
+      'chave',
+      removerReferencia,
+      removerFisicamente,
+    )).resolves.toBe('referenciado');
+    expect(removerReferencia).toHaveBeenCalledWith(tx);
+    expect(removerFisicamente).not.toHaveBeenCalled();
+    expect(removerReferencia.mock.invocationCallOrder[0]).toBeLessThan(
+      findRegistro.mock.invocationCallOrder[0],
+    );
   });
 });

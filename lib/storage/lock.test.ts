@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('drizzle-orm', () => ({
-  sql: (_strings: TemplateStringsArray, ...values: unknown[]) => ({ values }),
+  sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({
+    text: strings.join('?'),
+    values,
+  }),
 }));
 
 describe('bloquearChavesAnexo', () => {
@@ -16,5 +19,8 @@ describe('bloquearChavesAnexo', () => {
       ['m'],
       ['z'],
     ]);
+    expect(execute.mock.calls[0][0].text).toContain(
+      'pg_advisory_xact_lock(hashtextextended(?, 0))',
+    );
   });
 });
