@@ -5,3 +5,5 @@ ts	phase	decision	why	evidence	result
 2026-08-26T15:23:46Z	harness	add the legacy S3 fallback tests before implementation	the fallback must be observable without loading global process state	lib/env.test.ts	awaiting red run
 2026-08-26T15:24:21Z	harness	confirmed that both fallback tests fail before implementation	the exported fallback function does not exist	commit 4b5c4df	VERIFIED RED
 2026-08-26T15:24:53Z	config	infer S3 only from complete legacy credentials and keep explicit driver precedence	incomplete credentials must remain local	lib/env.ts	awaiting green run
+2026-08-26T15:25:30Z	config	verified legacy S3 fallback	the pure fallback tests cover complete and incomplete credentials	commit 2060d2f	VERIFIED
+2026-08-26T15:26:19Z	harness	add physical probes, paginated S3 listing, and dotted-name tests	absence and infrastructure failure need different outcomes	lib/storage/local.existence.test.ts, lib/storage/s3.test.ts	awaiting red run

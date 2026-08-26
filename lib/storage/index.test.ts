@@ -92,6 +92,10 @@ describe('driver local', () => {
     expect(() => caminhoDaChave('instituicoes/..//escape')).toThrow(
       'Chave de armazenamento inválida',
     );
+    expect(() => caminhoDaChave(
+      'instituicoes/320471aa-5994-4886-9ee6-1cee8e7aa810/pacientes/' +
+      '420471aa-5994-4886-9ee6-1cee8e7aa810/resultado..final.pdf',
+    )).not.toThrow();
   });
 
   it('valida MIME e tamanho', async () => {
