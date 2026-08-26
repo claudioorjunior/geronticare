@@ -71,6 +71,22 @@ describe('integração anexos (PGlite real) — v0.6.0', () => {
       tipo: 'application/pdf',
       tamanhoBytes: 4096,
     });
+
+    const registrosListados = await caller.registros.listar({
+      pacienteId: PACIENTE,
+      limit: 1,
+    });
+    expect(registrosListados).toHaveLength(1);
+    expect(registrosListados[0]).toMatchObject({
+      id: registro.id,
+      anexos: [
+        expect.objectContaining({
+          chave,
+          nome: 'exame.pdf',
+          tamanhoBytes: 4096,
+        }),
+      ],
+    });
   });
 
   it('registros.criar sem anexos funciona normalmente', async () => {
