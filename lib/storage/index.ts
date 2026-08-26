@@ -26,4 +26,17 @@ export function driverAtivo(): StorageDriver {
   return 'none';
 }
 
+export async function objetoExiste(chave: string): Promise<boolean> {
+  const driver = driverAtivo();
+  if (driver === 'local') {
+    const { anexoExisteLocal } = await import('./local');
+    return anexoExisteLocal(chave);
+  }
+  if (driver === 's3') {
+    const { anexoExisteS3 } = await import('./s3');
+    return anexoExisteS3(chave);
+  }
+  return false;
+}
+
 export { TAMANHO_MAXIMO_UPLOAD_BYTES } from './s3';

@@ -3,6 +3,8 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
@@ -59,6 +61,13 @@ export function sanitizarNomeArquivo(nome: string): string {
   return nomeLimpo.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 200);
 }
 
+export function chaveStorageValida(chave: string): boolean {
+  if (!chave || chave.startsWith('/') || chave.includes('\\')) return false;
+  return chave.split('/').every((segmento) => (
+    segmento.length > 0 && segmento !== '.' && segmento !== '..'
+  ));
+}
+
 /**
  * Gera uma URL pré-assinada para upload direto do browser para o S3.
  * O cliente faz o PUT diretamente, sem passar pelo servidor.
@@ -101,7 +110,7 @@ export async function gerarUrlUpload(
  * A autorização do recurso deve ser feita antes desta função.
  */
 export async function gerarUrlDownload(chave: string): Promise<string> {
-  if (!chave || chave.includes('..') || chave.startsWith('/')) {
+  if (!chaveStorageValida(chave)) {
     throw new Error('Chave de armazenamento inválida');
   }
 
@@ -155,6 +164,47 @@ export async function removerAnexo(chave: string): Promise<void> {
     Key: chave,
   });
   await obterS3Client().send(comando);
+}
+
+export async function anexoExisteS3(chave: string): Promise<boolean> {
+  try {
+    await obterS3Client().send(new HeadObjectCommand({ Bucket: bucket, Key: chave }));
+    return true;
+  } catch (error) {
+    if (
+      typeof error === 'object'
+      && error !== null
+      && '$metadata' in error
+      && typeof error.$metadata === 'object'
+      && error.$metadata !== null
+      && 'httpStatusCode' in error.$metadata
+      && error.$metadata.httpStatusCode === 404
+    ) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+export async function listarObjetosAnexosS3(continuationToken?: string): Promise<{
+  objetos: Array<{ chave: string; atualizadoEm: Date | undefined }>;
+  proximaPagina?: string;
+}> {
+  const resposta = await obterS3Client().send(new ListObjectsV2Command({
+    Bucket: bucket,
+    Prefix: 'instituicoes/',
+    ContinuationToken: continuationToken,
+  }));
+
+  if (resposta.IsTruncated && !resposta.NextContinuationToken) {
+    throw new Error('Resposta S3 truncada sem token de continuação');
+  }
+
+  return {
+    objetos: (resposta.Contents ?? []).flatMap((objeto) =>
+      objeto.Key ? [{ chave: objeto.Key, atualizadoEm: objeto.LastModified }] : []),
+    proximaPagina: resposta.IsTruncated ? resposta.NextContinuationToken : undefined,
+  };
 }
 
 /**
