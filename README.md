@@ -209,9 +209,13 @@ npm run dev
 # Build and serve with PostgreSQL
 cp .env.production.example .env.production
 # fill in DATABASE_URL, AUTH_SECRET, AUTH_URL, S3_* vars
+npm run db:migrate
 npm run build
 npm run start
 ```
+
+Apply migrations before starting the new application version. Migration `0008`
+adds the dashboard layout column and indexes required by the redesigned UI.
 
 The process exposes `GET /api/health` as a cache-free liveness check for monitoring and load balancers.
 

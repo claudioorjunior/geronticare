@@ -621,7 +621,7 @@ function DashboardAdmin() {
             value={String(resumo.admissoesSemanais)}
             tone="deep"
             icon={<UserPlus className="h-4 w-4" />}
-            subtitle="Cadastros nos últimos 7 dias"
+            subtitle="Admissões nos últimos 7 dias"
           />
           <KpiCardV2
             label="Avaliações Pendentes"
