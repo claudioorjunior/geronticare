@@ -8,11 +8,12 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const publicAsset = /\.(?:svg|png|jpe?g|gif|webp|ico|woff2?)$/i.test(pathname);
   const sessionCookie =
     request.cookies.get('better-auth.session_token') ??
     request.cookies.get('__Secure-better-auth.session_token');
 
-  if (pathname === '/' || pathname === '/setup') {
+  if (publicAsset || pathname === '/' || pathname === '/setup') {
     return NextResponse.next();
   }
 
@@ -32,5 +33,7 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|api/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)',
+  ],
 };
